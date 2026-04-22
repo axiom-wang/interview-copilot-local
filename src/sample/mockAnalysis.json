@@ -1,0 +1,156 @@
+{
+  "snapshots": [
+    {
+      "minSegments": 1,
+      "phase": {
+        "phase": "problem-framing",
+        "confidence": 0.86,
+        "nextBestAction": "Lock the interview objective and agree on one target user before feature brainstorming.",
+        "reason": "The team is still defining scope, audience, and what success looks like."
+      },
+      "consensus": {
+        "consensus": [
+          "The discussion should stay structured because time is limited.",
+          "The team needs one clear audience before proposing a solution."
+        ],
+        "tensions": [
+          "There is not yet a shared view on the highest-priority user problem."
+        ],
+        "missing": [
+          "A single evaluation metric for the final recommendation."
+        ]
+      },
+      "hints": {
+        "functionType": "Framing and structure",
+        "hint15s": "Suggest a simple structure: goal, target user, pain point, solution, metric.",
+        "hint30s": "Propose selecting one primary user group first so later ideas stay comparable.",
+        "hint60s": "Bridge the team by summarizing the goal, then invite quick votes on the target user and top pain point."
+      },
+      "mindMap": {
+        "topic": "Campus fitness app case",
+        "nodes": [
+          { "id": "root", "label": "Campus fitness app", "kind": "root", "x": 0, "y": 0 },
+          { "id": "scope", "label": "Case framing", "kind": "branch", "x": -220, "y": -80, "parentId": "root" },
+          { "id": "user", "label": "Target user", "kind": "branch", "x": 220, "y": -80, "parentId": "root" },
+          { "id": "goal", "label": "Success metric", "kind": "branch", "x": 0, "y": 170, "parentId": "root" }
+        ]
+      }
+    },
+    {
+      "minSegments": 5,
+      "phase": {
+        "phase": "option-divergence",
+        "confidence": 0.78,
+        "nextBestAction": "Compare the candidate pain points and choose the one with the strongest evidence and simplest MVP.",
+        "reason": "The team is exploring multiple solution directions around user pain and product value."
+      },
+      "consensus": {
+        "consensus": [
+          "On-campus students are the best initial audience.",
+          "The final answer should stay practical and measurable."
+        ],
+        "tensions": [
+          "The group is deciding whether discovery or accountability is the better entry problem."
+        ],
+        "missing": [
+          "A north-star metric that ties directly to user behavior.",
+          "A concise final-answer structure for speaking order."
+        ]
+      },
+      "hints": {
+        "functionType": "Option narrowing",
+        "hint15s": "Vote between the top pain points and explain the tradeoff in one sentence.",
+        "hint30s": "Recommend accountability as the wedge if the team values habit formation over feature breadth.",
+        "hint60s": "Close the divergence loop by comparing user need intensity, distribution ease, and MVP simplicity."
+      },
+      "mindMap": {
+        "topic": "Campus fitness app",
+        "nodes": [
+          { "id": "root", "label": "Campus fitness app", "kind": "root", "x": 0, "y": 0 },
+          { "id": "users", "label": "On-campus students", "kind": "branch", "x": -240, "y": -80, "parentId": "root" },
+          { "id": "problem", "label": "Habit adherence", "kind": "branch", "x": 220, "y": -80, "parentId": "root" },
+          { "id": "alt1", "label": "Class discovery", "kind": "leaf", "x": 120, "y": 130, "parentId": "problem" },
+          { "id": "alt2", "label": "Buddy accountability", "kind": "leaf", "x": 320, "y": 130, "parentId": "problem" },
+          { "id": "metric", "label": "North-star metric", "kind": "branch", "x": -40, "y": 200, "parentId": "root" }
+        ]
+      }
+    },
+    {
+      "minSegments": 8,
+      "phase": {
+        "phase": "alignment-building",
+        "confidence": 0.9,
+        "nextBestAction": "Turn the agreed logic into a clear speaking sequence and assign ownership for the final answer.",
+        "reason": "The conversation is consolidating around one audience, one core value proposition, and one metric."
+      },
+      "consensus": {
+        "consensus": [
+          "The launch should focus on students living on campus.",
+          "Buddy accountability is the best wedge for the MVP.",
+          "Shared recurring workouts are the behavioral outcome to optimize."
+        ],
+        "tensions": [
+          "The exact wording of the final metric and rollout plan still needs polishing."
+        ],
+        "missing": [
+          "A clear distribution plan and risk section for the final synthesis."
+        ]
+      },
+      "hints": {
+        "functionType": "Team alignment",
+        "hint15s": "Summarize the team's current answer in three bullets and propose speaker ownership.",
+        "hint30s": "Bridge to execution by naming the audience, core loop, metric, and rollout in one pass.",
+        "hint60s": "Help the team land the answer by converting agreement into a polished final narrative with speaker roles."
+      },
+      "mindMap": {
+        "topic": "Campus fitness app recommendation",
+        "nodes": [
+          { "id": "root", "label": "Recommendation", "kind": "root", "x": 0, "y": 0 },
+          { "id": "audience", "label": "On-campus students", "kind": "branch", "x": -260, "y": -60, "parentId": "root" },
+          { "id": "loop", "label": "Buddy accountability", "kind": "branch", "x": 0, "y": -120, "parentId": "root" },
+          { "id": "metric", "label": "Weekly shared workouts", "kind": "branch", "x": 250, "y": -60, "parentId": "root" },
+          { "id": "gtm", "label": "Campus ambassador launch", "kind": "branch", "x": -180, "y": 160, "parentId": "root" },
+          { "id": "risk", "label": "Retention drop after novelty", "kind": "branch", "x": 170, "y": 170, "parentId": "root" }
+        ]
+      }
+    },
+    {
+      "minSegments": 10,
+      "phase": {
+        "phase": "decision-lock",
+        "confidence": 0.93,
+        "nextBestAction": "Deliver the final recommendation crisply and keep the close focused on rollout and risks.",
+        "reason": "The group has reached stable alignment and is shifting into final-answer assembly."
+      },
+      "consensus": {
+        "consensus": [
+          "The answer is ready to be delivered with speaker role allocation.",
+          "The final output should cover market, product loop, go-to-market, and risk mitigation."
+        ],
+        "tensions": [
+          "Only minor wording differences remain on the final metric definition."
+        ],
+        "missing": [
+          "A concise concluding sentence that signals confidence and practicality."
+        ]
+      },
+      "hints": {
+        "functionType": "Final delivery",
+        "hint15s": "Offer a tight closing sentence that reinforces feasibility and user value.",
+        "hint30s": "Package the answer into target user, MVP loop, metric, and rollout with one risk callout.",
+        "hint60s": "Support the final delivery by sequencing speakers and adding one strong concluding recommendation."
+      },
+      "mindMap": {
+        "topic": "Final answer structure",
+        "nodes": [
+          { "id": "root", "label": "Final answer", "kind": "root", "x": 0, "y": 0 },
+          { "id": "market", "label": "Market and user", "kind": "branch", "x": -260, "y": -80, "parentId": "root" },
+          { "id": "product", "label": "Product loop", "kind": "branch", "x": 0, "y": -130, "parentId": "root" },
+          { "id": "metric", "label": "Metric", "kind": "branch", "x": 250, "y": -80, "parentId": "root" },
+          { "id": "rollout", "label": "Go-to-market", "kind": "branch", "x": -180, "y": 170, "parentId": "root" },
+          { "id": "risks", "label": "Risks and mitigation", "kind": "branch", "x": 170, "y": 170, "parentId": "root" }
+        ]
+      }
+    }
+  ]
+}

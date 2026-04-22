@@ -1,0 +1,72 @@
+[
+  {
+    "id": "mock-001",
+    "speaker": "Ava",
+    "text": "We have 25 minutes, so I'd like to align on the goal first: define a practical launch plan for a new campus fitness app.",
+    "relativeMs": 1200,
+    "isFinal": true
+  },
+  {
+    "id": "mock-002",
+    "speaker": "Ben",
+    "text": "If we treat this like a product case, maybe we should decide target users before we jump into features.",
+    "relativeMs": 3200,
+    "isFinal": true
+  },
+  {
+    "id": "mock-003",
+    "speaker": "Chloe",
+    "text": "I agree, and I think first-year students and busy office workers have very different motivations, so picking one audience matters.",
+    "relativeMs": 5200,
+    "isFinal": true
+  },
+  {
+    "id": "mock-004",
+    "speaker": "Daniel",
+    "text": "Let's optimize for students living on campus because distribution is cheaper and retention loops are easier to test.",
+    "relativeMs": 7600,
+    "isFinal": true
+  },
+  {
+    "id": "mock-005",
+    "speaker": "Ava",
+    "text": "Good, then the next question is what pain point wins: class discovery, accountability with friends, or habit tracking.",
+    "relativeMs": 9800,
+    "isFinal": true
+  },
+  {
+    "id": "mock-006",
+    "speaker": "Ben",
+    "text": "I would push accountability because students already know the gym exists, but they struggle to stick to a routine.",
+    "relativeMs": 12100,
+    "isFinal": true
+  },
+  {
+    "id": "mock-007",
+    "speaker": "Chloe",
+    "text": "That makes sense, though we still need one measurable north-star metric, maybe weekly active workout pairs.",
+    "relativeMs": 14500,
+    "isFinal": true
+  },
+  {
+    "id": "mock-008",
+    "speaker": "Daniel",
+    "text": "We are starting to converge: target is on-campus students, core value is buddy accountability, and metric is repeated shared sessions.",
+    "relativeMs": 17000,
+    "isFinal": true
+  },
+  {
+    "id": "mock-009",
+    "speaker": "Ava",
+    "text": "Before we close, let's divide the final answer into market, product loop, go-to-market, and risks so everyone can contribute.",
+    "relativeMs": 19600,
+    "isFinal": true
+  },
+  {
+    "id": "mock-010",
+    "speaker": "Ben",
+    "text": "I'll summarize the recommendation and Chloe can cover the metric logic, then Daniel can outline rollout risks.",
+    "relativeMs": 21900,
+    "isFinal": true
+  }
+]

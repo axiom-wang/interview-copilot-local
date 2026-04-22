@@ -1,0 +1,1125 @@
+{
+  "nested": {
+    "data": {
+      "nested": {
+        "speech": {
+          "nested": {
+            "ast": {
+              "nested": {
+                "ReqParams": {
+                  "fields": {
+                    "mode": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "sourceLanguage": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "targetLanguage": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "speakerId": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "corpus": {
+                      "type": "understanding.Corpus",
+                      "id": 100
+                    }
+                  }
+                },
+                "TranslateRequest": {
+                  "oneofs": {
+                    "_requestMeta": {
+                      "oneof": [
+                        "requestMeta"
+                      ]
+                    },
+                    "_denoise": {
+                      "oneof": [
+                        "denoise"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "requestMeta": {
+                      "type": "common.RequestMeta",
+                      "id": 1,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "event": {
+                      "type": "event.Type",
+                      "id": 2
+                    },
+                    "user": {
+                      "type": "understanding.User",
+                      "id": 3
+                    },
+                    "sourceAudio": {
+                      "type": "understanding.Audio",
+                      "id": 4
+                    },
+                    "targetAudio": {
+                      "type": "understanding.Audio",
+                      "id": 5
+                    },
+                    "request": {
+                      "type": "ReqParams",
+                      "id": 6
+                    },
+                    "denoise": {
+                      "type": "bool",
+                      "id": 7,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    }
+                  }
+                },
+                "TranslateResponse": {
+                  "oneofs": {
+                    "_responseMeta": {
+                      "oneof": [
+                        "responseMeta"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "responseMeta": {
+                      "type": "common.ResponseMeta",
+                      "id": 1,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "event": {
+                      "type": "event.Type",
+                      "id": 2
+                    },
+                    "data": {
+                      "type": "bytes",
+                      "id": 3
+                    },
+                    "text": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "startTime": {
+                      "type": "int32",
+                      "id": 5
+                    },
+                    "endTime": {
+                      "type": "int32",
+                      "id": 6
+                    },
+                    "spkChg": {
+                      "type": "bool",
+                      "id": 7
+                    },
+                    "mutedDurationMs": {
+                      "type": "int32",
+                      "id": 8
+                    }
+                  }
+                },
+                "ASTService": {
+                  "methods": {
+                    "Translate": {
+                      "requestType": "TranslateRequest",
+                      "requestStream": true,
+                      "responseType": "TranslateResponse",
+                      "responseStream": true
+                    }
+                  }
+                }
+              }
+            },
+            "event": {
+              "nested": {
+                "Type": {
+                  "options": {
+                    "allow_alias": true
+                  },
+                  "values": {
+                    "None": 0,
+                    "StartConnection": 1,
+                    "StartTask": 1,
+                    "FinishConnection": 2,
+                    "FinishTask": 2,
+                    "ConnectionStarted": 50,
+                    "TaskStarted": 50,
+                    "ConnectionFailed": 51,
+                    "TaskFailed": 51,
+                    "ConnectionFinished": 52,
+                    "TaskFinished": 52,
+                    "StartSession": 100,
+                    "CancelSession": 101,
+                    "FinishSession": 102,
+                    "SessionStarted": 150,
+                    "SessionCanceled": 151,
+                    "SessionFinished": 152,
+                    "SessionFailed": 153,
+                    "UsageResponse": 154,
+                    "ChargeData": 154,
+                    "TaskRequest": 200,
+                    "UpdateConfig": 201,
+                    "ImageRequest": 202,
+                    "AudioMuted": 250,
+                    "SayHello": 300,
+                    "TTSSentenceStart": 350,
+                    "TTSSentenceEnd": 351,
+                    "TTSResponse": 352,
+                    "TTSEnded": 359,
+                    "PodcastRoundStart": 360,
+                    "PodcastRoundResponse": 361,
+                    "PodcastRoundEnd": 362,
+                    "ASRInfo": 450,
+                    "ASRResponse": 451,
+                    "ASREnded": 459,
+                    "ChatTTSText": 500,
+                    "ChatTextQuery": 501,
+                    "ChatResponse": 550,
+                    "ChimeInStart": 551,
+                    "ChimeInEnd": 552,
+                    "ChatEnded": 559,
+                    "ThinkStart": 560,
+                    "ThinkResponse": 561,
+                    "ThinkEnd": 562,
+                    "ToolOutput": 563,
+                    "FCResponseStart": 564,
+                    "FCResponse": 565,
+                    "FCResponseEnd": 566,
+                    "SourceSubtitleStart": 650,
+                    "SourceSubtitleResponse": 651,
+                    "SourceSubtitleEnd": 652,
+                    "TranslationSubtitleStart": 653,
+                    "TranslationSubtitleResponse": 654,
+                    "TranslationSubtitleEnd": 655
+                  }
+                }
+              }
+            },
+            "common": {
+              "nested": {
+                "RequestMeta": {
+                  "fields": {
+                    "Endpoint": {
+                      "type": "string",
+                      "id": 1,
+                      "options": {
+                        "json_name": "endpoint"
+                      }
+                    },
+                    "AppKey": {
+                      "type": "string",
+                      "id": 2,
+                      "options": {
+                        "json_name": "app_key"
+                      }
+                    },
+                    "AppID": {
+                      "type": "string",
+                      "id": 3,
+                      "options": {
+                        "json_name": "app_id"
+                      }
+                    },
+                    "ResourceID": {
+                      "type": "string",
+                      "id": 4,
+                      "options": {
+                        "json_name": "resource_id"
+                      }
+                    },
+                    "ConnectionID": {
+                      "type": "string",
+                      "id": 5,
+                      "options": {
+                        "json_name": "connection_id"
+                      }
+                    },
+                    "SessionID": {
+                      "type": "string",
+                      "id": 6,
+                      "options": {
+                        "json_name": "session_id"
+                      }
+                    },
+                    "Sequence": {
+                      "type": "int32",
+                      "id": 7,
+                      "options": {
+                        "json_name": "sequence"
+                      }
+                    }
+                  }
+                },
+                "BillingItem": {
+                  "fields": {
+                    "Unit": {
+                      "type": "string",
+                      "id": 1,
+                      "options": {
+                        "json_name": "unit"
+                      }
+                    },
+                    "Quantity": {
+                      "type": "float",
+                      "id": 2,
+                      "options": {
+                        "json_name": "quantity"
+                      }
+                    }
+                  }
+                },
+                "Billing": {
+                  "fields": {
+                    "Items": {
+                      "rule": "repeated",
+                      "type": "BillingItem",
+                      "id": 1,
+                      "options": {
+                        "json_name": "items"
+                      }
+                    },
+                    "DurationMsec": {
+                      "type": "int64",
+                      "id": 2,
+                      "options": {
+                        "json_name": "duration_msec"
+                      }
+                    },
+                    "WordCount": {
+                      "type": "int64",
+                      "id": 3,
+                      "options": {
+                        "json_name": "word_count"
+                      }
+                    }
+                  }
+                },
+                "ResponseMeta": {
+                  "oneofs": {
+                    "_Billing": {
+                      "oneof": [
+                        "Billing"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "SessionID": {
+                      "type": "string",
+                      "id": 1,
+                      "options": {
+                        "json_name": "session_id"
+                      }
+                    },
+                    "Sequence": {
+                      "type": "int32",
+                      "id": 2,
+                      "options": {
+                        "json_name": "sequence"
+                      }
+                    },
+                    "StatusCode": {
+                      "type": "int32",
+                      "id": 3,
+                      "options": {
+                        "json_name": "status_code"
+                      }
+                    },
+                    "Message": {
+                      "type": "string",
+                      "id": 4,
+                      "options": {
+                        "json_name": "message"
+                      }
+                    },
+                    "Billing": {
+                      "type": "Billing",
+                      "id": 5,
+                      "options": {
+                        "json_name": "billing",
+                        "proto3_optional": true
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "understanding": {
+              "nested": {
+                "Code": {
+                  "values": {
+                    "ERROR_UNSPECIFIED": 0,
+                    "SUCCESS": 21000,
+                    "INVALID_REQUEST": 11100,
+                    "PERMISSION_DENIED": 11200,
+                    "LIMIT_QPS": 11301,
+                    "LIMIT_COUNT": 11302,
+                    "SERVER_BUSY": 11303,
+                    "INTERRUPTED": 21300,
+                    "ERROR_PARAMS": 11500,
+                    "LONG_AUDIO": 11101,
+                    "LARGE_PACKET": 11102,
+                    "INVALID_FORMAT": 11103,
+                    "SILENT_AUDIO": 11104,
+                    "EMPTY_AUDIO": 11105,
+                    "AUDIO_DOWNLOAD_FAIL": 21701,
+                    "TIMEOUT_WAITING": 21200,
+                    "TIMEOUT_PROCESSING": 21201,
+                    "ERROR_PROCESSING": 21100,
+                    "ERROR_UNKNOWN": 29900
+                  }
+                },
+                "Word": {
+                  "fields": {
+                    "text": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "startTime": {
+                      "type": "int32",
+                      "id": 2
+                    },
+                    "endTime": {
+                      "type": "int32",
+                      "id": 3
+                    },
+                    "blankDuration": {
+                      "type": "int32",
+                      "id": 4
+                    },
+                    "pronounce": {
+                      "type": "string",
+                      "id": 5
+                    },
+                    "confidence": {
+                      "type": "double",
+                      "id": 6
+                    }
+                  }
+                },
+                "UtteranceAddition": {
+                  "fields": {}
+                },
+                "ResultAddition": {
+                  "fields": {}
+                },
+                "Utterance": {
+                  "oneofs": {
+                    "_definite": {
+                      "oneof": [
+                        "definite"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "text": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "startTime": {
+                      "type": "int32",
+                      "id": 2
+                    },
+                    "endTime": {
+                      "type": "int32",
+                      "id": 3
+                    },
+                    "definite": {
+                      "type": "bool",
+                      "id": 4,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "words": {
+                      "rule": "repeated",
+                      "type": "Word",
+                      "id": 5
+                    },
+                    "language": {
+                      "type": "string",
+                      "id": 6
+                    },
+                    "confidence": {
+                      "type": "double",
+                      "id": 7
+                    },
+                    "speaker": {
+                      "type": "int32",
+                      "id": 8
+                    },
+                    "channelId": {
+                      "type": "int32",
+                      "id": 9
+                    },
+                    "additions": {
+                      "keyType": "string",
+                      "type": "string",
+                      "id": 100
+                    }
+                  }
+                },
+                "LanguageDetail": {
+                  "fields": {
+                    "prob": {
+                      "type": "double",
+                      "id": 1
+                    }
+                  }
+                },
+                "Result": {
+                  "oneofs": {
+                    "_termination": {
+                      "oneof": [
+                        "termination"
+                      ]
+                    },
+                    "_prefetch": {
+                      "oneof": [
+                        "prefetch"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "text": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "utterances": {
+                      "rule": "repeated",
+                      "type": "Utterance",
+                      "id": 2
+                    },
+                    "confidence": {
+                      "type": "double",
+                      "id": 3
+                    },
+                    "globalConfidence": {
+                      "type": "double",
+                      "id": 4
+                    },
+                    "language": {
+                      "type": "string",
+                      "id": 5
+                    },
+                    "languageDetails": {
+                      "keyType": "string",
+                      "type": "LanguageDetail",
+                      "id": 6
+                    },
+                    "termination": {
+                      "type": "bool",
+                      "id": 7,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "volume": {
+                      "type": "double",
+                      "id": 8
+                    },
+                    "speechRate": {
+                      "type": "double",
+                      "id": 9
+                    },
+                    "resultType": {
+                      "type": "string",
+                      "id": 10
+                    },
+                    "oriText": {
+                      "type": "string",
+                      "id": 11
+                    },
+                    "prefetch": {
+                      "type": "bool",
+                      "id": 12,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "additions": {
+                      "keyType": "string",
+                      "type": "string",
+                      "id": 100
+                    }
+                  }
+                },
+                "AudioInfo": {
+                  "fields": {
+                    "duration": {
+                      "type": "int64",
+                      "id": 1
+                    },
+                    "speechRate": {
+                      "type": "double",
+                      "id": 2
+                    }
+                  }
+                },
+                "App": {
+                  "fields": {
+                    "workFlowName": {
+                      "type": "string",
+                      "id": 1
+                    }
+                  }
+                },
+                "User": {
+                  "fields": {
+                    "uid": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "did": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "platform": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "sdkVersion": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "appVersion": {
+                      "type": "string",
+                      "id": 5
+                    }
+                  }
+                },
+                "Audio": {
+                  "fields": {
+                    "data": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "urlType": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "format": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "codec": {
+                      "type": "string",
+                      "id": 5
+                    },
+                    "language": {
+                      "type": "string",
+                      "id": 6
+                    },
+                    "rate": {
+                      "type": "int32",
+                      "id": 7
+                    },
+                    "bits": {
+                      "type": "int32",
+                      "id": 8
+                    },
+                    "channel": {
+                      "type": "int32",
+                      "id": 9
+                    },
+                    "tosBucket": {
+                      "type": "string",
+                      "id": 10
+                    },
+                    "tosAccessKey": {
+                      "type": "string",
+                      "id": 11
+                    },
+                    "audioTosObject": {
+                      "type": "string",
+                      "id": 12
+                    },
+                    "roleTrn": {
+                      "type": "string",
+                      "id": 13
+                    },
+                    "binaryData": {
+                      "type": "bytes",
+                      "id": 14
+                    }
+                  }
+                },
+                "AsrNotificationCode": {
+                  "values": {
+                    "NOTIFICATION_UNSPECIFIED": 0,
+                    "DISCONNECT": 1000
+                  }
+                },
+                "AsrNotification": {
+                  "fields": {
+                    "code": {
+                      "type": "AsrNotificationCode",
+                      "id": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "id": 2
+                    }
+                  }
+                },
+                "ReqParams": {
+                  "oneofs": {
+                    "_enableVad": {
+                      "oneof": [
+                        "enableVad"
+                      ]
+                    },
+                    "_enablePunc": {
+                      "oneof": [
+                        "enablePunc"
+                      ]
+                    },
+                    "_enableItn": {
+                      "oneof": [
+                        "enableItn"
+                      ]
+                    },
+                    "_enableDdc": {
+                      "oneof": [
+                        "enableDdc"
+                      ]
+                    },
+                    "_enableResample": {
+                      "oneof": [
+                        "enableResample"
+                      ]
+                    },
+                    "_vadSignal": {
+                      "oneof": [
+                        "vadSignal"
+                      ]
+                    },
+                    "_enableTranslate": {
+                      "oneof": [
+                        "enableTranslate"
+                      ]
+                    },
+                    "_disableEndPunc": {
+                      "oneof": [
+                        "disableEndPunc"
+                      ]
+                    },
+                    "_enableSpeakerInfo": {
+                      "oneof": [
+                        "enableSpeakerInfo"
+                      ]
+                    },
+                    "_enableChannelSplit": {
+                      "oneof": [
+                        "enableChannelSplit"
+                      ]
+                    },
+                    "_enableLid": {
+                      "oneof": [
+                        "enableLid"
+                      ]
+                    },
+                    "_enableInterrupt": {
+                      "oneof": [
+                        "enableInterrupt"
+                      ]
+                    },
+                    "_vadSegment": {
+                      "oneof": [
+                        "vadSegment"
+                      ]
+                    },
+                    "_enableOriText": {
+                      "oneof": [
+                        "enableOriText"
+                      ]
+                    },
+                    "_enableNonstream": {
+                      "oneof": [
+                        "enableNonstream"
+                      ]
+                    },
+                    "_showUtterances": {
+                      "oneof": [
+                        "showUtterances"
+                      ]
+                    },
+                    "_showWords": {
+                      "oneof": [
+                        "showWords"
+                      ]
+                    },
+                    "_showDuration": {
+                      "oneof": [
+                        "showDuration"
+                      ]
+                    },
+                    "_showLanguage": {
+                      "oneof": [
+                        "showLanguage"
+                      ]
+                    },
+                    "_showVolume": {
+                      "oneof": [
+                        "showVolume"
+                      ]
+                    },
+                    "_showVolumeV": {
+                      "oneof": [
+                        "showVolumeV"
+                      ]
+                    },
+                    "_showSpeechRate": {
+                      "oneof": [
+                        "showSpeechRate"
+                      ]
+                    },
+                    "_showPrefetch": {
+                      "oneof": [
+                        "showPrefetch"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "modelName": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "configName": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "enableVad": {
+                      "type": "bool",
+                      "id": 3,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enablePunc": {
+                      "type": "bool",
+                      "id": 4,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableItn": {
+                      "type": "bool",
+                      "id": 5,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableDdc": {
+                      "type": "bool",
+                      "id": 6,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableResample": {
+                      "type": "bool",
+                      "id": 7,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "vadSignal": {
+                      "type": "bool",
+                      "id": 8,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableTranslate": {
+                      "type": "bool",
+                      "id": 9,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "disableEndPunc": {
+                      "type": "bool",
+                      "id": 10,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableSpeakerInfo": {
+                      "type": "bool",
+                      "id": 11,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableChannelSplit": {
+                      "type": "bool",
+                      "id": 12,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "appLang": {
+                      "type": "string",
+                      "id": 13
+                    },
+                    "country": {
+                      "type": "string",
+                      "id": 14
+                    },
+                    "audioType": {
+                      "type": "string",
+                      "id": 15
+                    },
+                    "enableLid": {
+                      "type": "bool",
+                      "id": 16,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "reco2actNumSpk": {
+                      "type": "int32",
+                      "id": 17
+                    },
+                    "reco2maxNumSpk": {
+                      "type": "int32",
+                      "id": 18
+                    },
+                    "enableInterrupt": {
+                      "type": "bool",
+                      "id": 19,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "vadSegment": {
+                      "type": "bool",
+                      "id": 20,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableOriText": {
+                      "type": "bool",
+                      "id": 21,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "enableNonstream": {
+                      "type": "bool",
+                      "id": 22,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showUtterances": {
+                      "type": "bool",
+                      "id": 31,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showWords": {
+                      "type": "bool",
+                      "id": 32,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showDuration": {
+                      "type": "bool",
+                      "id": 33,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showLanguage": {
+                      "type": "bool",
+                      "id": 34,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showVolume": {
+                      "type": "bool",
+                      "id": 35,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showVolumeV": {
+                      "type": "bool",
+                      "id": 362,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showSpeechRate": {
+                      "type": "bool",
+                      "id": 37,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showPrefetch": {
+                      "type": "bool",
+                      "id": 38,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "resultType": {
+                      "type": "string",
+                      "id": 39
+                    },
+                    "startSilenceTime": {
+                      "type": "int32",
+                      "id": 61
+                    },
+                    "endSilenceTime": {
+                      "type": "int32",
+                      "id": 62
+                    },
+                    "vadSilenceTime": {
+                      "type": "int32",
+                      "id": 63
+                    },
+                    "minSilenceTime": {
+                      "type": "int32",
+                      "id": 64
+                    },
+                    "vadMode": {
+                      "type": "string",
+                      "id": 65
+                    },
+                    "vadSegmentDuration": {
+                      "type": "int32",
+                      "id": 66
+                    },
+                    "endWindowSize": {
+                      "type": "int32",
+                      "id": 67
+                    },
+                    "forceToSpeechTime": {
+                      "type": "int32",
+                      "id": 68
+                    },
+                    "corpus": {
+                      "type": "Corpus",
+                      "id": 100
+                    },
+                    "notification": {
+                      "type": "AsrNotification",
+                      "id": 101
+                    },
+                    "sensitiveWordsFilter": {
+                      "type": "string",
+                      "id": 102
+                    }
+                  }
+                },
+                "Corpus": {
+                  "oneofs": {
+                    "_showMatchHotWords": {
+                      "oneof": [
+                        "showMatchHotWords"
+                      ]
+                    },
+                    "_showAllMatchHotWords": {
+                      "oneof": [
+                        "showAllMatchHotWords"
+                      ]
+                    },
+                    "_showEffectiveHotWords": {
+                      "oneof": [
+                        "showEffectiveHotWords"
+                      ]
+                    }
+                  },
+                  "fields": {
+                    "context": {
+                      "type": "string",
+                      "id": 1
+                    },
+                    "boostingTableId": {
+                      "type": "string",
+                      "id": 2
+                    },
+                    "boostingTableName": {
+                      "type": "string",
+                      "id": 3
+                    },
+                    "boostingId": {
+                      "type": "string",
+                      "id": 4
+                    },
+                    "nnlmId": {
+                      "type": "string",
+                      "id": 5
+                    },
+                    "correctTableId": {
+                      "type": "string",
+                      "id": 6
+                    },
+                    "correctTableName": {
+                      "type": "string",
+                      "id": 7
+                    },
+                    "puncHotWords": {
+                      "type": "string",
+                      "id": 8
+                    },
+                    "hotWordsList": {
+                      "rule": "repeated",
+                      "type": "string",
+                      "id": 9
+                    },
+                    "glossaryList": {
+                      "keyType": "string",
+                      "type": "string",
+                      "id": 10
+                    },
+                    "showMatchHotWords": {
+                      "type": "bool",
+                      "id": 61,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showAllMatchHotWords": {
+                      "type": "bool",
+                      "id": 62,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    },
+                    "showEffectiveHotWords": {
+                      "type": "bool",
+                      "id": 63,
+                      "options": {
+                        "proto3_optional": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
