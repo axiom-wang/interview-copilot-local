@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: interview-copilot-realtime
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm install && npm run build:realtime
+    startCommand: npm run start:realtime
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_VERSION
+        value: 24.13.0
+      - key: ALLOWED_ORIGIN
+        value: https://interview-copilot-local.netlify.app
+      - key: BYTEDANCE_WS_URL
+        value: wss://openspeech.bytedance.com/api/v4/ast/v2/translate
+      - key: BYTEDANCE_RESOURCE_ID
+        value: volc.service_type.10053
+      - key: BYTEDANCE_APP_ID
+        sync: false
+      - key: BYTEDANCE_ACCESS_TOKEN
+        sync: false
