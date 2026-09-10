@@ -1,15 +1,24 @@
 import clsx from 'clsx'
 import { useEffect, useState } from 'react'
-import type { MeetingSummary } from '../types/analysis'
+import { resolveScenarioProfile, type MeetingScenarioId } from '../scenarios'
+import { useAppStore } from '../store/useAppStore'
+import type { MeetingMinutes, MeetingSummary } from '../types/analysis'
 
 interface SummaryPreviewPanelProps {
   summary: MeetingSummary | null
+  minutes?: MeetingMinutes | null
   className?: string
   isGenerating?: boolean
+  isGeneratingMinutes?: boolean
   isStale?: boolean
+  minutesStale?: boolean
   onGenerate?: () => Promise<boolean> | boolean | void
+  onGenerateMinutes?: () => Promise<boolean> | boolean | void
   disableGenerate?: boolean
+  scenarioId?: MeetingScenarioId
 }
+
+type SummaryView = 'speech' | 'minutes'
 
 const formatTimestamp = (timestamp: number | null | undefined) =>
   timestamp
@@ -20,31 +29,140 @@ const formatTimestamp = (timestamp: number | null | undefined) =>
       }).format(timestamp)
     : '未生成'
 
+const SectionList = ({
+  title,
+  items,
+}: {
+  title: string
+  items: string[]
+}) => (
+  <section className="theme-inline-card rounded-[var(--radius-card)] p-4">
+    <p className="theme-quiet text-[11px] font-semibold tracking-[0.08em] uppercase">
+      {title}
+    </p>
+    {items.length > 0 ? (
+      <ul className="theme-body mt-3 space-y-2 text-sm leading-7">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    ) : (
+      <p className="theme-muted mt-3 text-sm">暂无</p>
+    )}
+  </section>
+)
+
+const SpeechContent = ({
+  summary,
+  spokenSummaryLabel,
+}: {
+  summary: MeetingSummary
+  spokenSummaryLabel: string
+}) => (
+  <div className="space-y-4">
+    <section className="sheet-accent p-5">
+      <p className="text-[11px] font-semibold tracking-[0.08em] uppercase">
+        {spokenSummaryLabel}
+      </p>
+      <p className="mt-3 text-sm leading-8">{summary.speech60s}</p>
+    </section>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <SectionList items={summary.keyPoints} title="关键要点" />
+      <SectionList items={summary.nextSteps} title="下一步动作" />
+    </div>
+  </div>
+)
+
+const MinutesContent = ({ minutes }: { minutes: MeetingMinutes }) => (
+  <div className="space-y-4">
+    <section className="sheet-accent p-5">
+      <p className="text-[11px] font-semibold tracking-[0.08em] uppercase">
+        {minutes.title}
+      </p>
+      <p className="mt-3 text-sm leading-8">{minutes.overview}</p>
+    </section>
+
+    {minutes.topics.map((topic, index) => (
+      <section
+        className="theme-inline-card rounded-[var(--radius-card)] p-4"
+        key={`${topic.topic}-${index}`}
+      >
+        <h4 className="theme-title font-semibold">{topic.topic}</h4>
+        <ul className="theme-body mt-3 space-y-2 text-sm leading-7">
+          {topic.points.map((point, pointIndex) => (
+            <li key={`${topic.topic}-${pointIndex}`}>{point}</li>
+          ))}
+        </ul>
+        {topic.conclusion ? (
+          <p className="theme-muted mt-3 text-sm">结论：{topic.conclusion}</p>
+        ) : null}
+      </section>
+    ))}
+
+    <div className="grid gap-4 lg:grid-cols-2">
+      <SectionList items={minutes.decisions} title="已定决策" />
+      <SectionList items={minutes.openQuestions} title="待定问题" />
+    </div>
+
+    <section className="theme-inline-card overflow-x-auto rounded-[var(--radius-card)] p-4">
+      <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">行动项</p>
+      {minutes.actionItems.length > 0 ? (
+        <table className="theme-body mt-3 w-full min-w-[520px] text-left text-sm">
+          <thead>
+            <tr className="theme-divider border-b">
+              <th className="px-2 py-2">负责人</th>
+              <th className="px-2 py-2">任务</th>
+              <th className="px-2 py-2">时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {minutes.actionItems.map((item, index) => (
+              <tr className="theme-divider border-b" key={`${item.task}-${index}`}>
+                <td className="px-2 py-3">{item.owner || '待定'}</td>
+                <td className="px-2 py-3">{item.task}</td>
+                <td className="px-2 py-3">{item.due || '待定'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p className="theme-muted mt-3 text-sm">暂无行动项</p>
+      )}
+    </section>
+  </div>
+)
+
 export function SummaryPreviewPanel({
   summary,
+  minutes = null,
   className,
   isGenerating = false,
+  isGeneratingMinutes = false,
   isStale = false,
+  minutesStale = false,
   onGenerate,
+  onGenerateMinutes,
   disableGenerate = false,
+  scenarioId,
 }: SummaryPreviewPanelProps) {
+  const activeScenarioId = useAppStore((state) => state.scenarioId)
+  const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
+  const [activeView, setActiveView] = useState<SummaryView>('speech')
   const [isExpanded, setIsExpanded] = useState(false)
+  const activeResult = activeView === 'speech' ? summary : minutes
+  const isActiveGenerating =
+    activeView === 'speech' ? isGenerating : isGeneratingMinutes
+  const isActiveStale = activeView === 'speech' ? isStale : minutesStale
+  const activeGenerate = activeView === 'speech' ? onGenerate : onGenerateMinutes
 
   useEffect(() => {
-    if (!isExpanded) {
-      return
-    }
-
+    if (!isExpanded) return
     const previousOverflow = document.body.style.overflow
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsExpanded(false)
-      }
+      if (event.key === 'Escape') setIsExpanded(false)
     }
-
     document.body.style.overflow = 'hidden'
     window.addEventListener('keydown', onKeyDown)
-
     return () => {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', onKeyDown)
@@ -52,178 +170,118 @@ export function SummaryPreviewPanel({
   }, [isExpanded])
 
   const handleGenerate = async () => {
-    if (!onGenerate || disableGenerate || isGenerating) {
-      return
-    }
-
-    const shouldOpen = await onGenerate()
-
-    if (shouldOpen === false) {
-      return
-    }
-
-    setIsExpanded(true)
+    if (!activeGenerate || disableGenerate || isActiveGenerating) return
+    const shouldOpen = await activeGenerate()
+    if (shouldOpen !== false) setIsExpanded(true)
   }
+
+  const content = activeView === 'speech'
+    ? summary && (
+        <SpeechContent
+          spokenSummaryLabel={profile.spokenSummaryLabel}
+          summary={summary}
+        />
+      )
+    : minutes && <MinutesContent minutes={minutes} />
 
   return (
     <section className={clsx('panel-card p-5', className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="kicker theme-muted text-[11px]">产出预览</p>
-          <h2 className="theme-title mt-2 font-heading text-2xl">总结发言</h2>
-          <p className="theme-muted mt-2 text-sm">
-            默认在应用内查看 60 秒口播、关键要点和后续动作。
-          </p>
+          <p className="kicker theme-muted text-[11px]">会议总结</p>
+          <h2 className="theme-title mt-2 text-2xl font-semibold">
+            {activeView === 'speech' ? profile.spokenSummaryLabel : '标准会议纪要'}
+          </h2>
         </div>
-
         <div className="flex flex-wrap items-center gap-2">
-          {summary ? (
-            <span className="status-badge">生成于 {formatTimestamp(summary.updatedAt)}</span>
-          ) : null}
-          {isStale && summary ? (
-            <span className="status-badge" data-tone="warning">
-              内容可能过期
+          {activeResult ? (
+            <span className="status-badge">
+              生成于 {formatTimestamp(activeResult.updatedAt)}
             </span>
           ) : null}
-          {onGenerate ? (
+          {isActiveStale && activeResult ? (
+            <span className="status-badge" data-tone="warning">内容可能过期</span>
+          ) : null}
+          {activeGenerate ? (
             <button
-              className={clsx(
-                'rounded-full border px-4 py-2 text-sm transition',
-                disableGenerate || isGenerating
-                  ? 'theme-button-neutral cursor-not-allowed'
-                  : 'theme-button-success',
-              )}
-              disabled={disableGenerate || isGenerating}
-              onClick={() => {
-                void handleGenerate()
-              }}
+              className="btn-secondary"
+              disabled={disableGenerate || isActiveGenerating}
+              onClick={() => void handleGenerate()}
               type="button"
             >
-              {isGenerating ? '生成中...' : '生成 / 刷新并查看'}
+              {isActiveGenerating ? '生成中...' : '生成 / 刷新并查看'}
             </button>
           ) : null}
         </div>
       </div>
 
-      {isGenerating && !summary ? (
-        <div className="mt-5 space-y-4">
-          <div className="panel-skeleton h-30 rounded-[24px]" />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div className="panel-skeleton h-28 rounded-[24px]" />
-            <div className="panel-skeleton h-28 rounded-[24px]" />
-          </div>
-        </div>
-      ) : summary ? (
-        <button
-          className="theme-inline-card-hover theme-inline-card mt-5 block w-full rounded-[24px] p-5 text-left"
-          onClick={() => setIsExpanded(true)}
-          type="button"
-        >
-          <div className="theme-button-primary rounded-[20px] border p-4">
-            <p className="text-[11px] uppercase tracking-[0.18em] opacity-80">
-              60 秒口播
-            </p>
-            <p className="mt-3 text-sm leading-7">
-              {summary.speech60s}
-            </p>
-          </div>
+      <div className="tabs-list mt-4 w-fit">
+        {([
+          ['speech', '口播稿'],
+          ['minutes', '结构化纪要'],
+        ] as const).map(([id, label]) => (
+          <button
+            className="tabs-trigger"
+            data-active={activeView === id}
+            key={id}
+            onClick={() => setActiveView(id)}
+            type="button"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <div className="theme-inline-card rounded-[20px] p-4">
-              <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">
-                关键要点
-              </p>
-              <ul className="theme-body mt-3 space-y-2 text-sm leading-6">
-                {summary.keyPoints.slice(0, 3).map((point, index) => (
-                  <li key={`summary-point-${index}`}>{point}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="theme-inline-card rounded-[20px] p-4">
-              <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">
-                下一步动作
-              </p>
-              <ul className="theme-body mt-3 space-y-2 text-sm leading-6">
-                {summary.nextSteps.slice(0, 3).map((step, index) => (
-                  <li key={`summary-step-${index}`}>{step}</li>
-                ))}
-              </ul>
-            </div>
+      <div className="mt-5">
+        {isActiveGenerating && !activeResult ? (
+          <div className="panel-skeleton h-40 rounded-[var(--radius-card)]" />
+        ) : content ? (
+          <div
+            className="block w-full cursor-pointer text-left"
+            onClick={() => setIsExpanded(true)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                setIsExpanded(true)
+              }
+            }}
+            role="button"
+            tabIndex={0}
+          >
+            {content}
           </div>
-        </button>
-      ) : (
-        <div className="panel-empty theme-muted mt-5 rounded-[24px] p-5 text-sm leading-7">
-          {onGenerate
-            ? '总结结果已从新窗口切到应用内预览。点击右上角按钮后，会直接生成并展示。'
-            : '当前回放会话还没有保存总结发言。'}
-        </div>
-      )}
+        ) : (
+          <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm">
+            {activeView === 'speech'
+              ? '尚未生成口播总结。'
+              : '尚未生成标准会议纪要。'}
+          </div>
+        )}
+      </div>
 
-      {summary && isExpanded ? (
+      {activeResult && isExpanded ? (
         <div
           className="theme-overlay fixed inset-0 z-[1200] flex items-center justify-center px-4 py-6"
-          onClick={() => {
-            setIsExpanded(false)
-          }}
+          onClick={() => setIsExpanded(false)}
         >
           <div
             className="theme-overlay-card panel-card flex h-[88vh] w-[92vw] max-w-[1180px] flex-col overflow-hidden border"
-            onClick={(event) => {
-              event.stopPropagation()
-            }}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="theme-divider flex items-center justify-between border-b px-5 py-4">
-              <div>
-                <p className="kicker theme-muted text-[11px]">Full Preview</p>
-                <h3 className="theme-title mt-2 text-lg font-semibold">
-                  总结发言
-                </h3>
-              </div>
+              <h3 className="theme-title text-lg font-semibold">
+                {activeView === 'speech'
+                  ? profile.spokenSummaryLabel
+                  : '标准会议纪要'}
+              </h3>
               <button
-                className="theme-button-neutral rounded-full border px-3 py-1.5 text-sm transition"
-                onClick={() => {
-                  setIsExpanded(false)
-                }}
+                className="btn-ghost"
+                onClick={() => setIsExpanded(false)}
                 type="button"
               >
                 关闭
               </button>
             </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-5">
-              <div className="theme-button-primary rounded-[24px] border p-5">
-                <p className="text-[11px] uppercase tracking-[0.18em] opacity-80">
-                  60 秒口播
-                </p>
-                <p className="mt-3 text-sm leading-8">
-                  {summary.speech60s}
-                </p>
-              </div>
-
-              <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                <div className="theme-inline-card rounded-[24px] p-5">
-                  <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">
-                    关键要点
-                  </p>
-                  <ul className="theme-body mt-3 space-y-3 text-sm leading-7">
-                    {summary.keyPoints.map((point, index) => (
-                      <li key={`expanded-summary-point-${index}`}>{point}</li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="theme-inline-card rounded-[24px] p-5">
-                  <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">
-                    下一步动作
-                  </p>
-                  <ul className="theme-body mt-3 space-y-3 text-sm leading-7">
-                    {summary.nextSteps.map((step, index) => (
-                      <li key={`expanded-summary-step-${index}`}>{step}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-5">{content}</div>
           </div>
         </div>
       ) : null}

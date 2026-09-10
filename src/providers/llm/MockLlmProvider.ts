@@ -4,6 +4,7 @@ import { legacyMindMapToFlowMap } from '../../services/mindMapTransform'
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   MockAnalysisScenario,
   PhaseAnalysis,
@@ -139,7 +140,7 @@ export class MockLlmProvider implements LlmProvider {
 
     return {
       speech60s:
-        '我们刚刚围绕题目完成了观点梳理、分歧对齐和结论收敛。我的总结是：先明确核心结论，再用关键依据支撑，最后给出可执行的下一步分工与时间点。',
+        '我们刚刚围绕会议目标完成了观点梳理、分歧对齐和结论收敛。我的总结是：先明确核心结论，再用关键依据支撑，最后给出可执行的下一步分工与时间点。',
       keyPoints:
         keyPoints.length > 0
           ? keyPoints
@@ -149,6 +150,40 @@ export class MockLlmProvider implements LlmProvider {
               '形成可执行结论与行动项',
             ],
       nextSteps: ['确认最终口径', '分配汇报角色', '补齐风险与预案'],
+      updatedAt,
+    }
+  }
+
+  async generateMeetingMinutes(
+    segments: TranscriptSegment[],
+    _context?: AnalysisPromptContext,
+  ): Promise<MeetingMinutes> {
+    void _context
+    const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
+    const points = segments
+      .filter((segment) => segment.text.trim())
+      .slice(-5)
+      .map((segment) => segment.text.replace(/\s+/g, ' ').trim())
+
+    return {
+      title: '会议纪要',
+      overview: '本次会议围绕当前主题完成了信息同步、观点讨论和下一步梳理。',
+      topics: [
+        {
+          topic: '主要讨论',
+          points: points.length > 0 ? points : ['当前有效转写较少。'],
+          conclusion: '',
+        },
+      ],
+      decisions: [],
+      openQuestions: ['确认尚未收口的关键问题'],
+      actionItems: [
+        {
+          owner: '',
+          task: '补齐结论并确认后续行动',
+          due: '',
+        },
+      ],
       updatedAt,
     }
   }
@@ -168,8 +203,8 @@ export class MockLlmProvider implements LlmProvider {
 
     const reasoning = [
       context?.questionContext?.trim()
-        ? '已结合当前题目信息来判断回答方向。'
-        : '当前没有额外题目信息，因此优先依据讨论主线作答。',
+        ? '已结合当前会议背景来判断回答方向。'
+        : '当前没有额外会议背景，因此优先依据讨论主线作答。',
       context?.phaseContext?.trim()
         ? `当前讨论阶段是 ${context.phaseContext.trim()}，回答需要贴合这个推进节奏。`
         : '当前阶段信息有限，建议采用更稳妥的推进式表达。',
@@ -182,7 +217,7 @@ export class MockLlmProvider implements LlmProvider {
       conclusion: `针对“${normalizedQuestion}”，当前更稳妥的做法是顺着团队主线给出克制判断，并主动帮助团队往下一步推进。`,
       reasoning,
       suggestedReply:
-        '我理解我们现在更重要的是先把题目目标和当前已经形成的共识讲清楚，而不是急着补很多新点。基于刚才的讨论，我会先给出一个更稳妥的判断，再补一句为什么我们这样取舍，这样会更像在帮助团队收敛。然后如果大家认可，我们可以顺势把下一步要确认的结论或者分工一起推进掉。',
+        '我理解我们现在更重要的是先把会议目标和当前已经形成的共识讲清楚，而不是急着补很多新点。基于刚才的讨论，我会先给出一个更稳妥的判断，再补一句为什么我们这样取舍，这样会更像在帮助团队收敛。然后如果大家认可，我们可以顺势把下一步要确认的结论或者分工一起推进掉。',
       updatedAt,
     }
   }

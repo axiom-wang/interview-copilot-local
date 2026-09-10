@@ -48,19 +48,29 @@ export interface ByteDanceAstRuntimeConfig {
   wsUrl: string
 }
 
-export const getByteDanceAstRuntimeConfig = (): ByteDanceAstRuntimeConfig => {
-  const appId = process.env.BYTEDANCE_APP_ID?.trim()
-  const accessToken = process.env.BYTEDANCE_ACCESS_TOKEN?.trim()
+export type ByteDanceAstRuntimeConfigOverride = Partial<ByteDanceAstRuntimeConfig>
+
+export const getByteDanceAstRuntimeConfig = (
+  override?: ByteDanceAstRuntimeConfigOverride,
+): ByteDanceAstRuntimeConfig => {
+  const appId = override?.appId?.trim() || process.env.BYTEDANCE_APP_ID?.trim()
+  const accessToken =
+    override?.accessToken?.trim() || process.env.BYTEDANCE_ACCESS_TOKEN?.trim()
   const resourceId =
-    process.env.BYTEDANCE_RESOURCE_ID?.trim() || DEFAULT_RESOURCE_ID
-  const wsUrl = process.env.BYTEDANCE_WS_URL?.trim() || DEFAULT_WS_URL
+    override?.resourceId?.trim() ||
+    process.env.BYTEDANCE_RESOURCE_ID?.trim() ||
+    DEFAULT_RESOURCE_ID
+  const wsUrl =
+    override?.wsUrl?.trim() ||
+    process.env.BYTEDANCE_WS_URL?.trim() ||
+    DEFAULT_WS_URL
 
   if (!appId) {
-    throw new Error('缺少 BYTEDANCE_APP_ID，请先在 .env 中配置。')
+    throw new Error('缺少字节同传 App ID，请先在设置中配置语音转写模型。')
   }
 
   if (!accessToken) {
-    throw new Error('缺少 BYTEDANCE_ACCESS_TOKEN，请先在 .env 中配置。')
+    throw new Error('缺少字节同传 Access Token，请先在设置中配置语音转写模型。')
   }
 
   return {

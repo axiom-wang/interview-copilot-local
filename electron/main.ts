@@ -37,7 +37,7 @@ const createWindow = async () => {
     minWidth: 1200,
     minHeight: 760,
     backgroundColor: '#08111f',
-    title: 'Interview Copilot Local',
+    title: '会议智能助手',
     webPreferences: {
       preload: resolvePreloadPath(),
       contextIsolation: true,

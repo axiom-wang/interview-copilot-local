@@ -28,6 +28,12 @@ type StartSessionRequest = {
   mode?: 's2t' | 's2s'
   sourceLanguage?: string
   targetLanguage?: string
+  credentials?: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }
 }
 
 type StartSessionResult =
@@ -58,9 +64,17 @@ export const registerAstIpcHandlers = () => {
 
   ipcMain.handle(
     SMOKE_TEST_BYTEDANCE_AST_CHANNEL,
-    async (): Promise<SmokeTestResult> => {
+    async (
+      _event,
+      request?: {
+        appId?: string
+        accessToken?: string
+        resourceId?: string
+        wsUrl?: string
+      },
+    ): Promise<SmokeTestResult> => {
       try {
-        await smokeTestByteDanceAstConnection()
+        await smokeTestByteDanceAstConnection(request)
         return { ok: true }
       } catch (error) {
         return {

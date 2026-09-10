@@ -16,6 +16,7 @@
     "start:realtime": "tsx realtime/server.ts"
   },
   "dependencies": {
+    "@netlify/identity": "^2.0.0",
     "@tailwindcss/vite": "^4.2.2",
     "@xyflow/react": "^12.10.2",
     "clsx": "^2.1.1",

@@ -1,3 +1,4 @@
+import { resolveScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
@@ -9,9 +10,14 @@ import {
 export const buildExtractConsensusPrompt = (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
-) =>
-  composePromptWithGlobalSystemPrompt(`
-请根据以下最近 90 秒群面转写，提取当前“已形成共识、存在分歧、仍缺失关键点”。
+) => {
+  const profile = resolveScenarioProfile(context?.scenarioId)
+  const dimensions = profile.valueDimensions
+    .map((dimension) => `- ${dimension}`)
+    .join('\n')
+
+  return composePromptWithGlobalSystemPrompt(`
+请根据以下最近 90 秒转写，提取当前“已形成共识、存在分歧、仍缺失关键点”。
 
 分析要求：
 1. “已形成共识”必须满足以下至少一项：
@@ -22,16 +28,10 @@ export const buildExtractConsensusPrompt = (
    - 明确存在不同方案、不同优先级、不同取舍标准
    - 或表面一致但实际口径未统一
 3. “仍缺失关键点”指：
-   - 这道题要得出高质量方案本应讨论，但当前尚未覆盖或覆盖不足的关键维度
+   - 要形成高质量结论本应讨论，但当前尚未覆盖或覆盖不足的关键维度
 
-在群面中，关键点通常优先从以下维度检查：
-- 题目目标是否明确
-- 核心用户/对象是否明确
-- 成功标准或评价标准是否明确
-- 资源/预算/周期/可行性是否讨论
-- 风险与兜底是否讨论
-- 落地步骤是否讨论
-- 团队汇报结构是否准备
+在当前场景中，关键点通常优先从以下维度检查：
+${dimensions}
 
 请不要把以下内容当成高质量共识：
 - 口头附和
@@ -64,5 +64,6 @@ ${formatOptionalPromptContext(context)}
 
 转写内容：
 ${formatSegmentsForPrompt(segments)}
-`.trim())
+`.trim(), profile)
+}
 

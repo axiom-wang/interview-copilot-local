@@ -1,8 +1,10 @@
+import type { MeetingScenarioProfile } from '../scenarios'
+import { resolveScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext, SummaryAssemblyContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 
-export const GLOBAL_GROUP_INTERVIEW_SYSTEM_PROMPT = `
-你是一个“中文群面实时辅助分析器”，服务于互联网/产品/HR/运营等结构化群体面试场景。
+export const buildGlobalSystemPrompt = (profile: MeetingScenarioProfile) => `
+你是一个“${profile.analystRole}”，服务于${profile.domainHint}。
 
 你的任务不是泛泛总结，而是识别“当前讨论在推进什么、缺什么、下一步最该做什么”。
 
@@ -10,19 +12,11 @@ export const GLOBAL_GROUP_INTERVIEW_SYSTEM_PROMPT = `
 
 1. 优先分析“讨论过程”，而不是只总结表面内容。
 2. 只基于输入文本判断，不要编造未出现的事实、数据、角色立场或结论。
-3. 群面有效信息通常围绕以下维度出现：
-   - 题目目标
-   - 用户/对象
-   - 核心痛点
-   - 约束条件（预算、周期、资源、合规、技术可行性）
-   - 方案选项
-   - 比较与取舍
-   - 风险与兜底
-   - 分工与落地
-   - 汇报与总结
+3. 有效信息通常围绕以下维度出现：
+${profile.valueDimensions.map((dimension) => `   - ${dimension}`).join('\n')}
 4. 请自动忽略以下低价值内容：
    - 寒暄、附和、口头禅、重复表态
-   - 与题目无关的闲聊
+   - 与会议目标无关的闲聊
    - 没有新增信息的重复复述
 5. 当证据不足时，要明确降低置信度，并指出“仍缺哪些关键点”。
 6. 输出必须简洁、结构化、可直接驱动前端 UI。
@@ -38,7 +32,7 @@ export const GLOBAL_GROUP_INTERVIEW_SYSTEM_PROMPT = `
    - 收敛结论
    - 分工落地
    - 汇报总结
-10. 你的语言风格应像一个高水平群面陪练：冷静、判断清楚、可执行，不空泛。
+10. 你的语言风格应像一个${profile.analystTone}：冷静、判断清楚、可执行，不空泛。
 `.trim()
 
 const normalizeContextValue = (value: string | undefined) => {
@@ -124,6 +118,7 @@ ${sections.join('\n\n')}
 export const formatOptionalPromptContext = (
   context?: AnalysisPromptContext,
 ) => {
+  const profile = resolveScenarioProfile(context?.scenarioId)
   const questionContext = normalizeContextValue(context?.questionContext)
   const roleContext = normalizeContextValue(context?.roleContext)
   const phaseContext = normalizeContextValue(context?.phaseContext)
@@ -134,15 +129,18 @@ export const formatOptionalPromptContext = (
   const sections: string[] = []
 
   if (questionContext) {
-    sections.push(`面试题背景：${questionContext}`)
+    sections.push(`${profile.topicContextLabel}：${questionContext}`)
   }
 
   if (roleContext) {
-    sections.push(`用户角色：${roleContext}`)
+    sections.push(`${profile.roleContextLabel}：${roleContext}`)
   }
 
   if (phaseContext) {
-    sections.push(`当前讨论阶段：${phaseContext}`)
+    const phaseLabel =
+      profile.phaseLabels[phaseContext as keyof typeof profile.phaseLabels] ??
+      phaseContext
+    sections.push(`当前讨论阶段：${phaseLabel}`)
   }
 
   if (summaryAssemblyContext) {
@@ -159,8 +157,11 @@ ${sections.join('\n\n')}
 `.trim()
 }
 
-export const composePromptWithGlobalSystemPrompt = (taskPrompt: string) =>
-  `${GLOBAL_GROUP_INTERVIEW_SYSTEM_PROMPT}
+export const composePromptWithGlobalSystemPrompt = (
+  taskPrompt: string,
+  profile: MeetingScenarioProfile,
+) =>
+  `${buildGlobalSystemPrompt(profile)}
 
 ---
 任务指令：

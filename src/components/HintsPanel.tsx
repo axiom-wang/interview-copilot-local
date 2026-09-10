@@ -27,13 +27,10 @@ const HintCard = ({
   label: string
   value: string
 }) => (
-  <div className="theme-inline-card-strong rounded-[24px] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-    <div className="flex items-center justify-between gap-3">
-      <p className="theme-quiet text-[11px] uppercase tracking-[0.18em]">
-        {label}
-      </p>
-      <span className="status-badge">建议卡</span>
-    </div>
+  <div className="theme-inline-card-strong rounded-[var(--radius-card)] p-4">
+    <p className="theme-quiet text-[11px] font-semibold tracking-[0.08em] uppercase">
+      {label}
+    </p>
     <p className="theme-title mt-3 text-sm leading-7">{value}</p>
   </div>
 )
@@ -54,7 +51,7 @@ export function HintsPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="kicker theme-muted text-[11px]">发言建议</p>
-          <h2 className="theme-title mt-2 font-heading text-2xl">下一轮怎么说</h2>
+          <h2 className="theme-title mt-2 text-2xl font-semibold">下一轮怎么说</h2>
           <p className="theme-muted mt-2 text-sm">
             把 15 / 30 / 60 秒表达拆成等权建议卡，优先保证你随时能接得住讨论。
           </p>
@@ -62,22 +59,17 @@ export function HintsPanel({
 
         {showRefreshControl ? (
           <button
-            className={clsx(
-              'rounded-full border px-4 py-2 text-sm transition',
-              isRefreshing
-                ? 'theme-button-neutral cursor-not-allowed'
-                : 'theme-button-primary',
-            )}
+            className="btn-secondary"
             disabled={isRefreshing || !onRefresh}
             onClick={() => onRefresh?.()}
             type="button"
           >
-            {isRefreshing ? '刷新中...' : '生成 / 刷新建议'}
+            {isRefreshing ? '刷新中…' : '生成建议'}
           </button>
         ) : null}
       </div>
 
-      <div className="theme-muted mt-4 flex flex-wrap items-center gap-2 text-xs">
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
         <span className="status-badge" data-tone="primary">
           动作类型：{hints?.functionType ?? '待生成'}
         </span>
@@ -91,21 +83,21 @@ export function HintsPanel({
 
       {shouldShowLoading ? (
         <div className="mt-5 space-y-4">
-          <div className="panel-skeleton h-24 rounded-[24px]" />
+          <div className="panel-skeleton h-24 rounded-[var(--radius-card)]" />
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="panel-skeleton h-36 rounded-[24px]" />
-            <div className="panel-skeleton h-36 rounded-[24px]" />
-            <div className="panel-skeleton h-36 rounded-[24px]" />
+            <div className="panel-skeleton h-36 rounded-[var(--radius-card)]" />
+            <div className="panel-skeleton h-36 rounded-[var(--radius-card)]" />
+            <div className="panel-skeleton h-36 rounded-[var(--radius-card)]" />
           </div>
         </div>
       ) : hints ? (
         <div className="mt-5 space-y-4">
-          <div className="theme-button-success rounded-[24px] border p-4">
-            <p className="text-[11px] uppercase tracking-[0.18em] opacity-80">
-              Why Now
+          <div className="sheet-accent">
+            <p className="text-[11px] font-semibold tracking-[0.08em] uppercase">
+              现在开口
             </p>
             <p className="mt-3 text-sm leading-7">
-              {hints.whyNow || '建议优先承接当前主线，避免在关键收敛点重新发散。'}
+              {hints.whyNow || '建议优先承接当前主线，避免在关键收束点重新发散。'}
             </p>
           </div>
 
@@ -116,9 +108,9 @@ export function HintsPanel({
           </div>
         </div>
       ) : (
-        <div className="panel-empty theme-muted mt-5 rounded-[24px] p-5 text-sm leading-7">
+        <div className="panel-empty theme-muted mt-5 rounded-[var(--radius-card)] p-5 text-sm leading-7">
           {showRefreshControl
-            ? '点击“生成 / 刷新建议”后，这里会给出适合当前讨论阶段的接话脚本。'
+            ? '点击“生成建议”后，这里会给出适合当前讨论阶段的接话脚本。'
             : '当前回放快照还没有可用建议。'}
         </div>
       )}

@@ -1,6 +1,7 @@
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   PhaseConsensusAnalysisBundle,
@@ -29,6 +30,7 @@ const normalizeSummaryAssemblyContext = (
 }
 
 const normalizePromptContext = (context: AnalysisPromptContext | undefined) => ({
+  scenarioId: context?.scenarioId,
   questionContext: context?.questionContext?.trim() || undefined,
   roleContext: context?.roleContext?.trim() || undefined,
   phaseContext: context?.phaseContext?.trim() || undefined,
@@ -48,6 +50,7 @@ const buildRequestKey = (
 
   return [
     ...segments.map((segment) => `${segment.id}:${segment.timestamp}`),
+    `scenario:${normalizedContext.scenarioId ?? ''}`,
     `q:${normalizedContext.questionContext ?? ''}`,
     `r:${normalizedContext.roleContext ?? ''}`,
     `p:${normalizedContext.phaseContext ?? ''}`,
@@ -70,6 +73,9 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
 
   private lastSummaryRequestKey: string | null = null
   private lastSummaryPromise: Promise<MeetingSummary> | null = null
+
+  private lastMinutesRequestKey: string | null = null
+  private lastMinutesPromise: Promise<MeetingMinutes> | null = null
 
   private lastQaRequestKey: string | null = null
   private lastQaPromise: Promise<InterviewQaAnswer> | null = null
@@ -286,6 +292,48 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     return this.lastQaPromise
   }
 
+  private async ensureMeetingMinutes(
+    segments: TranscriptSegment[],
+    context?: AnalysisPromptContext,
+  ) {
+    const normalizedContext = normalizePromptContext(context)
+    const requestKey = buildRequestKey(segments, normalizedContext)
+    const cachedMinutesPromise = this.lastMinutesPromise
+
+    if (this.lastMinutesRequestKey === requestKey && cachedMinutesPromise) {
+      return cachedMinutesPromise
+    }
+
+    const bridge = window.interviewCopilot
+    if (!bridge?.generateMeetingMinutes) {
+      throw new Error('Electron 会议纪要桥接不可用')
+    }
+
+    this.lastMinutesRequestKey = requestKey
+    this.lastMinutesPromise = bridge
+      .generateMeetingMinutes({
+        segments,
+        ...normalizedContext,
+      })
+      .then((result): MeetingMinutes => {
+        if (!result.ok) {
+          throw new Error(result.error)
+        }
+
+        return result.minutes
+      })
+      .catch((error) => {
+        if (this.lastMinutesRequestKey === requestKey) {
+          this.lastMinutesRequestKey = null
+          this.lastMinutesPromise = null
+        }
+
+        throw error
+      })
+
+    return this.lastMinutesPromise
+  }
+
   async detectPhase(
     segments: TranscriptSegment[],
     context?: AnalysisPromptContext,
@@ -321,6 +369,13 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ): Promise<MeetingSummary> {
     return this.ensureMeetingSummary(segments, context)
+  }
+
+  async generateMeetingMinutes(
+    segments: TranscriptSegment[],
+    context?: AnalysisPromptContext,
+  ): Promise<MeetingMinutes> {
+    return this.ensureMeetingMinutes(segments, context)
   }
 
   async answerInterviewQuestion(

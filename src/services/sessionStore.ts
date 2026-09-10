@@ -2,8 +2,10 @@ import mockAnalysis from '../sample/mockAnalysis.json'
 import mockTranscript from '../sample/mockTranscript.json'
 import { normalizeFunctionType } from './analysisNormalization'
 import { normalizeMindMapSnapshot } from './mindMapTransform'
+import { resolveScenarioProfile } from '../scenarios'
 import type {
   ConsensusAnalysis,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   PhaseType,
@@ -171,6 +173,46 @@ const normalizeMeetingSummary = (
     speech60s: speech60s || keyPoints[0] || '暂无总结发言',
     keyPoints: keyPoints.length > 0 ? keyPoints : ['待补充关键要点'],
     nextSteps: nextSteps.length > 0 ? nextSteps : ['待补充下一步动作'],
+    updatedAt: asFiniteNumber(record.updatedAt, fallbackTimestamp),
+  }
+}
+
+const normalizeMeetingMinutes = (
+  value: unknown,
+  fallbackTimestamp: number,
+): MeetingMinutes | null => {
+  const record = isRecord(value) ? value : null
+
+  if (!record) {
+    return null
+  }
+
+  const topics = (Array.isArray(record.topics) ? record.topics : [])
+    .filter(isRecord)
+    .map((topic) => ({
+      topic: asString(topic.topic),
+      points: uniqueStrings(topic.points),
+      conclusion: asString(topic.conclusion),
+    }))
+    .filter((topic) => topic.topic || topic.points.length > 0)
+  const actionItems = (
+    Array.isArray(record.actionItems) ? record.actionItems : []
+  )
+    .filter(isRecord)
+    .map((item) => ({
+      owner: asString(item.owner),
+      task: asString(item.task),
+      due: asString(item.due),
+    }))
+    .filter((item) => item.task)
+
+  return {
+    title: asString(record.title, '会议纪要'),
+    overview: asString(record.overview, '本次会议内容已整理。'),
+    topics,
+    decisions: uniqueStrings(record.decisions),
+    openQuestions: uniqueStrings(record.openQuestions),
+    actionItems,
     updatedAt: asFiniteNumber(record.updatedAt, fallbackTimestamp),
   }
 }
@@ -456,6 +498,10 @@ const normalizeSessionRecord = (
       ...derivedMindMaps,
     ]),
     meetingSummary: normalizeMeetingSummary(value.meetingSummary, endedAt),
+    meetingMinutes: normalizeMeetingMinutes(value.meetingMinutes, endedAt),
+    scenarioId: resolveScenarioProfile(
+      asString(value.scenarioId, 'group-interview'),
+    ).id,
     speakerProfiles,
     speakerOrder: normalizeSpeakerOrder(
       value.speakerOrder,
@@ -527,6 +573,8 @@ const buildDemoSession = (): SessionRecord => {
         .filter((snapshot): snapshot is MindMapSnapshot => snapshot !== null),
     ),
     meetingSummary: null,
+    meetingMinutes: null,
+    scenarioId: 'group-interview',
     speakerProfiles,
     speakerOrder: Object.keys(speakerProfiles),
   }

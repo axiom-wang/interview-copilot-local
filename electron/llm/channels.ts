@@ -10,5 +10,8 @@ export const GENERATE_MIND_MAP_CHANNEL =
 export const GENERATE_MEETING_SUMMARY_CHANNEL =
   'interview-copilot:generate-meeting-summary'
 
+export const GENERATE_MEETING_MINUTES_CHANNEL =
+  'interview-copilot:generate-meeting-minutes'
+
 export const ANSWER_INTERVIEW_QUESTION_CHANNEL =
   'interview-copilot:answer-interview-question'

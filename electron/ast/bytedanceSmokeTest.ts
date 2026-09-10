@@ -1,11 +1,16 @@
 import type { IncomingMessage } from 'node:http'
 import WebSocket, { type ErrorEvent } from 'ws'
-import { getByteDanceAstRuntimeConfig } from './bytedanceConfig'
+import {
+  getByteDanceAstRuntimeConfig,
+  type ByteDanceAstRuntimeConfigOverride,
+} from './bytedanceConfig'
 
 const CONNECTION_TIMEOUT_MS = 5000
 
-export const smokeTestByteDanceAstConnection = async () => {
-  const config = getByteDanceAstRuntimeConfig()
+export const smokeTestByteDanceAstConnection = async (
+  override?: ByteDanceAstRuntimeConfigOverride,
+) => {
+  const config = getByteDanceAstRuntimeConfig(override)
 
   return new Promise<void>((resolve, reject) => {
     const socket = new WebSocket(config.wsUrl, {

@@ -260,7 +260,7 @@ export const openMeetingSummaryWindow = (summary: MeetingSummary) => {
       <h1>总结发言</h1>
       <p class="meta">更新时间：${escapeHtml(formatTimestamp(summary.updatedAt))}</p>
       <div class="section">
-        <h2 class="section-title">60秒口播稿</h2>
+        <h2 class="section-title">口播稿</h2>
         <p class="speech">${escapeHtml(summary.speech60s)}</p>
       </div>
       <div class="section">

@@ -6,6 +6,7 @@ import { PhasePanel } from '../components/PhasePanel'
 import { ReplayTimeline } from '../components/ReplayTimeline'
 import { SummaryPreviewPanel } from '../components/SummaryPreviewPanel'
 import { TranscriptPanel } from '../components/TranscriptPanel'
+import { Tabs } from '../components/ui/Tabs'
 import {
   exportSessionAsJson,
   exportSessionAsMarkdown,
@@ -77,14 +78,14 @@ export function ReplayPage() {
 
   if (!selectedSession || activeReplayTimestamp === null) {
     return (
-      <div className="panel-card panel-empty theme-muted flex min-h-[680px] items-center justify-center rounded-[28px] text-sm">
+      <div className="panel-card panel-empty theme-muted flex min-h-[480px] items-center justify-center text-sm">
         当前还没有可回放的会话。
       </div>
     )
   }
 
   return (
-    <div className="grid h-full gap-4 xl:grid-cols-[360px_1fr]">
+    <div className="grid h-full gap-4 xl:grid-cols-[300px_minmax(0,1fr)_minmax(360px,400px)]">
       <div className="self-start">
         <ReplayTimeline
           onChangeTimestamp={setReplayTimestamp}
@@ -101,75 +102,107 @@ export function ReplayPage() {
         />
       </div>
 
-      <div className="flex min-h-[780px] min-w-0 flex-col gap-4">
-        <div className="grid min-h-[720px] gap-4 xl:grid-cols-[minmax(0,1.12fr)_minmax(360px,0.88fr)]">
-          <TranscriptPanel
-            description="回放模式下，转写视图与实时模式保持一致，方便从现场切换到复盘时维持同一套工作视角。"
-            emptyMessage={
-              searchTerm
-                ? '当前搜索条件下没有匹配的转写片段。'
-                : '当前回放时间点还没有转写内容。'
-            }
-            headerControls={
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <label className="theme-input rounded-[20px] px-4 py-3 xl:max-w-md xl:flex-1">
-                    <span className="sr-only">搜索转写</span>
-                    <input
-                      className="theme-title w-full bg-transparent text-sm outline-none placeholder:text-[color:var(--text-muted)]"
-                      onChange={(event) => setSearchTerm(event.currentTarget.value)}
-                      placeholder="搜索转写内容或发言人"
-                      type="search"
-                      value={searchTerm}
-                    />
-                  </label>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      className="theme-button-primary rounded-full border px-4 py-2 text-sm transition"
-                      onClick={() => exportSessionAsJson(selectedSession)}
-                      type="button"
-                    >
-                      导出 JSON
-                    </button>
-                    <button
-                      className="theme-button-neutral rounded-full border px-4 py-2 text-sm transition"
-                      onClick={() => exportSessionAsMarkdown(selectedSession)}
-                      type="button"
-                    >
-                      导出 Markdown
-                    </button>
-                  </div>
-                </div>
+      <div className="min-h-[520px] min-w-0 xl:min-h-[640px]">
+        <TranscriptPanel
+          description="回放模式下转写视图与实时模式保持一致，方便从现场切换到复盘。"
+          emptyMessage={
+            searchTerm
+              ? '当前搜索条件下没有匹配的转写片段。'
+              : '当前回放时间点还没有转写内容。'
+          }
+          headerControls={
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <label className="theme-input px-3 py-2.5 xl:max-w-md xl:flex-1">
+                  <span className="sr-only">搜索转写</span>
+                  <input
+                    className="theme-title w-full bg-transparent text-sm outline-none placeholder:text-[color:var(--text-muted)]"
+                    onChange={(event) => setSearchTerm(event.currentTarget.value)}
+                    placeholder="搜索转写内容或发言人"
+                    type="search"
+                    value={searchTerm}
+                  />
+                </label>
 
                 <div className="flex flex-wrap gap-2">
-                  <span className="status-badge">会话：{selectedSession.title}</span>
-                  <span className="status-badge">可见片段：{visibleSegments.length}</span>
-                  <span className="status-badge">搜索结果：{filteredSegments.length}</span>
+                  <button
+                    className="btn-secondary"
+                    onClick={() => exportSessionAsJson(selectedSession)}
+                    type="button"
+                  >
+                    导出 JSON
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => exportSessionAsMarkdown(selectedSession)}
+                    type="button"
+                  >
+                    导出 Markdown
+                  </button>
                 </div>
               </div>
-            }
-            pinnedSegments={selectedSession.pinnedSegments}
-            searchTerm={searchTerm}
-            segments={filteredSegments}
-            speakerProfiles={speakerProfiles}
-            title="回放转写"
-          />
 
-          <div className="grid min-w-0 content-start gap-4">
-            <PhasePanel phaseAnalysis={activeSnapshot?.phaseAnalysis ?? null} />
-            <ConsensusPanel
-              analysis={activeSnapshot?.consensusAnalysis ?? null}
-              detailSegments={visibleSegments}
-              speakerProfiles={speakerProfiles}
-            />
-            <HintsPanel hints={activeSnapshot?.speakingHints ?? null} />
-            <div className="grid gap-4 2xl:grid-cols-2">
-              <MindMapPanel snapshot={activeSnapshot?.mindMapSnapshot ?? null} />
-              <SummaryPreviewPanel summary={selectedSession.meetingSummary ?? null} />
+              <div className="flex flex-wrap gap-2">
+                <span className="status-badge">会话：{selectedSession.title}</span>
+                {selectedSession.id === 'session-demo' ? (
+                  <span className="status-badge" data-tone="primary">
+                    示例数据
+                  </span>
+                ) : null}
+                <span className="status-badge">可见片段：{visibleSegments.length}</span>
+                <span className="status-badge">搜索结果：{filteredSegments.length}</span>
+              </div>
             </div>
-          </div>
-        </div>
+          }
+          pinnedSegments={selectedSession.pinnedSegments}
+          searchTerm={searchTerm}
+          segments={filteredSegments}
+          speakerProfiles={speakerProfiles}
+          title="回放转写"
+        />
+      </div>
+
+      <div className="flex min-h-[520px] min-w-0 flex-col gap-4 xl:min-h-[640px]">
+        <PhasePanel
+          phaseAnalysis={activeSnapshot?.phaseAnalysis ?? null}
+          scenarioId={selectedSession.scenarioId}
+        />
+        <HintsPanel hints={activeSnapshot?.speakingHints ?? null} />
+        <Tabs
+          className="min-h-0 flex-1"
+          defaultTabId="consensus"
+          items={[
+            {
+              id: 'consensus',
+              label: '共识分歧',
+              content: (
+                <ConsensusPanel
+                  analysis={activeSnapshot?.consensusAnalysis ?? null}
+                  detailSegments={visibleSegments}
+                  speakerProfiles={speakerProfiles}
+                />
+              ),
+            },
+            {
+              id: 'mindmap',
+              label: '思维导图',
+              content: (
+                <MindMapPanel snapshot={activeSnapshot?.mindMapSnapshot ?? null} />
+              ),
+            },
+            {
+              id: 'summary',
+              label: '会议总结',
+              content: (
+                <SummaryPreviewPanel
+                  minutes={selectedSession.meetingMinutes ?? null}
+                  scenarioId={selectedSession.scenarioId}
+                  summary={selectedSession.meetingSummary ?? null}
+                />
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   )

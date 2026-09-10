@@ -45,6 +45,8 @@ export interface OpenAiRuntimeConfig {
   baseURL: string
 }
 
+export type OpenAiRuntimeConfigOverride = Partial<OpenAiRuntimeConfig>
+
 const readRuntimeEnv = (key: string) => {
   const netlifyEnv = (
     globalThis as typeof globalThis & {
@@ -55,14 +57,19 @@ const readRuntimeEnv = (key: string) => {
   return netlifyEnv?.trim() || process.env[key]?.trim()
 }
 
-export const getOpenAiRuntimeConfig = (): OpenAiRuntimeConfig => {
-  const apiKey = readRuntimeEnv('OPENAI_API_KEY')
-  const model = readRuntimeEnv('OPENAI_MODEL') || 'gpt-5.4-mini'
+export const getOpenAiRuntimeConfig = (
+  override?: OpenAiRuntimeConfigOverride,
+): OpenAiRuntimeConfig => {
+  const apiKey = override?.apiKey?.trim() || readRuntimeEnv('OPENAI_API_KEY')
+  const model =
+    override?.model?.trim() || readRuntimeEnv('OPENAI_MODEL') || 'gpt-5.4-mini'
   const baseURL =
-    readRuntimeEnv('OPENAI_BASE_URL')?.replace(/\/$/, '') || DEFAULT_OPENAI_BASE_URL
+    override?.baseURL?.trim().replace(/\/$/, '') ||
+    readRuntimeEnv('OPENAI_BASE_URL')?.replace(/\/$/, '') ||
+    DEFAULT_OPENAI_BASE_URL
 
   if (!apiKey) {
-    throw new Error('缺少 OPENAI_API_KEY，请先在 .env 中配置')
+    throw new Error('缺少 OpenAI API Key，请先在设置中配置文本分析模型。')
   }
 
   return {

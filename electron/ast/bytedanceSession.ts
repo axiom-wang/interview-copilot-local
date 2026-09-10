@@ -14,6 +14,12 @@ type ByteDanceStartOptions = {
   mode?: 's2t' | 's2s'
   sourceLanguage?: string
   targetLanguage?: string
+  credentials?: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }
 }
 
 type SpeakerStability = 'stable' | 'unstable'
@@ -224,7 +230,7 @@ export class ByteDanceAstSession {
     await this.stop()
 
     this.protoRuntime = await loadProtoRuntime()
-    const config = getByteDanceAstRuntimeConfig()
+    const config = getByteDanceAstRuntimeConfig(options.credentials)
     this.connectionId = randomUUID()
     this.sessionId = randomUUID()
     this.sessionEpochMs = Date.now()

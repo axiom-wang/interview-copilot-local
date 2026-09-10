@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import type {
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseConsensusAnalysisBundle,
   SpeakingHints,
@@ -11,6 +12,7 @@ import type { TranscriptSegment } from '../../src/types/transcript'
 import {
   analyzeTranscriptRealtimeBundle,
   answerInterviewQuestionOnly,
+  generateMeetingMinutesOnly,
   generateMeetingSummaryOnly,
   generateSpeakingHintsOnly,
   generateTranscriptMindMap,
@@ -18,6 +20,7 @@ import {
 import {
   ANALYZE_TRANSCRIPT_REALTIME_CHANNEL,
   ANSWER_INTERVIEW_QUESTION_CHANNEL,
+  GENERATE_MEETING_MINUTES_CHANNEL,
   GENERATE_MEETING_SUMMARY_CHANNEL,
   GENERATE_MIND_MAP_CHANNEL,
   GENERATE_SPEAKING_HINTS_CHANNEL,
@@ -71,6 +74,16 @@ type MeetingSummaryResult =
       error: string
     }
 
+type MeetingMinutesResult =
+  | {
+      ok: true
+      minutes: MeetingMinutes
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 type InterviewQuestionResult =
   | {
       ok: true
@@ -111,6 +124,7 @@ const validateRequest = (request: TranscriptRequest) => {
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.phaseContext) ||
+    !isStringOrUndefined(request.scenarioId) ||
     !isSummaryAssemblyContext(request.summaryAssemblyContext)
   ) {
     throw new Error('无效的上下文输入')
@@ -130,6 +144,7 @@ const validateInterviewQuestionRequest = (
 const toPromptContext = (
   request: TranscriptRequest,
 ): AnalysisPromptContext => ({
+  scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
   phaseContext: request.phaseContext?.trim() || undefined,
@@ -141,6 +156,7 @@ export const registerLlmIpcHandlers = () => {
   ipcMain.removeHandler(GENERATE_SPEAKING_HINTS_CHANNEL)
   ipcMain.removeHandler(GENERATE_MIND_MAP_CHANNEL)
   ipcMain.removeHandler(GENERATE_MEETING_SUMMARY_CHANNEL)
+  ipcMain.removeHandler(GENERATE_MEETING_MINUTES_CHANNEL)
   ipcMain.removeHandler(ANSWER_INTERVIEW_QUESTION_CHANNEL)
 
   ipcMain.handle(
@@ -234,6 +250,30 @@ export const registerLlmIpcHandlers = () => {
         return {
           ok: false,
           error: error instanceof Error ? error.message : '未知总结发言生成错误',
+        }
+      }
+    },
+  )
+
+  ipcMain.handle(
+    GENERATE_MEETING_MINUTES_CHANNEL,
+    async (_event, request: TranscriptRequest): Promise<MeetingMinutesResult> => {
+      try {
+        validateRequest(request)
+
+        const minutes = await generateMeetingMinutesOnly(
+          request.segments,
+          toPromptContext(request),
+        )
+
+        return {
+          ok: true,
+          minutes,
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : '未知会议纪要生成错误',
         }
       }
     },

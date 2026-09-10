@@ -1,6 +1,7 @@
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   SpeakingHints,
@@ -32,6 +33,10 @@ export interface LlmProvider {
     segments: TranscriptSegment[],
     context?: AnalysisPromptContext,
   ): Promise<MeetingSummary>
+  generateMeetingMinutes(
+    segments: TranscriptSegment[],
+    context?: AnalysisPromptContext,
+  ): Promise<MeetingMinutes>
   answerInterviewQuestion(
     question: string,
     segments: TranscriptSegment[],

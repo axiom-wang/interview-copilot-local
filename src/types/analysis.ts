@@ -47,6 +47,28 @@ export interface MeetingSummary {
   updatedAt: number
 }
 
+export interface MeetingMinutesTopic {
+  topic: string
+  points: string[]
+  conclusion: string
+}
+
+export interface MeetingMinutesActionItem {
+  owner: string
+  task: string
+  due: string
+}
+
+export interface MeetingMinutes {
+  title: string
+  overview: string
+  topics: MeetingMinutesTopic[]
+  decisions: string[]
+  openQuestions: string[]
+  actionItems: MeetingMinutesActionItem[]
+  updatedAt: number
+}
+
 export interface InterviewQaAnswer {
   conclusion: string
   reasoning: string[]

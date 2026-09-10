@@ -36,6 +36,12 @@ export class RemoteByteDanceAstProvider implements AstProvider {
 
   private readonly audioCapture = new AudioCaptureService()
   private readonly wsUrl: string
+  private credentials: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  } = {}
 
   private socket: WebSocket | null = null
   private onSegment: TranscriptSegmentCallback | undefined
@@ -52,6 +58,20 @@ export class RemoteByteDanceAstProvider implements AstProvider {
 
   constructor(wsUrl: string) {
     this.wsUrl = wsUrl
+  }
+
+  setCredentials(credentials: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }) {
+    this.credentials = {
+      appId: credentials.appId?.trim() || undefined,
+      accessToken: credentials.accessToken?.trim() || undefined,
+      resourceId: credentials.resourceId?.trim() || undefined,
+      wsUrl: credentials.wsUrl?.trim() || undefined,
+    }
   }
 
   async start(
@@ -228,6 +248,7 @@ export class RemoteByteDanceAstProvider implements AstProvider {
       mode: 's2t',
       sourceLanguage: 'zh',
       targetLanguage: 'en',
+      credentials: this.credentials,
     })
   }
 

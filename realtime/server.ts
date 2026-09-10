@@ -12,6 +12,12 @@ type StartMessage = {
   mode?: 's2t' | 's2s'
   sourceLanguage?: string
   targetLanguage?: string
+  credentials?: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }
 }
 
 type StopMessage = {
@@ -156,6 +162,7 @@ const attachAstSession = (socket: ManagedWebSocket) => {
         mode: message.mode,
         sourceLanguage: message.sourceLanguage,
         targetLanguage: message.targetLanguage,
+        credentials: message.credentials,
       })
       activeSession = session
     } catch (error) {

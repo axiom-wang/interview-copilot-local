@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseConsensusAnalysisBundle,
   SpeakingHints,
@@ -21,6 +22,7 @@ import {
 import {
   ANALYZE_TRANSCRIPT_REALTIME_CHANNEL,
   ANSWER_INTERVIEW_QUESTION_CHANNEL,
+  GENERATE_MEETING_MINUTES_CHANNEL,
   GENERATE_MEETING_SUMMARY_CHANNEL,
   GENERATE_SPEAKING_HINTS_CHANNEL,
   GENERATE_MIND_MAP_CHANNEL,
@@ -68,6 +70,16 @@ type GenerateMeetingSummaryResult =
   | {
       ok: true
       summary: MeetingSummary
+    }
+  | {
+      ok: false
+      error: string
+    }
+
+type GenerateMeetingMinutesResult =
+  | {
+      ok: true
+      minutes: MeetingMinutes
     }
   | {
       ok: false
@@ -130,14 +142,25 @@ contextBridge.exposeInMainWorld('interviewCopilot', {
       GENERATE_MEETING_SUMMARY_CHANNEL,
       request,
     ) as Promise<GenerateMeetingSummaryResult>,
+  generateMeetingMinutes: (request: TranscriptRequest) =>
+    ipcRenderer.invoke(
+      GENERATE_MEETING_MINUTES_CHANNEL,
+      request,
+    ) as Promise<GenerateMeetingMinutesResult>,
   answerInterviewQuestion: (request: InterviewQuestionRequest) =>
     ipcRenderer.invoke(
       ANSWER_INTERVIEW_QUESTION_CHANNEL,
       request,
     ) as Promise<AnswerInterviewQuestionResult>,
-  smokeTestByteDanceAstConnection: () =>
+  smokeTestByteDanceAstConnection: (request?: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }) =>
     ipcRenderer.invoke(
       SMOKE_TEST_BYTEDANCE_AST_CHANNEL,
+      request,
     ) as Promise<SmokeTestByteDanceAstResult>,
   startByteDanceAstSession: (request: StartByteDanceAstSessionRequest) =>
     ipcRenderer.invoke(

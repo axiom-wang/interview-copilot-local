@@ -7,6 +7,7 @@ import { normalizeMindMapSnapshot } from '../../src/services/mindMapTransform'
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   PhaseType,
@@ -124,6 +125,46 @@ export const parseMeetingSummary = (
     speech60s,
     keyPoints: coerceStringArray(value.keyPoints, { maxItems: 5 }),
     nextSteps: coerceStringArray(value.nextSteps, { maxItems: 4 }),
+    updatedAt,
+  }
+}
+
+export const parseMeetingMinutes = (
+  value: unknown,
+  updatedAt: number,
+): MeetingMinutes => {
+  if (!isObject(value)) {
+    throw new Error('meeting minutes response format is invalid')
+  }
+
+  const topics = Array.isArray(value.topics)
+    ? value.topics
+        .filter(isObject)
+        .map((topic) => ({
+          topic: coerceString(topic.topic),
+          points: coerceStringArray(topic.points),
+          conclusion: coerceString(topic.conclusion),
+        }))
+        .filter((topic) => topic.topic || topic.points.length > 0)
+    : []
+  const actionItems = Array.isArray(value.actionItems)
+    ? value.actionItems
+        .filter(isObject)
+        .map((item) => ({
+          owner: coerceString(item.owner),
+          task: coerceString(item.task),
+          due: coerceString(item.due),
+        }))
+        .filter((item) => item.task)
+    : []
+
+  return {
+    title: coerceString(value.title, '会议纪要'),
+    overview: coerceString(value.overview, '本次会议内容已整理。'),
+    topics,
+    decisions: coerceStringArray(value.decisions),
+    openQuestions: coerceStringArray(value.openQuestions),
+    actionItems,
     updatedAt,
   }
 }

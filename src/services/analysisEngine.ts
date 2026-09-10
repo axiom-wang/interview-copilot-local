@@ -1,6 +1,7 @@
 import type { LlmProvider } from '../providers/llm/LlmProvider'
 import type {
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseConsensusAnalysisBundle,
   SpeakingHints,
@@ -29,6 +30,12 @@ export interface MindMapRunResult {
 
 export interface MeetingSummaryRunResult {
   summary: MeetingSummary
+  providerLabel: string
+  warning?: string
+}
+
+export interface MeetingMinutesRunResult {
+  minutes: MeetingMinutes
   providerLabel: string
   warning?: string
 }
@@ -167,6 +174,39 @@ export const generateMeetingSummaryWithFallback = async (
         error instanceof Error
           ? error.message
           : '未知总结通道错误，已回退到模拟总结。',
+    }
+  }
+}
+
+export const generateMeetingMinutesWithFallback = async (
+  primaryProvider: LlmProvider,
+  fallbackProvider: LlmProvider,
+  segments: TranscriptSegment[],
+  context?: AnalysisPromptContext,
+): Promise<MeetingMinutesRunResult> => {
+  try {
+    const minutes = await primaryProvider.generateMeetingMinutes(
+      segments,
+      context,
+    )
+
+    return {
+      minutes,
+      providerLabel: primaryProvider.label,
+    }
+  } catch (error) {
+    const minutes = await fallbackProvider.generateMeetingMinutes(
+      segments,
+      context,
+    )
+
+    return {
+      minutes,
+      providerLabel: `${primaryProvider.label} -> ${fallbackProvider.label}`,
+      warning:
+        error instanceof Error
+          ? error.message
+          : '未知会议纪要通道错误，已回退到模拟纪要。',
     }
   }
 }

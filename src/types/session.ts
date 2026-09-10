@@ -1,9 +1,11 @@
 import type {
   ConsensusAnalysis,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   SpeakingHints,
 } from './analysis'
+import type { MeetingScenarioId } from '../scenarios'
 import type { MindMapSnapshot } from './mindmap'
 import type { SpeakerProfile } from './speaker'
 import type { TranscriptSegment } from './transcript'
@@ -34,6 +36,8 @@ export interface SessionRecord {
   analysisSnapshots: ReplaySnapshot[]
   mindMapSnapshots: MindMapSnapshot[]
   meetingSummary: MeetingSummary | null
+  meetingMinutes: MeetingMinutes | null
+  scenarioId: MeetingScenarioId
   speakerProfiles: Record<string, SpeakerProfile>
   speakerOrder: string[]
 }

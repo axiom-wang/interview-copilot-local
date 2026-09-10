@@ -9,16 +9,17 @@ interface RuntimeMessageStripProps {
 }
 
 const toneClassNames: Record<RuntimeMessageTone, string> = {
-  info: 'border-cyan-300/18 bg-cyan-300/10 text-[color:var(--button-primary-text)]',
+  info: 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-[color:var(--accent-text)]',
   warning:
-    'border-amber-300/24 bg-amber-300/10 text-[color:var(--button-warning-text)]',
-  error: 'border-rose-300/22 bg-rose-300/10 text-[color:var(--button-danger-text)]',
+    'border-[color:var(--warning-border)] bg-[color:var(--warning-soft)] text-[color:var(--warning-text)]',
+  error:
+    'border-[color:var(--danger-border)] bg-[color:var(--danger-soft)] text-[color:var(--danger-text)]',
 }
 
 const toneLabels: Record<RuntimeMessageTone, string> = {
-  info: 'Info',
-  warning: 'Warning',
-  error: 'Error',
+  info: '提示',
+  warning: '注意',
+  error: '错误',
 }
 
 export function RuntimeMessageStrip({
@@ -29,7 +30,7 @@ export function RuntimeMessageStrip({
   return (
     <div
       className={clsx(
-        'rounded-[22px] border px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]',
+        'rounded-[var(--radius-panel)] border px-4 py-3',
         toneClassNames[tone],
         className,
       )}

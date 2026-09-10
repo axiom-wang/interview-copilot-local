@@ -2,6 +2,7 @@
 
 import type {
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseConsensusAnalysisBundle,
   SpeakingHints,
@@ -59,6 +60,16 @@ type GenerateMeetingSummaryResult =
       error: string
     }
 
+type GenerateMeetingMinutesResult =
+  | {
+      ok: true
+      minutes: MeetingMinutes
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 type AnswerInterviewQuestionResult =
   | {
       ok: true
@@ -82,6 +93,12 @@ interface StartByteDanceAstSessionRequest {
   mode?: 's2t' | 's2s'
   sourceLanguage?: string
   targetLanguage?: string
+  credentials?: {
+    appId?: string
+    accessToken?: string
+    resourceId?: string
+    wsUrl?: string
+  }
 }
 
 type StartByteDanceAstSessionResult =
@@ -96,6 +113,7 @@ type StartByteDanceAstSessionResult =
 declare global {
   interface ImportMetaEnv {
     readonly VITE_REALTIME_WS_URL?: string
+    readonly VITE_FORCE_MOCK_AUTH?: string
   }
 
   interface Window {
@@ -113,10 +131,18 @@ declare global {
       generateMeetingSummary?: (
         request: TranscriptRequest,
       ) => Promise<GenerateMeetingSummaryResult>
+      generateMeetingMinutes?: (
+        request: TranscriptRequest,
+      ) => Promise<GenerateMeetingMinutesResult>
       answerInterviewQuestion?: (
         request: InterviewQuestionRequest,
       ) => Promise<AnswerInterviewQuestionResult>
-      smokeTestByteDanceAstConnection?: () => Promise<SmokeTestByteDanceAstResult>
+      smokeTestByteDanceAstConnection?: (request?: {
+        appId?: string
+        accessToken?: string
+        resourceId?: string
+        wsUrl?: string
+      }) => Promise<SmokeTestByteDanceAstResult>
       startByteDanceAstSession?: (
         request: StartByteDanceAstSessionRequest,
       ) => Promise<StartByteDanceAstSessionResult>

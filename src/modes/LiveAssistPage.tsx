@@ -6,8 +6,10 @@ import { PhasePanel } from '../components/PhasePanel'
 import { RuntimeMessageStrip } from '../components/RuntimeMessageStrip'
 import { SummaryPreviewPanel } from '../components/SummaryPreviewPanel'
 import { TranscriptPanel } from '../components/TranscriptPanel'
+import { Tabs } from '../components/ui/Tabs'
 import { exportLiveTranscriptAsTxt } from '../services/transcriptExport'
 import { useAppStore } from '../store/useAppStore'
+import { useSettingsStore } from '../store/useSettingsStore'
 import type { SpeakerProfile } from '../types/speaker'
 
 const getSpeakerDisplayName = (
@@ -43,6 +45,9 @@ export function LiveAssistPage() {
   const meetingSummary = useAppStore((state) => state.meetingSummary)
   const summaryStale = useAppStore((state) => state.summaryStale)
   const isGeneratingSummary = useAppStore((state) => state.isGeneratingSummary)
+  const meetingMinutes = useAppStore((state) => state.meetingMinutes)
+  const minutesStale = useAppStore((state) => state.minutesStale)
+  const isGeneratingMinutes = useAppStore((state) => state.isGeneratingMinutes)
   const aiQuestionDraft = useAppStore((state) => state.aiQuestionDraft)
   const aiQaHistory = useAppStore((state) => state.aiQaHistory)
   const aiQaError = useAppStore((state) => state.aiQaError)
@@ -51,6 +56,7 @@ export function LiveAssistPage() {
   const statusMessage = useAppStore((state) => state.statusMessage)
   const speakerStability = useAppStore((state) => state.speakerStability)
   const isAnalyzing = useAppStore((state) => state.isAnalyzing)
+  const supportsLiveAssist = useAppStore((state) => state.supportsLiveAssist)
   const markSpeakerAsMe = useAppStore((state) => state.markSpeakerAsMe)
   const renameSpeaker = useAppStore((state) => state.renameSpeaker)
   const clearSpeakerBinding = useAppStore((state) => state.clearSpeakerBinding)
@@ -60,9 +66,14 @@ export function LiveAssistPage() {
   const generateMeetingSummary = useAppStore(
     (state) => state.generateMeetingSummary,
   )
+  const generateMeetingMinutes = useAppStore(
+    (state) => state.generateMeetingMinutes,
+  )
   const setAiQuestionDraft = useAppStore((state) => state.setAiQuestionDraft)
   const askAiQuestion = useAppStore((state) => state.askAiQuestion)
   const clearAiQaHistory = useAppStore((state) => state.clearAiQaHistory)
+  const setActiveView = useAppStore((state) => state.setActiveView)
+  const hasFullConfig = useSettingsStore((state) => state.hasFullConfig)
 
   const pinnedSegments = liveSegments
     .filter((segment) => pinnedSegmentIds.includes(segment.id))
@@ -116,9 +127,29 @@ export function LiveAssistPage() {
     exportLiveTranscriptAsTxt(liveSegments, speakerProfiles)
   }
 
+  const needsSetup = !hasFullConfig() || !supportsLiveAssist
+
   return (
-    <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.1fr)]">
-      <div className="flex min-h-[720px] min-w-0 flex-col gap-4">
+    <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,420px)]">
+      <div className="flex min-h-[520px] min-w-0 flex-col gap-4 xl:min-h-[640px]">
+        {needsSetup ? (
+          <div className="panel-card border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] p-4">
+            <h3 className="theme-title text-sm font-semibold">开始前请完成配置</h3>
+            <p className="theme-body mt-2 text-sm leading-6">
+              {!hasFullConfig()
+                ? '请先填写语音转写与文本分析模型配置，才能开始实时辅助。'
+                : '实时转写服务地址尚未配置，当前仅可使用回放与设置。'}
+            </p>
+            <button
+              className="btn-primary mt-3"
+              onClick={() => setActiveView('settings')}
+              type="button"
+            >
+              前往模型设置
+            </button>
+          </div>
+        ) : null}
+
         {runtimeMessage ? (
           <RuntimeMessageStrip
             message={runtimeMessage.message}
@@ -127,7 +158,7 @@ export function LiveAssistPage() {
         ) : null}
 
         <TranscriptPanel
-          description="转写区保持第一优先级。你可以在这里查看实时滚动内容、标记关键片段，并在需要时快速修正说话人映射。"
+          description="实时转写始终放在左侧，方便边听边跟进。可标记关键片段并修正说话人。"
           onClearSpeakerBinding={(speakerId) => clearSpeakerBinding(speakerId)}
           onDeleteSegment={deleteLiveSegment}
           onExportAll={handleExportAllTranscript}
@@ -140,71 +171,99 @@ export function LiveAssistPage() {
         />
       </div>
 
-      <div className="grid min-h-[720px] min-w-0 content-start gap-4 xl:grid-cols-2">
-        <div className="min-w-0">
-          <PhasePanel
-            className="h-full"
-            isLoading={isAnalyzing}
-            phaseAnalysis={phaseAnalysis}
-          />
-        </div>
-        <div className="min-w-0">
-          <HintsPanel
-            className="h-full"
-            hints={speakingHints}
-            isRefreshing={isRefreshingHints}
-            isStale={speakingHintsStale}
-            lastUpdatedAt={lastHintsUpdatedAt}
-            onRefresh={() => {
-              void refreshSpeakingHints()
-            }}
-            showRefreshControl
-          />
-        </div>
-        <div className="min-w-0 xl:col-span-2">
-          <ConsensusPanel
-            analysis={consensusAnalysis}
-            detailSegments={liveSegments}
-            isLoading={isAnalyzing}
-            speakerProfiles={speakerProfiles}
-          />
-        </div>
-        <div className="min-w-0 xl:col-span-2">
-          <AiQaPanel
-            disableAsk={disableAiQuestionAsk}
-            error={aiQaError}
-            history={aiQaHistory}
-            isAnswering={isAnsweringQuestion}
-            onAsk={() => {
-              void askAiQuestion()
-            }}
-            onClearHistory={clearAiQaHistory}
-            onQuestionDraftChange={setAiQuestionDraft}
-            questionDraft={aiQuestionDraft}
-          />
-        </div>
-        <div className="grid min-w-0 gap-4 xl:col-span-2 2xl:grid-cols-2">
-          <MindMapPanel
-            disableGenerate={finalSegmentCount === 0}
-            isGenerating={isGeneratingMindMap}
-            isStale={mindMapStale}
-            onGenerate={async () => {
-              await generateMindMap()
-              return Boolean(useAppStore.getState().mindMap)
-            }}
-            snapshot={mindMap}
-          />
-          <SummaryPreviewPanel
-            disableGenerate={finalSegmentCount === 0}
-            isGenerating={isGeneratingSummary}
-            isStale={summaryStale}
-            onGenerate={async () => {
-              await generateMeetingSummary()
-              return Boolean(useAppStore.getState().meetingSummary)
-            }}
-            summary={meetingSummary}
-          />
-        </div>
+      <div className="flex min-h-[520px] min-w-0 flex-col gap-4 xl:min-h-[640px]">
+        <PhasePanel
+          className="shrink-0"
+          isLoading={isAnalyzing}
+          phaseAnalysis={phaseAnalysis}
+        />
+        <HintsPanel
+          className="shrink-0"
+          hints={speakingHints}
+          isRefreshing={isRefreshingHints}
+          isStale={speakingHintsStale}
+          lastUpdatedAt={lastHintsUpdatedAt}
+          onRefresh={() => {
+            void refreshSpeakingHints()
+          }}
+          showRefreshControl
+        />
+
+        <Tabs
+          className="min-h-0 flex-1"
+          defaultTabId="consensus"
+          items={[
+            {
+              id: 'consensus',
+              label: '共识分歧',
+              content: (
+                <ConsensusPanel
+                  analysis={consensusAnalysis}
+                  detailSegments={liveSegments}
+                  isLoading={isAnalyzing}
+                  speakerProfiles={speakerProfiles}
+                />
+              ),
+            },
+            {
+              id: 'qa',
+              label: 'AI 问答',
+              content: (
+                <AiQaPanel
+                  disableAsk={disableAiQuestionAsk}
+                  error={aiQaError}
+                  history={aiQaHistory}
+                  isAnswering={isAnsweringQuestion}
+                  onAsk={() => {
+                    void askAiQuestion()
+                  }}
+                  onClearHistory={clearAiQaHistory}
+                  onQuestionDraftChange={setAiQuestionDraft}
+                  questionDraft={aiQuestionDraft}
+                />
+              ),
+            },
+            {
+              id: 'mindmap',
+              label: '思维导图',
+              content: (
+                <MindMapPanel
+                  disableGenerate={finalSegmentCount === 0}
+                  isGenerating={isGeneratingMindMap}
+                  isStale={mindMapStale}
+                  onGenerate={async () => {
+                    await generateMindMap()
+                    return Boolean(useAppStore.getState().mindMap)
+                  }}
+                  snapshot={mindMap}
+                />
+              ),
+            },
+            {
+              id: 'summary',
+              label: '会议总结',
+              content: (
+                <SummaryPreviewPanel
+                  disableGenerate={finalSegmentCount === 0}
+                  isGenerating={isGeneratingSummary}
+                  isGeneratingMinutes={isGeneratingMinutes}
+                  isStale={summaryStale}
+                  minutes={meetingMinutes}
+                  minutesStale={minutesStale}
+                  onGenerate={async () => {
+                    await generateMeetingSummary()
+                    return Boolean(useAppStore.getState().meetingSummary)
+                  }}
+                  onGenerateMinutes={async () => {
+                    await generateMeetingMinutes()
+                    return Boolean(useAppStore.getState().meetingMinutes)
+                  }}
+                  summary={meetingSummary}
+                />
+              ),
+            },
+          ]}
+        />
       </div>
     </div>
   )

@@ -1,3 +1,6 @@
+import { resolveScenarioProfile, SCENARIO_PROFILES } from '../scenarios'
+import { useAppStore } from '../store/useAppStore'
+
 interface PromptContextInputsProps {
   questionContextDraft: string
   roleContextDraft: string
@@ -14,7 +17,7 @@ interface PromptContextInputsProps {
 }
 
 const contextCardClassName =
-  'theme-inline-card-strong rounded-[24px] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+  'theme-inline-card-strong rounded-[var(--radius-card)] p-4'
 
 const getComparableContextValue = (value: string) =>
   value.replace(/\r\n/g, '\n').trim()
@@ -43,6 +46,9 @@ export function PromptContextInputs({
   onClearRoleContext,
   onToggleCollapsed,
 }: PromptContextInputsProps) {
+  const scenarioId = useAppStore((state) => state.scenarioId)
+  const setScenarioId = useAppStore((state) => state.setScenarioId)
+  const profile = resolveScenarioProfile(scenarioId)
   const isQuestionApplyDisabled =
     !getComparableContextValue(questionContextDraft) ||
     getComparableContextValue(questionContextDraft) ===
@@ -61,7 +67,7 @@ export function PromptContextInputs({
         <div>
           <p className="kicker theme-muted text-[11px]">分析上下文</p>
           <h3 className="theme-title mt-2 text-lg font-semibold">
-            题目与角色信息
+            背景与角色信息
           </h3>
           <p className="theme-muted mt-1 text-sm">
             应用后会参与阶段分析、发言建议、AI 问答与总结生成。
@@ -70,13 +76,13 @@ export function PromptContextInputs({
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="status-badge" data-tone={hasAppliedContext ? 'active' : undefined}>
-            题目：{summarizeContext(appliedQuestionContext)}
+            {profile.topicContextLabel}：{summarizeContext(appliedQuestionContext)}
           </span>
           <span className="status-badge" data-tone={hasAppliedContext ? 'primary' : undefined}>
-            角色：{summarizeContext(appliedRoleContext)}
+            {profile.roleContextLabel}：{summarizeContext(appliedRoleContext)}
           </span>
           <button
-            className="theme-button-neutral rounded-full border px-4 py-2 text-sm transition"
+            className="btn-secondary"
             onClick={onToggleCollapsed}
             type="button"
           >
@@ -87,17 +93,38 @@ export function PromptContextInputs({
 
       {!collapsed ? (
         <div className="mt-4 grid gap-3 xl:grid-cols-2">
+          <div className={`${contextCardClassName} xl:col-span-2`}>
+            <label className="theme-title text-sm font-semibold" htmlFor="meeting-scenario">
+              会议场景
+            </label>
+            <select
+              className="theme-input mt-3 w-full px-4 py-3 text-sm"
+              id="meeting-scenario"
+              onChange={(event) => {
+                setScenarioId(event.currentTarget.value as typeof scenarioId)
+              }}
+              value={scenarioId}
+            >
+              {Object.values(SCENARIO_PROFILES).map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.label} · {scenario.description}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className={contextCardClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="theme-title text-sm font-semibold">题目上下文</h4>
+                <h4 className="theme-title text-sm font-semibold">
+                  {profile.topicContextLabel}
+                </h4>
                 <p className="theme-muted mt-1 text-xs">
-                  填写题目原文、背景、目标与约束。
+                  填写主题、背景、目标与约束。
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className="theme-button-primary rounded-full border px-3 py-1 text-xs transition disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn-primary text-xs"
                   disabled={isQuestionApplyDisabled}
                   onClick={onApplyQuestionContext}
                   type="button"
@@ -105,7 +132,7 @@ export function PromptContextInputs({
                   应用
                 </button>
                 <button
-                  className="theme-button-neutral rounded-full border px-3 py-1 text-xs transition"
+                  className="btn-ghost text-xs"
                   onClick={onClearQuestionContext}
                   type="button"
                 >
@@ -114,11 +141,11 @@ export function PromptContextInputs({
               </div>
             </div>
             <textarea
-              className="theme-input h-32 w-full resize-none rounded-2xl px-4 py-3 text-sm leading-6 outline-none transition"
+              className="theme-input h-32 w-full resize-none rounded-xl px-4 py-3 text-sm leading-6"
               onChange={(event) =>
                 onQuestionContextDraftChange(event.currentTarget.value)
               }
-              placeholder="例如：候选人需要围绕某个业务题做方案分析，兼顾目标、资源、风险和推进节奏。"
+              placeholder={profile.topicPlaceholder}
               value={questionContextDraft}
             />
             <div className="theme-muted mt-3 flex items-center justify-between gap-3 text-xs">
@@ -134,14 +161,16 @@ export function PromptContextInputs({
           <div className={contextCardClassName}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
-                <h4 className="theme-title text-sm font-semibold">角色上下文</h4>
+                <h4 className="theme-title text-sm font-semibold">
+                  {profile.roleContextLabel}
+                </h4>
                 <p className="theme-muted mt-1 text-xs">
                   说明当前身份、职责边界与表达风格。
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className="theme-button-primary rounded-full border px-3 py-1 text-xs transition disabled:cursor-not-allowed disabled:opacity-45"
+                  className="btn-primary text-xs"
                   disabled={isRoleApplyDisabled}
                   onClick={onApplyRoleContext}
                   type="button"
@@ -149,7 +178,7 @@ export function PromptContextInputs({
                   应用
                 </button>
                 <button
-                  className="theme-button-neutral rounded-full border px-3 py-1 text-xs transition"
+                  className="btn-ghost text-xs"
                   onClick={onClearRoleContext}
                   type="button"
                 >
@@ -158,9 +187,9 @@ export function PromptContextInputs({
               </div>
             </div>
             <textarea
-              className="theme-input h-32 w-full resize-none rounded-2xl px-4 py-3 text-sm leading-6 outline-none transition"
+              className="theme-input h-32 w-full resize-none rounded-xl px-4 py-3 text-sm leading-6"
               onChange={(event) => onRoleContextDraftChange(event.currentTarget.value)}
-              placeholder="例如：你是产品经理候选人，需要体现结构化思考、业务判断和协作意识。"
+              placeholder={profile.rolePlaceholder}
               value={roleContextDraft}
             />
             <div className="theme-muted mt-3 flex items-center justify-between gap-3 text-xs">

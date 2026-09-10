@@ -5,7 +5,7 @@
       "phase": {
         "phase": "problem-framing",
         "confidence": 0.86,
-        "nextBestAction": "Lock the interview objective and agree on one target user before feature brainstorming.",
+        "nextBestAction": "Confirm the meeting objective and agree on one target user before feature brainstorming.",
         "reason": "The team is still defining scope, audience, and what success looks like."
       },
       "consensus": {
@@ -17,7 +17,7 @@
           "There is not yet a shared view on the highest-priority user problem."
         ],
         "missing": [
-          "A single evaluation metric for the final recommendation."
+          "A single evaluation metric for the recommendation."
         ]
       },
       "hints": {
@@ -27,10 +27,10 @@
         "hint60s": "Bridge the team by summarizing the goal, then invite quick votes on the target user and top pain point."
       },
       "mindMap": {
-        "topic": "Campus fitness app case",
+        "topic": "Campus fitness app discussion",
         "nodes": [
           { "id": "root", "label": "Campus fitness app", "kind": "root", "x": 0, "y": 0 },
-          { "id": "scope", "label": "Case framing", "kind": "branch", "x": -220, "y": -80, "parentId": "root" },
+          { "id": "scope", "label": "Topic framing", "kind": "branch", "x": -220, "y": -80, "parentId": "root" },
           { "id": "user", "label": "Target user", "kind": "branch", "x": 220, "y": -80, "parentId": "root" },
           { "id": "goal", "label": "Success metric", "kind": "branch", "x": 0, "y": 170, "parentId": "root" }
         ]
@@ -54,7 +54,7 @@
         ],
         "missing": [
           "A north-star metric that ties directly to user behavior.",
-          "A concise final-answer structure for speaking order."
+          "A concise conclusion structure and speaking order."
         ]
       },
       "hints": {
@@ -98,9 +98,9 @@
       },
       "hints": {
         "functionType": "Team alignment",
-        "hint15s": "Summarize the team's current answer in three bullets and propose speaker ownership.",
+        "hint15s": "Summarize the team's current conclusion in three bullets and propose owner assignments.",
         "hint30s": "Bridge to execution by naming the audience, core loop, metric, and rollout in one pass.",
-        "hint60s": "Help the team land the answer by converting agreement into a polished final narrative with speaker roles."
+        "hint60s": "Help the team close by converting agreement into a clear conclusion with owner assignments."
       },
       "mindMap": {
         "topic": "Campus fitness app recommendation",
@@ -119,12 +119,12 @@
       "phase": {
         "phase": "decision-lock",
         "confidence": 0.93,
-        "nextBestAction": "Deliver the final recommendation crisply and keep the close focused on rollout and risks.",
-        "reason": "The group has reached stable alignment and is shifting into final-answer assembly."
+        "nextBestAction": "State the final recommendation crisply and keep the close focused on rollout and risks.",
+        "reason": "The group has reached stable alignment and is shifting into conclusion assembly."
       },
       "consensus": {
         "consensus": [
-          "The answer is ready to be delivered with speaker role allocation.",
+          "The conclusion is ready to be shared with clear owner allocation.",
           "The final output should cover market, product loop, go-to-market, and risk mitigation."
         ],
         "tensions": [
@@ -141,9 +141,9 @@
         "hint60s": "Support the final delivery by sequencing speakers and adding one strong concluding recommendation."
       },
       "mindMap": {
-        "topic": "Final answer structure",
+        "topic": "Final recommendation structure",
         "nodes": [
-          { "id": "root", "label": "Final answer", "kind": "root", "x": 0, "y": 0 },
+          { "id": "root", "label": "Recommendation", "kind": "root", "x": 0, "y": 0 },
           { "id": "market", "label": "Market and user", "kind": "branch", "x": -260, "y": -80, "parentId": "root" },
           { "id": "product", "label": "Product loop", "kind": "branch", "x": 0, "y": -130, "parentId": "root" },
           { "id": "metric", "label": "Metric", "kind": "branch", "x": 250, "y": -80, "parentId": "root" },

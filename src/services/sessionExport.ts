@@ -1,3 +1,4 @@
+import { resolveScenarioProfile } from '../scenarios'
 import type { SessionRecord } from '../types/session'
 
 const sanitizeFileName = (value: string) =>
@@ -67,12 +68,41 @@ export const exportSessionAsMarkdown = (session: SessionRecord) => {
           .join('\n')
       : '- 暂无'
 
+  const profile = resolveScenarioProfile(session.scenarioId)
   const summarySection = session.meetingSummary
     ? `### ${formatDateTime(session.meetingSummary.updatedAt)}
 
-- 60 秒口播：${session.meetingSummary.speech60s}
+- ${profile.spokenSummaryLabel}：${session.meetingSummary.speech60s}
 - 关键要点：${session.meetingSummary.keyPoints.join('；') || '暂无'}
 - 下一步动作：${session.meetingSummary.nextSteps.join('；') || '暂无'}`
+    : '暂无'
+
+  const minutes = session.meetingMinutes
+  const minutesSection = minutes
+    ? `### ${minutes.title || '会议纪要'}
+
+- 概览：${minutes.overview || '暂无'}
+- 已定决策：${minutes.decisions.join('；') || '暂无'}
+- 待定问题：${minutes.openQuestions.join('；') || '暂无'}
+- 行动项：${
+        minutes.actionItems.length > 0
+          ? minutes.actionItems
+              .map((item) => `${item.owner || '待定'}｜${item.task}${item.due ? `｜${item.due}` : ''}`)
+              .join('；')
+          : '暂无'
+      }
+${
+  minutes.topics.length > 0
+    ? minutes.topics
+        .map(
+          (topic) =>
+            `- ${topic.topic}：${topic.points.join('；') || '暂无'}${
+              topic.conclusion ? `（结论：${topic.conclusion}）` : ''
+            }`,
+        )
+        .join('\n')
+    : '- 议题：暂无'
+}`
     : '暂无'
 
   const snapshotSection =
@@ -88,7 +118,7 @@ export const exportSessionAsMarkdown = (session: SessionRecord) => {
 
             return `### ${formatDateTime(snapshot.timestamp)}
 
-- 阶段：${snapshot.phaseAnalysis.phase}
+- 阶段：${profile.phaseLabels[snapshot.phaseAnalysis.phase] ?? snapshot.phaseAnalysis.phase}
 - 下一动作：${nextAction}
 - 共识：${snapshot.consensusAnalysis.consensus.join('；') || '暂无'}
 - 分歧：${snapshot.consensusAnalysis.tensions.join('；') || '暂无'}
@@ -109,6 +139,7 @@ export const exportSessionAsMarkdown = (session: SessionRecord) => {
 
 - 开始时间：${formatDateTime(session.startedAt)}
 - 结束时间：${formatDateTime(session.endedAt)}
+- 会议场景：${profile.label}
 - 转写片段数：${session.transcriptSegments.length}
 - 分析快照数：${session.analysisSnapshots.length}
 - 标记片段数：${session.pinnedSegments.length}
@@ -120,6 +151,10 @@ ${pinnedSection}
 ## 总结发言
 
 ${summarySection}
+
+## 会议纪要
+
+${minutesSection}
 
 ## 时间线快照
 

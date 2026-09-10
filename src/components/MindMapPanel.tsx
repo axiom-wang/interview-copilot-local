@@ -39,18 +39,25 @@ const getThemeToken = (name: string, fallback: string) => {
 }
 
 const getNodeStyle = (type: MindMapNodeType) => ({
-  borderRadius: 18,
-  border: `1px solid ${getThemeToken('--panel-border', 'rgba(148, 163, 184, 0.16)')}`,
+  borderRadius: 8,
+  border: `1px solid ${
+    type === 'root'
+      ? getThemeToken('--accent-border', '#c7d2fe')
+      : getThemeToken('--panel-border', '#e2e8f0')
+  }`,
   background:
     type === 'root'
-      ? getThemeToken('--button-primary-bg', 'rgba(34, 211, 238, 0.14)')
+      ? getThemeToken('--accent-soft', '#eef2ff')
       : type === 'branch'
-        ? getThemeToken('--surface-inline-strong', 'rgba(2, 8, 23, 0.56)')
-        : getThemeToken('--surface-inline', 'rgba(15, 23, 42, 0.44)'),
-  color: getThemeToken('--text-primary', '#f8fbff'),
+        ? getThemeToken('--surface-inline-strong', '#f1f5f9')
+        : getThemeToken('--surface-inline', '#f8fafc'),
+  color:
+    type === 'root'
+      ? getThemeToken('--accent-text', '#3730a3')
+      : getThemeToken('--text-primary', '#0f172a'),
   padding: 10,
   minWidth: type === 'root' ? 180 : 140,
-  boxShadow: getThemeToken('--shadow-soft', '0 12px 30px rgba(2, 8, 23, 0.18)'),
+  boxShadow: getThemeToken('--shadow-sm', '0 1px 2px rgba(15, 23, 42, 0.06)'),
 })
 
 const buildMindMapElements = (snapshot: MindMapSnapshot | null) => {
@@ -73,7 +80,7 @@ const buildMindMapElements = (snapshot: MindMapSnapshot | null) => {
       target: edge.target,
       animated: false,
       style: {
-        stroke: getThemeToken('--panel-border-strong', 'rgba(125, 211, 252, 0.38)'),
+        stroke: getThemeToken('--accent-border', '#c7d2fe'),
         strokeWidth: 1.4,
       },
     })) ?? []
@@ -136,7 +143,7 @@ export function MindMapPanel({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="kicker theme-muted text-[11px]">产出预览</p>
-          <h2 className="theme-title mt-2 font-heading text-2xl">思维导图</h2>
+          <h2 className="theme-title mt-2 text-2xl font-semibold">思维导图</h2>
           <p className="theme-muted mt-2 text-sm">
             直接在应用内预览讨论结构，必要时再放大查看。
           </p>
@@ -153,12 +160,7 @@ export function MindMapPanel({
           ) : null}
           {onGenerate ? (
             <button
-              className={clsx(
-                'rounded-full border px-4 py-2 text-sm transition',
-                disableGenerate || isGenerating
-                  ? 'theme-button-neutral border cursor-not-allowed'
-                  : 'theme-button-primary border',
-              )}
+              className="btn-secondary"
               disabled={disableGenerate || isGenerating}
               onClick={() => {
                 void handleGenerate()
@@ -173,7 +175,7 @@ export function MindMapPanel({
 
       <div
         className={clsx(
-          'theme-viz-surface group mt-5 h-[320px] overflow-hidden rounded-[24px] border',
+          'theme-viz-surface group mt-5 h-[320px] overflow-hidden rounded-[var(--radius-card)] border',
           'theme-divider',
           canExpand ? 'cursor-zoom-in' : '',
         )}
@@ -185,12 +187,12 @@ export function MindMapPanel({
       >
         {isGenerating && !snapshot ? (
           <div className="flex h-full flex-col justify-between p-5">
-            <div className="panel-skeleton h-8 w-40 rounded-full" />
+            <div className="panel-skeleton h-8 w-40 rounded-md" />
             <div className="grid flex-1 grid-cols-2 gap-4 py-6">
-              <div className="panel-skeleton rounded-[24px]" />
-              <div className="panel-skeleton rounded-[24px]" />
+              <div className="panel-skeleton rounded-[var(--radius-card)]" />
+              <div className="panel-skeleton rounded-[var(--radius-card)]" />
             </div>
-            <div className="panel-skeleton h-6 w-56 rounded-full" />
+            <div className="panel-skeleton h-6 w-56 rounded-md" />
           </div>
         ) : snapshot ? (
           <div className="relative h-full">
@@ -206,8 +208,8 @@ export function MindMapPanel({
             >
               <Background color={gridColor} gap={22} />
             </ReactFlow>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/20 to-transparent px-4 py-3 text-right text-xs text-[color:var(--viz-overlay-text)] opacity-0 transition group-hover:opacity-100">
-              点击放大查看
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 px-4 py-3 text-right opacity-0 transition group-hover:opacity-100">
+              <span className="status-badge">点击放大查看</span>
             </div>
           </div>
         ) : (
@@ -240,7 +242,7 @@ export function MindMapPanel({
                 </h3>
               </div>
               <button
-                className="theme-button-neutral rounded-full border px-3 py-1.5 text-sm transition"
+                className="btn-ghost"
                 onClick={() => {
                   setIsExpanded(false)
                 }}

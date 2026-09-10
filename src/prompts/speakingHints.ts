@@ -1,3 +1,4 @@
+import { resolveScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
@@ -73,6 +74,7 @@ const formatSessionSummary = (context?: AnalysisPromptContext) => {
 }
 
 const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
+  const profile = resolveScenarioProfile(context?.scenarioId)
   const questionContext = normalizeContextValue(context?.questionContext)
   const roleContext = normalizeContextValue(context?.roleContext)
   const phaseContext = normalizeContextValue(context?.phaseContext)
@@ -81,15 +83,18 @@ const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
   const sections: string[] = []
 
   if (questionContext) {
-    sections.push(`面试题信息：\n${questionContext}`)
+    sections.push(`${profile.topicContextLabel}：\n${questionContext}`)
   }
 
   if (roleContext) {
-    sections.push(`用户角色：\n${roleContext}`)
+    sections.push(`${profile.roleContextLabel}：\n${roleContext}`)
   }
 
   if (phaseContext) {
-    sections.push(`当前阶段：\n${phaseContext}`)
+    const phaseLabel =
+      profile.phaseLabels[phaseContext as keyof typeof profile.phaseLabels] ??
+      phaseContext
+    sections.push(`当前阶段：\n${phaseLabel}`)
   }
 
   if (sessionSummary) {
@@ -109,17 +114,22 @@ ${sections.join('\n\n')}
 export const buildSpeakingHintsPrompt = (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
-) =>
-  composePromptWithGlobalSystemPrompt(`
-请综合以下信息，生成“当前最实战的群面发言建议”：
+) => {
+  const profile = resolveScenarioProfile(context?.scenarioId)
+  const styleRules = profile.hintStyleRules
+    .map((rule) => `- ${rule}`)
+    .join('\n')
+
+  return composePromptWithGlobalSystemPrompt(`
+请综合以下信息，生成“当前最实用的发言建议”：
 
 信息优先级如下（必须遵守）：
-1. 优先理解面试题本身要回答什么，包括题目目标、用户对象、约束条件、角色诉求。
+1. 优先理解当前会议主题要解决什么，包括目标、相关对象、约束条件、角色诉求。
 2. 其次参考完整会话中已经形成的讨论主线，包括：已有共识、当前分歧、整体阶段、已讨论过的重点。
 3. 最后结合最近 90 秒转写，判断“此刻”最适合插入什么功能性动作。
-4. 不要只盯着最近 90 秒的表面内容，而忽略整场讨论主线和题目本身。
+4. 不要只盯着最近 90 秒的表面内容，而忽略整场讨论主线和会议目标。
 
-你的目标不是写一段漂亮空话，而是判断：在当前这个时点，用户最适合承担哪一种“功能性动作”，才能最有效推动团队讨论。
+你的目标不是写一段漂亮空话，而是判断：在当前这个时点，${profile.participantPersona}最适合承担哪一种“功能性动作”，才能最有效推动团队讨论。
 
 functionType 必须严格从以下 6 类中选 1 类：
 - 推进结构：当讨论散、重复、没有统一顺序时，用于定义框架、明确讨论路径
@@ -131,34 +141,30 @@ functionType 必须严格从以下 6 类中选 1 类：
 
 判断原则：
 1. 只能选当前“最优先”的一个动作，不要平均分配。
-2. 先判断“题目此时最缺什么”，再判断“最近 90 秒最适合补什么”。
+2. 先判断“当前议题最缺什么”，再判断“最近 90 秒最适合补什么”。
 3. 优先选择能对团队推进最有帮助的动作，而不是最能展示个人的动作。
-4. 如果最近 90 秒内容较窄、较碎或信息不足，不要被局部带偏，要回到题目要求和整场讨论主线。
-5. 建议必须符合群面口语风格，像真实候选人会说的话，不要像AI作文。
-6. 建议必须和题目、当前阶段、完整讨论脉络保持一致，不能脱离上下文。
+4. 如果最近 90 秒内容较窄、较碎或信息不足，不要被局部带偏，要回到会议目标和整场讨论主线。
+5. 建议必须符合真实会议口语风格，像${profile.participantPersona}会说的话，不要像 AI 作文。
+6. 建议必须和会议目标、当前阶段、完整讨论脉络保持一致，不能脱离上下文。
 7. 如果证据不足，也要给出最稳健的建议，不要输出空泛模板。
 
 你在判断时应特别关注：
-- 当前讨论是否已经回答了题目的核心问题
-- 当前是否缺少用户视角、约束意识、风险意识、落地路径
+- 当前讨论是否已经回应会议的核心目标
+- 当前是否缺少相关对象视角、约束意识、风险意识、落地路径
 - 当前是更需要继续发散，还是更需要比较、收敛、分工或总结
 - 最近 90 秒是在推进主线，还是只是局部争论/局部补充
 
 输出严格为 JSON：
 {
   "functionType": "推进结构 | 补齐信息 | 化解分歧 | 收敛结论 | 分工落地 | 汇报总结",
-  "whyNow": "一句话说明为什么当前最适合做这个动作，需同时体现题目要求与当前讨论状态",
+  "whyNow": "一句话说明为什么当前最适合做这个动作，需同时体现会议目标与当前讨论状态",
   "hint15s": "15秒内能说完的口语版建议",
   "hint30s": "30秒左右的口语版建议",
   "hint60s": "60秒左右的口语版建议"
 }
 
 语言要求：
-- 口语化
-- 不抢功
-- 不强势压人
-- 强调“我们”“大家”
-- 避免空泛框架词堆砌
+${styleRules}
 - 尽量体现用户视角、约束意识、收敛意识、协作意识
 - 如果有角色设定，建议应尽量兼顾该角色关注点，但不能损害团队整体推进
 
@@ -166,4 +172,5 @@ ${formatSpeakingHintsContext(context)}
 
 最近 90 秒转写：
 ${formatSegmentsForPrompt(segments)}
-`.trim())
+`.trim(), profile)
+}

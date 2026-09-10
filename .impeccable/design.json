@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-09T17:06:00.000Z",
+  "title": "Design System: 会议智能助手",
+  "extensions": {
+    "colorMeta": {
+      "indigo-signal": {
+        "role": "primary",
+        "displayName": "Indigo Signal",
+        "canonical": "#4f46e5",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#3730a3",
+          "#4338ca",
+          "#4f46e5",
+          "#6366f1",
+          "#c7d2fe",
+          "#eef2ff"
+        ]
+      },
+      "indigo-signal-hover": {
+        "role": "primary",
+        "displayName": "Indigo Signal Hover",
+        "canonical": "#4338ca",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#3730a3",
+          "#4338ca",
+          "#4f46e5",
+          "#6366f1",
+          "#a5b4fc",
+          "#eef2ff"
+        ]
+      },
+      "indigo-wash": {
+        "role": "primary",
+        "displayName": "Indigo Wash",
+        "canonical": "#eef2ff",
+        "tonalRamp": [
+          "#312e81",
+          "#3730a3",
+          "#4f46e5",
+          "#818cf8",
+          "#a5b4fc",
+          "#c7d2fe",
+          "#e0e7ff",
+          "#eef2ff"
+        ]
+      },
+      "indigo-ink": {
+        "role": "primary",
+        "displayName": "Indigo Ink",
+        "canonical": "#3730a3",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#3730a3",
+          "#4338ca",
+          "#4f46e5",
+          "#6366f1",
+          "#c7d2fe",
+          "#eef2ff"
+        ]
+      },
+      "accent-border": {
+        "role": "primary",
+        "displayName": "Accent Border",
+        "canonical": "#c7d2fe",
+        "tonalRamp": [
+          "#312e81",
+          "#4338ca",
+          "#4f46e5",
+          "#818cf8",
+          "#a5b4fc",
+          "#c7d2fe",
+          "#e0e7ff",
+          "#eef2ff"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0f172a",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f1f5f9",
+          "#ffffff"
+        ]
+      },
+      "slate-canvas": {
+        "role": "neutral",
+        "displayName": "Slate Canvas",
+        "canonical": "#f8fafc",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#e2e8f0",
+          "#f1f5f9",
+          "#f8fafc"
+        ]
+      },
+      "slate-canvas-deep": {
+        "role": "neutral",
+        "displayName": "Slate Canvas Deep",
+        "canonical": "#f1f5f9",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f1f5f9"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#e2e8f0",
+        "tonalRamp": [
+          "#0f172a",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f1f5f9",
+          "#f8fafc"
+        ]
+      },
+      "input-stroke": {
+        "role": "neutral",
+        "displayName": "Input Stroke",
+        "canonical": "#cbd5e1",
+        "tonalRamp": [
+          "#0f172a",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f8fafc"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#0f172a",
+        "tonalRamp": [
+          "#020617",
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f8fafc"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Ink Secondary",
+        "canonical": "#334155",
+        "tonalRamp": [
+          "#0f172a",
+          "#1e293b",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#f8fafc"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Ink Muted",
+        "canonical": "#64748b",
+        "tonalRamp": [
+          "#0f172a",
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f8fafc"
+        ]
+      },
+      "ink-quiet": {
+        "role": "neutral",
+        "displayName": "Ink Quiet",
+        "canonical": "#94a3b8",
+        "tonalRamp": [
+          "#334155",
+          "#475569",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f1f5f9",
+          "#f8fafc"
+        ]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Success",
+        "canonical": "#059669",
+        "tonalRamp": [
+          "#064e3b",
+          "#065f46",
+          "#047857",
+          "#059669",
+          "#10b981",
+          "#6ee7b7",
+          "#a7f3d0",
+          "#ecfdf5"
+        ]
+      },
+      "success-wash": {
+        "role": "secondary",
+        "displayName": "Success Wash",
+        "canonical": "#ecfdf5",
+        "tonalRamp": [
+          "#064e3b",
+          "#065f46",
+          "#059669",
+          "#34d399",
+          "#6ee7b7",
+          "#a7f3d0",
+          "#d1fae5",
+          "#ecfdf5"
+        ]
+      },
+      "success-ink": {
+        "role": "secondary",
+        "displayName": "Success Ink",
+        "canonical": "#065f46",
+        "tonalRamp": [
+          "#022c22",
+          "#064e3b",
+          "#065f46",
+          "#047857",
+          "#059669",
+          "#6ee7b7",
+          "#a7f3d0",
+          "#ecfdf5"
+        ]
+      },
+      "warning": {
+        "role": "tertiary",
+        "displayName": "Warning",
+        "canonical": "#d97706",
+        "tonalRamp": [
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#f59e0b",
+          "#fcd34d",
+          "#fde68a",
+          "#fffbeb"
+        ]
+      },
+      "warning-wash": {
+        "role": "tertiary",
+        "displayName": "Warning Wash",
+        "canonical": "#fffbeb",
+        "tonalRamp": [
+          "#78350f",
+          "#92400e",
+          "#d97706",
+          "#f59e0b",
+          "#fcd34d",
+          "#fde68a",
+          "#fef3c7",
+          "#fffbeb"
+        ]
+      },
+      "warning-ink": {
+        "role": "tertiary",
+        "displayName": "Warning Ink",
+        "canonical": "#92400e",
+        "tonalRamp": [
+          "#451a03",
+          "#78350f",
+          "#92400e",
+          "#b45309",
+          "#d97706",
+          "#fde68a",
+          "#fef3c7",
+          "#fffbeb"
+        ]
+      },
+      "danger": {
+        "role": "tertiary",
+        "displayName": "Danger",
+        "canonical": "#dc2626",
+        "tonalRamp": [
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#dc2626",
+          "#ef4444",
+          "#fca5a5",
+          "#fecaca",
+          "#fef2f2"
+        ]
+      },
+      "danger-wash": {
+        "role": "tertiary",
+        "displayName": "Danger Wash",
+        "canonical": "#fef2f2",
+        "tonalRamp": [
+          "#7f1d1d",
+          "#991b1b",
+          "#dc2626",
+          "#f87171",
+          "#fca5a5",
+          "#fecaca",
+          "#fee2e2",
+          "#fef2f2"
+        ]
+      },
+      "danger-ink": {
+        "role": "tertiary",
+        "displayName": "Danger Ink",
+        "canonical": "#991b1b",
+        "tonalRamp": [
+          "#450a0a",
+          "#7f1d1d",
+          "#991b1b",
+          "#b91c1c",
+          "#dc2626",
+          "#fecaca",
+          "#fee2e2",
+          "#fef2f2"
+        ]
+      },
+      "auth-hero-start": {
+        "role": "primary",
+        "displayName": "Auth Hero Start",
+        "canonical": "#312e81",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#3730a3",
+          "#4338ca",
+          "#4f46e5",
+          "#6366f1",
+          "#c7d2fe",
+          "#eef2ff"
+        ]
+      },
+      "auth-hero-end": {
+        "role": "primary",
+        "displayName": "Auth Hero End",
+        "canonical": "#6366f1",
+        "tonalRamp": [
+          "#1e1b4b",
+          "#312e81",
+          "#4338ca",
+          "#4f46e5",
+          "#6366f1",
+          "#818cf8",
+          "#c7d2fe",
+          "#eef2ff"
+        ]
+      },
+      "on-accent": {
+        "role": "neutral",
+        "displayName": "On Accent",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0f172a",
+          "#334155",
+          "#64748b",
+          "#94a3b8",
+          "#cbd5e1",
+          "#e2e8f0",
+          "#f8fafc",
+          "#ffffff"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Login title 「会议智能助手」 only." },
+      "headline": { "displayName": "Headline", "purpose": "Workbench panel titles." },
+      "title": { "displayName": "Title", "purpose": "Shell product name, drawers, section heads." },
+      "body": { "displayName": "Body", "purpose": "Transcript, hints, settings, buttons." },
+      "label": { "displayName": "Label", "purpose": "Uppercase kickers and phase meta." }
+    },
+    "shadows": [
+      {
+        "name": "hairline-rest",
+        "value": "0 1px 2px rgba(15, 23, 42, 0.06)",
+        "purpose": "Default panel-card and tab active chip."
+      },
+      {
+        "name": "lifted-sheet",
+        "value": "0 4px 12px rgba(15, 23, 42, 0.08)",
+        "purpose": "Drawers, popovers, and lifted briefing/analysis cards."
+      },
+      {
+        "name": "focus-ring",
+        "value": "0 0 0 3px rgba(79, 70, 229, 0.35)",
+        "purpose": "Input focus halo."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "160ms ease",
+        "purpose": "Button, nav, and inline-card color/border/shadow transitions."
+      },
+      {
+        "name": "shimmer",
+        "value": "1.6s linear infinite",
+        "purpose": "Panel skeleton sweep only."
+      }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px" },
+      { "name": "auth-split", "value": "960px" },
+      { "name": "xl-workbench", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one indigo action that advances the session.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">开始</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem; border-radius: 6px; border: 1px solid var(--accent, #4f46e5); background: var(--accent, #4f46e5); color: #fff; padding: 0.5rem 0.875rem; font-size: 0.875rem; font-weight: 500; line-height: 1.25; transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease; } .ds-btn-primary:hover { background: var(--accent-hover, #4338ca); } .ds-btn-primary:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.45; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Paper control for pause, stop, and prep.",
+      "html": "<button class=\"ds-btn-secondary\" type=\"button\">暂停</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--panel-border, #e2e8f0); background: var(--panel-surface, #fff); color: var(--text-secondary, #334155); padding: 0.5rem 0.875rem; font-size: 0.875rem; font-weight: 500; line-height: 1.25; transition: background-color 160ms ease, color 160ms ease; } .ds-btn-secondary:hover { background: var(--surface-inline-hover, #f1f5f9); color: var(--text-primary, #0f172a); } .ds-btn-secondary:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Quiet actions: pin, save, logout.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">标记</button>",
+      "css": ".ds-btn-ghost { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--text-secondary, #334155); padding: 0.5rem 0.875rem; font-size: 0.875rem; font-weight: 500; transition: background-color 160ms ease, color 160ms ease; } .ds-btn-ghost:hover { background: var(--surface-inline, #f8fafc); color: var(--text-primary, #0f172a); } .ds-btn-ghost:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive wash, not a solid red brick.",
+      "html": "<button class=\"ds-btn-danger\" type=\"button\">删除</button>",
+      "css": ".ds-btn-danger { display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--danger-border, #fecaca); background: var(--danger-soft, #fef2f2); color: var(--danger-text, #991b1b); padding: 0.5rem 0.875rem; font-size: 0.875rem; font-weight: 500; transition: background-color 160ms ease; } .ds-btn-danger:hover { background: #fee2e2; } .ds-btn-danger:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Paper field with indigo focus ring.",
+      "html": "<input class=\"ds-input\" placeholder=\"补充会议目标、背景、约束\" type=\"text\" />",
+      "css": ".ds-input { width: 100%; border: 1px solid var(--input-border, #cbd5e1); border-radius: 6px; background: var(--input-bg, #fff); color: var(--text-primary, #0f172a); padding: 0.625rem 0.75rem; font-size: 0.875rem; } .ds-input::placeholder { color: var(--text-muted, #64748b); } .ds-input:focus { border-color: var(--accent, #4f46e5); background: var(--input-focus-bg, #fff); box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.35); outline: none; }"
+    },
+    {
+      "name": "Panel Card",
+      "kind": "card",
+      "refersTo": "card-panel",
+      "description": "White briefing sheet used across Live Assist.",
+      "html": "<article class=\"ds-panel\"><p class=\"ds-kicker\">Live Assist</p><h2 class=\"ds-panel-title\">实时转写</h2><p class=\"ds-panel-body\">边听边跟进讨论。</p></article>",
+      "css": ".ds-panel { border: 1px solid var(--panel-border, #e2e8f0); border-radius: 10px; background: var(--panel-surface, #fff); box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08); padding: 1rem; } .ds-kicker { margin: 0; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; font-size: 11px; color: var(--text-muted, #64748b); } .ds-panel-title { margin: 0.5rem 0 0; font-size: 1.5rem; font-weight: 600; color: var(--text-primary, #0f172a); } .ds-panel-body { margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.625; color: var(--text-secondary, #334155); }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Pill for listening and connection state.",
+      "html": "<span class=\"ds-badge\">识别稳定</span><span class=\"ds-badge ds-badge-active\">模型已就绪</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; gap: 0.375rem; border-radius: 999px; border: 1px solid var(--badge-border, #e2e8f0); background: var(--badge-bg, #f1f5f9); padding: 0.25rem 0.625rem; font-size: 0.75rem; line-height: 1.2; color: var(--text-secondary, #334155); } .ds-badge-active { border-color: var(--success-border, #a7f3d0); background: var(--success-soft, #ecfdf5); color: var(--success-text, #065f46); }"
+    },
+    {
+      "name": "Sidebar Nav",
+      "kind": "nav",
+      "refersTo": "nav-item-active",
+      "description": "220px desk rail; active item is indigo wash, not a solid bar.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav-item ds-nav-item-active\" type=\"button\">实时辅助</button><button class=\"ds-nav-item\" type=\"button\">回放复盘</button></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem; width: 220px; background: var(--sidebar-bg, #fff); border-right: 1px solid var(--sidebar-border, #e2e8f0); } .ds-nav-item { border: 0; border-radius: 6px; padding: 0.625rem 0.75rem; text-align: left; font-size: 0.875rem; font-weight: 500; background: transparent; color: var(--text-muted, #64748b); } .ds-nav-item:hover { background: var(--surface-inline, #f8fafc); color: var(--text-primary, #0f172a); } .ds-nav-item-active { background: var(--accent-soft, #eef2ff); color: var(--accent-text, #3730a3); } .ds-nav-item:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }"
+    },
+    {
+      "name": "Tab List",
+      "kind": "custom",
+      "refersTo": "tabs-trigger-active",
+      "description": "Inset well switching consensus, Q&A, mind map, summary.",
+      "html": "<div class=\"ds-tabs\"><button class=\"ds-tab ds-tab-active\" type=\"button\">共识分歧</button><button class=\"ds-tab\" type=\"button\">AI 问答</button></div>",
+      "css": ".ds-tabs { display: flex; gap: 0.25rem; padding: 0.25rem; border: 1px solid var(--panel-border, #e2e8f0); border-radius: 8px; background: var(--surface-inline, #f8fafc); } .ds-tab { flex: 1; border: 0; border-radius: 6px; background: transparent; padding: 0.5rem 0.75rem; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted, #64748b); } .ds-tab-active { background: var(--panel-surface, #fff); color: var(--text-primary, #0f172a); box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06); } .ds-tab:focus-visible { outline: 2px solid rgba(79, 70, 229, 0.35); outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Briefing Desk",
+    "overview": "The product looks like a personal briefing desk, not a shared war room. Light slate paper, a white work surface, and one indigo signal color that marks the next action. Login can feel like a softer SaaS product (split hero, generous type). Once inside, the UI is a workbench: 220px sidebar, 56px app bar, and a two-column live floor so the transcript stays beside the hints.\n\nThe typeface is Inter plus system Chinese fallbacks — one family for UI and headings. Density is medium: 14px body, 8–10px radii, 16px panel padding. Personality is practical and Chinese-first. The user asked new work to feel tactile and confident (clear primary vs ghost, decisive hover color) and for analysis cards to lift using the existing medium shadow, while chrome stays flat.\n\nConfirmed visual rejection: no neon command-center, no dark glassmorphism, no rainbow status bars.",
+    "keyCharacteristics": [
+      "One Inter stack for Latin and Chinese UI",
+      "Slate paper canvas with white panels",
+      "Indigo used as a scarce action signal",
+      "Hairline slate borders; cards may lift with --shadow-md",
+      "Status is semantic (green / amber / red washes), never a rainbow strip",
+      "Dark theme exists as a token overlay on the same structure"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Indigo fill is for the one action that advances the session (Start, Save settings, Ask). Everything else is secondary, ghost, or a semantic wash.",
+        "section": "colors"
+      },
+      {
+        "name": "The Semantic Wash Rule",
+        "body": "Success, warning, and danger use matching wash + ink + border. Never invent a fourth accent family for “visual interest.”",
+        "section": "colors"
+      },
+      {
+        "name": "The One Voice Type Rule",
+        "body": "Do not add a second display serif or a mono “terminal” face. Kickers may track; body copy never shouts in all caps.",
+        "section": "typography"
+      },
+      {
+        "name": "The Lifted Sheet Rule",
+        "body": "The work product (transcript, phase, hints, consensus) may lift. The desk itself (sidebar, app bar, page canvas) stays flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do keep transcript on the left and analysis on the right at `xl`.",
+      "Do use Indigo Signal for at most one primary action in a cluster.",
+      "Do lift briefing cards with `--shadow-md`; keep sidebar and app bar flat.",
+      "Do mark live/system state with semantic washes and 8px dots, not decorative charts.",
+      "Do write UI in Chinese with short English kickers."
+    ],
+    "donts": [
+      "Don't build a neon command-center, dark glass panels, or rainbow status bars.",
+      "Don't introduce a second accent (magenta, cyan, gold) for “energy.” Magenta button tokens already alias to indigo.",
+      "Don't put the login hero gradient on workbench chrome.",
+      "Don't add a display serif or a terminal mono as the product voice.",
+      "Don't turn every control into a pill; 6–10px is the form language."
+    ]
+  }
+}

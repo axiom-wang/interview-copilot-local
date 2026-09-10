@@ -9,6 +9,7 @@ import { RendererOpenAiLlmProvider } from '../providers/llm/RendererOpenAiLlmPro
 import {
   analyzeTranscriptWithFallback,
   answerInterviewQuestionWithFallback,
+  generateMeetingMinutesWithFallback,
   generateMeetingSummaryWithFallback,
   generateSpeakingHintsWithFallback,
   generateMindMapWithFallback,
@@ -20,9 +21,15 @@ import {
   saveSession,
 } from '../services/sessionStore'
 import { createPinnedSegment } from '../services/transcriptBuffer'
+import {
+  DEFAULT_SCENARIO_ID,
+  resolveScenarioProfile,
+  type MeetingScenarioId,
+} from '../scenarios'
 import type {
   ConsensusAnalysis,
   InterviewQaTurn,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   RealtimeAnalysisBundle,
@@ -35,11 +42,13 @@ import type { SpeakerProfile } from '../types/speaker'
 import type { TranscriptSegment } from '../types/transcript'
 
 type AppMode = 'live' | 'replay'
+type AppView = 'live' | 'replay' | 'settings'
 type AstProviderId = 'bytedance-ast'
 type RuntimeEnvironment = 'electron' | 'web'
 
 interface AppState {
   mode: AppMode
+  activeView: AppView
   runtimeEnvironment: RuntimeEnvironment
   isEmbedded: boolean
   supportsDesktopBridge: boolean
@@ -50,6 +59,7 @@ interface AppState {
   isRefreshingHints: boolean
   isGeneratingMindMap: boolean
   isGeneratingSummary: boolean
+  isGeneratingMinutes: boolean
   isAnsweringQuestion: boolean
   selectedAstProviderId: AstProviderId
   activeAstProviderId: AstProviderId
@@ -74,6 +84,8 @@ interface AppState {
   meetingSummary: MeetingSummary | null
   summaryStale: boolean
   lastSummaryUpdatedAt: number | null
+  meetingMinutes: MeetingMinutes | null
+  minutesStale: boolean
   analysisSnapshots: ReplaySnapshot[]
   savedSessions: SessionRecord[]
   selectedSessionId: string | null
@@ -83,12 +95,27 @@ interface AppState {
   aiQuestionDraft: string
   questionContext: string
   roleContext: string
+  scenarioId: MeetingScenarioId
   aiQaHistory: InterviewQaTurn[]
   aiQaError: string | null
   errorMessage: string | null
   statusMessage: string | null
   lastUpdatedAt: number | null
   initialize: () => void
+  applyModelSettings: (settings: {
+    ast: {
+      appId: string
+      accessToken: string
+      resourceId: string
+      wsUrl: string
+    }
+    llm: {
+      apiKey: string
+      model: string
+      baseURL: string
+    }
+  }) => void
+  setActiveView: (view: AppView) => void
   setMode: (mode: AppMode) => void
   startStream: () => Promise<void>
   togglePause: () => Promise<void>
@@ -109,6 +136,7 @@ interface AppState {
   setReplayTimestamp: (timestamp: number) => void
   setQuestionContextDraft: (value: string) => void
   setRoleContextDraft: (value: string) => void
+  setScenarioId: (scenarioId: MeetingScenarioId) => void
   setAiQuestionDraft: (value: string) => void
   applyQuestionContext: () => void
   applyRoleContext: () => void
@@ -120,6 +148,7 @@ interface AppState {
   refreshSpeakingHints: () => Promise<void>
   generateMindMap: () => Promise<void>
   generateMeetingSummary: () => Promise<void>
+  generateMeetingMinutes: () => Promise<void>
 }
 
 const astProviders: Record<AstProviderId, AstProvider> = {
@@ -133,6 +162,7 @@ let analysisRunToken = 0
 let speakingHintsRunToken = 0
 let mindMapRunToken = 0
 let summaryRunToken = 0
+let minutesRunToken = 0
 let aiQuestionRunToken = 0
 let streamRunToken = 0
 let analysisTimeoutId: number | null = null
@@ -141,6 +171,7 @@ const ignoredLiveSegmentIds = new Set<string>()
 const ANALYSIS_DEBOUNCE_MS = 1500
 const QUESTION_CONTEXT_STORAGE_KEY = 'interview-copilot-local/question-context'
 const ROLE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/role-context'
+const SCENARIO_ID_STORAGE_KEY = 'interview-copilot-local/scenario-id'
 const QA_SEGMENT_WINDOW_MS = 5 * 60 * 1000
 const MAX_QA_SEGMENTS = 24
 const MAX_QA_HISTORY_ITEMS = 6
@@ -158,6 +189,8 @@ const INTRO_NOISE_WORDS_SAFE = new Set([
   '\u670b\u53cb',
   '\u8bc4\u59d4',
   '\u7ec4\u5458',
+  '\u4e3b\u6301\u4eba',
+  '\u5404\u4f4d',
   '\u6211\u4eec',
   '\u8fd9\u91cc',
 ])
@@ -188,6 +221,8 @@ const INTRO_NOISE_WORDS = new Set([
   '朋友',
   '评委',
   '组员',
+  '主持人',
+  '各位',
   '我们',
   '这里',
 ])
@@ -360,14 +395,21 @@ const createDefaultSpeakerProfile = (
   updatedAt,
 })
 
-const createFallbackSpeakingHints = (updatedAt: number): SpeakingHints => ({
-  functionType: normalizeFunctionType(undefined),
-  whyNow: '当前建议尚未手动刷新，先给出稳妥的默认推进动作。',
-  hint15s: '建议点击“刷新建议”获取当前群面的实时发言建议。',
-  hint30s: '当前建议尚未手动更新，请先点击“刷新建议”，再按 15/30/60 秒脚本发言。',
-  hint60s: '为了保证建议贴合当前讨论，请手动刷新后再发言：先给结论，再给依据，最后推进下一步。',
-  updatedAt,
-})
+const createFallbackSpeakingHints = (
+  updatedAt: number,
+  scenarioId: MeetingScenarioId = DEFAULT_SCENARIO_ID,
+): SpeakingHints => {
+  const profile = resolveScenarioProfile(scenarioId)
+
+  return {
+    functionType: normalizeFunctionType(undefined),
+    whyNow: '当前建议尚未手动刷新，先给出稳妥的默认推进动作。',
+    hint15s: `建议点击“刷新建议”获取当前${profile.label}的实时发言建议。`,
+    hint30s: '当前建议尚未手动更新，请先点击“刷新建议”，再按 15/30/60 秒脚本发言。',
+    hint60s: '为了保证建议贴合当前讨论，请手动刷新后再发言：先给结论，再给依据，最后推进下一步。',
+    updatedAt,
+  }
+}
 
 const buildReplaySnapshot = (
   bundle: RealtimeAnalysisBundle,
@@ -763,6 +805,7 @@ const persistContextValue = (storageKey: string, value: string) => {
 const buildPromptContext = (
   state: Pick<
     AppState,
+    | 'scenarioId'
     | 'questionContext'
     | 'roleContext'
     | 'phaseAnalysis'
@@ -782,6 +825,7 @@ const buildPromptContext = (
   )
 
   return {
+    scenarioId: state.scenarioId,
     questionContext,
     roleContext,
     phaseContext,
@@ -800,7 +844,11 @@ const buildPromptContext = (
 const buildQuestionAnswerPromptContext = (
   state: Pick<
     AppState,
-    'questionContext' | 'roleContext' | 'phaseAnalysis' | 'consensusAnalysis'
+    | 'scenarioId'
+    | 'questionContext'
+    | 'roleContext'
+    | 'phaseAnalysis'
+    | 'consensusAnalysis'
   >,
 ): AnalysisPromptContext => {
   const questionContext = state.questionContext.trim() || undefined
@@ -814,6 +862,7 @@ const buildQuestionAnswerPromptContext = (
   )
 
   return {
+    scenarioId: state.scenarioId,
     questionContext,
     roleContext,
     phaseContext,
@@ -866,8 +915,34 @@ const getIsEmbedded = () => {
 
 const getWebStatusMessage = (isEmbedded: boolean) =>
   isEmbedded
-    ? 'Web embed mode is active. Configure VITE_REALTIME_WS_URL to enable Live Assist; otherwise Replay remains available.'
-    : 'Web preview mode is active. Configure VITE_REALTIME_WS_URL to enable Live Assist; otherwise Replay remains available.'
+    ? '当前为网页嵌入模式。请先在设置中配置模型，并确保实时转写服务可用。'
+    : '请先在设置中配置语音转写与文本分析模型，再开始实时辅助。'
+
+const applyModelSettingsToProviders = (settings: {
+  ast: {
+    appId: string
+    accessToken: string
+    resourceId: string
+    wsUrl: string
+  }
+  llm: {
+    apiKey: string
+    model: string
+    baseURL: string
+  }
+}) => {
+  const astProvider = astProviders['bytedance-ast']
+  if (
+    astProvider instanceof RemoteByteDanceAstProvider ||
+    astProvider instanceof RendererByteDanceAstProvider
+  ) {
+    astProvider.setCredentials(settings.ast)
+  }
+
+  if (llmProvider instanceof HttpOpenAiLlmProvider) {
+    llmProvider.setModelConfig(settings.llm)
+  }
+}
 
 const getSegmentsForAnalysis = (segments: TranscriptSegment[]) => {
   const latestById = new Map<string, TranscriptSegment>()
@@ -948,11 +1023,27 @@ const getSpeakerDisplayName = (
   return profile.displayName ?? speakerId
 }
 
-const createFallbackMeetingSummary = (updatedAt: number): MeetingSummary => ({
-  speech60s:
-    '当前还没有可用的总结发言。建议先继续转写并点击“总结发言”按钮，再获取贴合本场讨论的口播总结。',
-  keyPoints: ['先补充更多有效转写内容，再生成会议总结。'],
-  nextSteps: ['点击“总结发言”按钮手动生成最新总结。'],
+const createFallbackMeetingSummary = (
+  updatedAt: number,
+  scenarioId: MeetingScenarioId = DEFAULT_SCENARIO_ID,
+): MeetingSummary => {
+  const profile = resolveScenarioProfile(scenarioId)
+
+  return {
+    speech60s: `当前还没有可用的${profile.spokenSummaryLabel}。建议先继续转写，再生成贴合本场讨论的口播总结。`,
+    keyPoints: ['先补充更多有效转写内容，再生成会议总结。'],
+    nextSteps: ['点击生成按钮获取最新总结。'],
+    updatedAt,
+  }
+}
+
+const createFallbackMeetingMinutes = (updatedAt: number): MeetingMinutes => ({
+  title: '会议纪要',
+  overview: '当前还没有可用的会议纪要。建议先继续转写，再生成结构化纪要。',
+  topics: [],
+  decisions: [],
+  openQuestions: ['待补充有效转写后再生成纪要'],
+  actionItems: [],
   updatedAt,
 })
 
@@ -973,6 +1064,7 @@ const isMindMapSnapshot = (
 
 export const useAppStore = create<AppState>((set, get) => ({
   mode: 'live',
+  activeView: 'live',
   runtimeEnvironment: 'web',
   isEmbedded: false,
   supportsDesktopBridge: false,
@@ -983,6 +1075,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isRefreshingHints: false,
   isGeneratingMindMap: false,
   isGeneratingSummary: false,
+  isGeneratingMinutes: false,
   isAnsweringQuestion: false,
   selectedAstProviderId: 'bytedance-ast',
   activeAstProviderId: 'bytedance-ast',
@@ -1007,6 +1100,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   meetingSummary: null,
   summaryStale: false,
   lastSummaryUpdatedAt: null,
+  meetingMinutes: null,
+  minutesStale: false,
   analysisSnapshots: [],
   savedSessions: [],
   selectedSessionId: null,
@@ -1016,6 +1111,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   aiQuestionDraft: '',
   questionContext: '',
   roleContext: '',
+  scenarioId: DEFAULT_SCENARIO_ID,
   aiQaHistory: [],
   aiQaError: null,
   errorMessage: null,
@@ -1035,9 +1131,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       : sessions.at(-1) ?? sessions[0] ?? null
     const questionContext = readStoredContext(QUESTION_CONTEXT_STORAGE_KEY)
     const roleContext = readStoredContext(ROLE_CONTEXT_STORAGE_KEY)
+    const scenarioId = resolveScenarioProfile(
+      readStoredContext(SCENARIO_ID_STORAGE_KEY),
+    ).id
 
     set({
       mode: supportsLiveAssist ? 'live' : 'replay',
+      activeView: supportsLiveAssist ? 'live' : 'replay',
       runtimeEnvironment,
       isEmbedded,
       supportsDesktopBridge,
@@ -1055,6 +1155,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       aiQuestionDraft: '',
       questionContext,
       roleContext,
+      scenarioId,
       aiQaHistory: [],
       aiQaError: null,
       savedSessions: sessions,
@@ -1064,12 +1165,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       errorMessage: null,
     })
   },
+  applyModelSettings: (settings) => {
+    applyModelSettingsToProviders(settings)
+  },
+  setActiveView: (view) => {
+    if (view === 'settings') {
+      set({ activeView: 'settings' })
+      return
+    }
+
+    get().setMode(view)
+    set({ activeView: view })
+  },
   setMode: (mode) => {
     const sessions = get().savedSessions
     const selectedSession = getSelectedSession(sessions, get().selectedSessionId)
 
     set({
       mode,
+      activeView: mode,
       selectedSessionId: selectedSession?.id ?? null,
       replayTimestamp: selectedSession?.endedAt ?? null,
     })
@@ -1078,7 +1192,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!get().supportsLiveAssist) {
       set({
         mode: 'live',
-        errorMessage: 'Live Assist is unavailable because realtime backend is not configured.',
+        errorMessage: '实时辅助不可用：请先配置实时转写服务地址，并在设置中填写模型信息。',
         statusMessage: getWebStatusMessage(get().isEmbedded),
       })
       return
@@ -1089,6 +1203,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     speakingHintsRunToken += 1
     mindMapRunToken += 1
     summaryRunToken += 1
+    minutesRunToken += 1
     aiQuestionRunToken += 1
     const activeToken = streamRunToken
     const sessionStartedAt = Date.now()
@@ -1108,6 +1223,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isRefreshingHints: false,
       isGeneratingMindMap: false,
       isGeneratingSummary: false,
+      isGeneratingMinutes: false,
       isAnsweringQuestion: false,
       activeAstProviderId: selectedProviderId,
       astProviderLabel: selectedProvider.label,
@@ -1130,6 +1246,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       mindMapStale: false,
       meetingSummary: null,
       summaryStale: false,
+      meetingMinutes: null,
+      minutesStale: false,
       aiQaHistory: [],
       aiQaError: null,
       lastSummaryUpdatedAt: null,
@@ -1202,6 +1320,10 @@ export const useAppStore = create<AppState>((set, get) => ({
             Boolean(state.meetingSummary) && segment.isFinal
               ? true
               : state.summaryStale,
+          minutesStale:
+            Boolean(state.meetingMinutes) && segment.isFinal
+              ? true
+              : state.minutesStale,
           lastUpdatedAt: segment.timestamp,
         }
       })
@@ -1309,6 +1431,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     speakingHintsRunToken += 1
     mindMapRunToken += 1
     summaryRunToken += 1
+    minutesRunToken += 1
     aiQuestionRunToken += 1
     clearAnalysisTimer()
     stopAllAstProviders()
@@ -1320,6 +1443,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isRefreshingHints: false,
       isGeneratingMindMap: false,
       isGeneratingSummary: false,
+      isGeneratingMinutes: false,
       isAnsweringQuestion: false,
       activeAstProviderId: get().selectedAstProviderId,
       listeningStatusLabel: '未监听',
@@ -1327,6 +1451,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       speakingHintsStale: false,
       mindMapStale: false,
       summaryStale: false,
+      minutesStale: false,
       aiQaHistory: [],
       aiQaError: null,
       statusMessage: '转写已停止。',
@@ -1510,6 +1635,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         summaryStale: hasRemainingSegments
           ? Boolean(state.meetingSummary)
           : false,
+        meetingMinutes: hasRemainingSegments ? state.meetingMinutes : null,
+        minutesStale: hasRemainingSegments
+          ? Boolean(state.meetingMinutes)
+          : false,
         lastSummaryUpdatedAt: hasRemainingSegments
           ? state.lastSummaryUpdatedAt
           : null,
@@ -1570,6 +1699,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         .map((snapshot) => snapshot.mindMapSnapshot)
         .filter(isMindMapSnapshot),
       meetingSummary: state.meetingSummary,
+      meetingMinutes: state.meetingMinutes,
+      scenarioId: state.scenarioId,
     }
 
     const savedSessions = saveSession(session)
@@ -1620,6 +1751,26 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   setRoleContextDraft: (value) => {
     set({ roleContextDraft: normalizeContextInput(value) })
+  },
+  setScenarioId: (scenarioId) => {
+    const resolvedScenarioId = resolveScenarioProfile(scenarioId).id
+    const shouldRefresh =
+      get().liveSegments.length > 0 && !get().isPaused
+    persistContextValue(SCENARIO_ID_STORAGE_KEY, resolvedScenarioId)
+    set({
+      scenarioId: resolvedScenarioId,
+      speakingHintsStale: Boolean(get().speakingHints),
+      mindMapStale: Boolean(get().mindMap),
+      summaryStale: Boolean(get().meetingSummary),
+      minutesStale: Boolean(get().meetingMinutes),
+      statusMessage: `已切换为${resolveScenarioProfile(resolvedScenarioId).label}。`,
+    })
+
+    if (shouldRefresh) {
+      scheduleAnalysis(() => {
+        void get().refreshAnalysis()
+      })
+    }
   },
   setAiQuestionDraft: (value) => {
     set({
@@ -1790,7 +1941,7 @@ export const useAppStore = create<AppState>((set, get) => ({
               consensusAnalysis: result.bundle.consensusAnalysis,
               speakingHints:
                 currentState.speakingHints ??
-                createFallbackSpeakingHints(timestamp),
+                createFallbackSpeakingHints(timestamp, state.scenarioId),
             },
             timestamp,
             currentState.mindMap,
@@ -1953,7 +2104,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         const consensusAnalysis =
           latestBundle?.consensusAnalysis ?? state.consensusAnalysis
         const speakingHints =
-          state.speakingHints ?? createFallbackSpeakingHints(timestamp)
+          state.speakingHints ??
+          createFallbackSpeakingHints(timestamp, state.scenarioId)
 
         if (!phaseAnalysis || !consensusAnalysis) {
           return {
@@ -2050,9 +2202,63 @@ export const useAppStore = create<AppState>((set, get) => ({
       set((currentState) => ({
         isGeneratingSummary: false,
         meetingSummary:
-          currentState.meetingSummary ?? createFallbackMeetingSummary(Date.now()),
+          currentState.meetingSummary ??
+          createFallbackMeetingSummary(Date.now(), currentState.scenarioId),
         errorMessage: toErrorMessage(error),
         statusMessage: '总结发言生成失败，请稍后重试。',
+      }))
+    }
+  },
+  generateMeetingMinutes: async () => {
+    const state = get()
+    const segments = getSegmentsForSummary(state.liveSegments)
+    const promptContext = buildPromptContext(state)
+
+    if (!segments.length || state.isPaused) {
+      return
+    }
+
+    minutesRunToken += 1
+    const activeToken = minutesRunToken
+
+    set({
+      isGeneratingMinutes: true,
+      errorMessage: null,
+      statusMessage: '正在生成会议纪要...',
+    })
+
+    try {
+      const result = await generateMeetingMinutesWithFallback(
+        llmProvider,
+        fallbackLlmProvider,
+        segments,
+        promptContext,
+      )
+
+      if (activeToken !== minutesRunToken) {
+        return
+      }
+
+      set((currentState) => ({
+        meetingMinutes: result.minutes,
+        minutesStale: false,
+        analysisProviderLabel: result.providerLabel,
+        errorMessage: result.warning ?? currentState.errorMessage,
+        isGeneratingMinutes: false,
+        statusMessage: '会议纪要已更新。',
+      }))
+    } catch (error) {
+      if (activeToken !== minutesRunToken) {
+        return
+      }
+
+      set((currentState) => ({
+        isGeneratingMinutes: false,
+        meetingMinutes:
+          currentState.meetingMinutes ??
+          createFallbackMeetingMinutes(Date.now()),
+        errorMessage: toErrorMessage(error),
+        statusMessage: '会议纪要生成失败，请稍后重试。',
       }))
     }
   },

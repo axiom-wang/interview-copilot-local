@@ -1,26 +1,51 @@
 import { useEffect } from 'react'
-import { TopBar } from './components/TopBar'
+import { AuthPage } from './pages/AuthPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { AppShell } from './components/layout/AppShell'
 import { LiveAssistPage } from './modes/LiveAssistPage'
 import { ReplayPage } from './modes/ReplayPage'
 import { useAppStore } from './store/useAppStore'
+import { useAuthStore } from './store/useAuthStore'
 
 function App() {
-  const mode = useAppStore((state) => state.mode)
+  const activeView = useAppStore((state) => state.activeView)
   const initialize = useAppStore((state) => state.initialize)
+  const authReady = useAuthStore((state) => state.ready)
+  const user = useAuthStore((state) => state.user)
+  const initializeAuth = useAuthStore((state) => state.initialize)
 
   useEffect(() => {
-    initialize()
-  }, [initialize])
+    void initializeAuth()
+  }, [initializeAuth])
+
+  useEffect(() => {
+    if (user) {
+      initialize()
+    }
+  }, [initialize, user])
+
+  if (!authReady) {
+    return (
+      <div className="page-shell flex min-h-screen items-center justify-center">
+        <p className="theme-muted text-sm">正在加载…</p>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <AuthPage />
+  }
 
   return (
-    <div className="page-shell min-h-screen">
-      <div className="app-frame flex min-h-screen flex-col px-4 py-4 md:px-6">
-        <TopBar />
-        <main className="mt-4 flex min-h-0 flex-1">
-          {mode === 'live' ? <LiveAssistPage /> : <ReplayPage />}
-        </main>
-      </div>
-    </div>
+    <AppShell>
+      {activeView === 'settings' ? (
+        <SettingsPage />
+      ) : activeView === 'replay' ? (
+        <ReplayPage />
+      ) : (
+        <LiveAssistPage />
+      )}
+    </AppShell>
   )
 }
 

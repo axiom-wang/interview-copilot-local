@@ -1,11 +1,15 @@
 import type { Config, Context } from '@netlify/functions'
+import { getUser } from '@netlify/identity'
 import {
   analyzeTranscriptRealtimeBundle,
   answerInterviewQuestionOnly,
+  generateMeetingMinutesOnly,
   generateMeetingSummaryOnly,
   generateSpeakingHintsOnly,
   generateTranscriptMindMap,
+  probeOpenAiConnection,
 } from '../../electron/llm/openaiAnalysisService'
+import type { OpenAiRuntimeConfigOverride } from '../../electron/llm/openaiConfig'
 import type { AnalysisPromptContext } from '../../src/types/promptContext'
 import type { TranscriptSegment } from '../../src/types/transcript'
 
@@ -21,8 +25,10 @@ type AnalysisAction =
   | 'realtime'
   | 'speaking-hints'
   | 'mind-map'
+  | 'meeting-minutes'
   | 'meeting-summary'
   | 'interview-question'
+  | 'probe'
 
 const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), {
@@ -61,6 +67,7 @@ const validateTranscriptRequest = (request: TranscriptRequest) => {
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.phaseContext) ||
+    !isStringOrUndefined(request.scenarioId) ||
     !isSummaryAssemblyContext(request.summaryAssemblyContext)
   ) {
     throw new Error('Invalid analysis context.')
@@ -80,6 +87,7 @@ const validateInterviewQuestionRequest = (
 const toPromptContext = (
   request: TranscriptRequest,
 ): AnalysisPromptContext => ({
+  scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
   phaseContext: request.phaseContext?.trim() || undefined,
@@ -90,8 +98,10 @@ const isAnalysisAction = (value: string | undefined): value is AnalysisAction =>
   value === 'realtime' ||
   value === 'speaking-hints' ||
   value === 'mind-map' ||
+  value === 'meeting-minutes' ||
   value === 'meeting-summary' ||
-  value === 'interview-question'
+  value === 'interview-question' ||
+  value === 'probe'
 
 const readJsonBody = async <T>(request: Request) => {
   try {
@@ -101,10 +111,48 @@ const readJsonBody = async <T>(request: Request) => {
   }
 }
 
+const readModelConfigFromHeaders = (
+  request: Request,
+): OpenAiRuntimeConfigOverride => {
+  const apiKey = request.headers.get('x-model-api-key')?.trim()
+  const model = request.headers.get('x-model-name')?.trim()
+  const baseURL = request.headers.get('x-model-base-url')?.trim()
+
+  return {
+    apiKey: apiKey || undefined,
+    model: model || undefined,
+    baseURL: baseURL || undefined,
+  }
+}
+
+const requireAuthenticatedUser = async () => {
+  try {
+    const user = await getUser()
+    if (!user) {
+      return null
+    }
+
+    return user
+  } catch {
+    // Identity may be unavailable in local preview builds.
+    return null
+  }
+}
+
 const handleAnalysisAction = async (
   action: AnalysisAction,
   request: Request,
+  configOverride: OpenAiRuntimeConfigOverride,
 ) => {
+  if (action === 'probe') {
+    const result = await probeOpenAiConnection(configOverride)
+    return json({
+      ok: true,
+      model: result.model,
+      baseURL: result.baseURL,
+    })
+  }
+
   if (action === 'interview-question') {
     const body = await readJsonBody<InterviewQuestionRequest>(request)
     validateInterviewQuestionRequest(body)
@@ -113,6 +161,7 @@ const handleAnalysisAction = async (
       body.question,
       body.segments,
       toPromptContext(body),
+      configOverride,
     )
 
     return json({ ok: true, answer })
@@ -123,21 +172,46 @@ const handleAnalysisAction = async (
   const context = toPromptContext(body)
 
   if (action === 'realtime') {
-    const bundle = await analyzeTranscriptRealtimeBundle(body.segments, context)
+    const bundle = await analyzeTranscriptRealtimeBundle(
+      body.segments,
+      context,
+      configOverride,
+    )
     return json({ ok: true, bundle })
   }
 
   if (action === 'speaking-hints') {
-    const hints = await generateSpeakingHintsOnly(body.segments, context)
+    const hints = await generateSpeakingHintsOnly(
+      body.segments,
+      context,
+      configOverride,
+    )
     return json({ ok: true, hints })
   }
 
   if (action === 'mind-map') {
-    const snapshot = await generateTranscriptMindMap(body.segments, context)
+    const snapshot = await generateTranscriptMindMap(
+      body.segments,
+      context,
+      configOverride,
+    )
     return json({ ok: true, snapshot })
   }
 
-  const summary = await generateMeetingSummaryOnly(body.segments, context)
+  if (action === 'meeting-minutes') {
+    const minutes = await generateMeetingMinutesOnly(
+      body.segments,
+      context,
+      configOverride,
+    )
+    return json({ ok: true, minutes })
+  }
+
+  const summary = await generateMeetingSummaryOnly(
+    body.segments,
+    context,
+    configOverride,
+  )
   return json({ ok: true, summary })
 }
 
@@ -152,8 +226,27 @@ export default async (request: Request, context: Context) => {
     return json({ ok: false, error: 'Unknown analysis action.' }, { status: 404 })
   }
 
+  const identityEnabled =
+    (
+      globalThis as typeof globalThis & {
+        Netlify?: { env?: { get?: (name: string) => string | undefined } }
+      }
+    ).Netlify?.env?.get?.('IDENTITY_REQUIRED') === 'true'
+
+  if (identityEnabled) {
+    const user = await requireAuthenticatedUser()
+    if (!user) {
+      return json({ ok: false, error: 'Unauthorized.' }, { status: 401 })
+    }
+  } else {
+    // Soft gate: if Identity is available and a user exists, great.
+    // If not configured (local/mock), allow request through with user-supplied keys.
+    await requireAuthenticatedUser()
+  }
+
   try {
-    return await handleAnalysisAction(action, request)
+    const configOverride = readModelConfigFromHeaders(request)
+    return await handleAnalysisAction(action, request, configOverride)
   } catch (error) {
     return json(
       {

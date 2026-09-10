@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import { resolveScenarioProfile } from '../scenarios'
 import type { ReplaySnapshot, SessionRecord } from '../types/session'
 
 interface ReplayTimelineProps {
@@ -39,10 +40,10 @@ export function ReplayTimeline({
     sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null
 
   return (
-    <section className="panel-card flex h-full min-h-[720px] flex-col p-5">
+    <section className="panel-card flex h-full min-h-[520px] flex-col p-5 xl:min-h-[720px]">
       <div>
-        <p className="kicker theme-muted text-[11px]">Session Navigator</p>
-        <h2 className="theme-title mt-2 font-heading text-2xl">回放时间导航</h2>
+        <p className="kicker theme-muted text-[11px]">会话导航</p>
+        <h2 className="theme-title mt-2 text-2xl font-semibold">回放时间导航</h2>
         <p className="theme-muted mt-2 text-sm leading-6">
           左侧保留会话列表，选中后可直接拖动时间、跳快照、查看摘要与导图。
         </p>
@@ -52,13 +53,14 @@ export function ReplayTimeline({
         {sessions.map((session) => {
           const isDemoSession = session.id === 'session-demo'
           const isSelected = session.id === selectedSessionId
+          const scenarioLabel = resolveScenarioProfile(session.scenarioId).label
 
           return (
             <article
               className={clsx(
-                'rounded-[24px] border p-4 transition',
+                'rounded-[var(--radius-card)] border p-4 transition',
                 isSelected
-                  ? 'border-cyan-300/24 bg-cyan-300/10'
+                  ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]'
                   : 'theme-inline-card theme-inline-card-hover',
               )}
               key={session.id}
@@ -74,11 +76,19 @@ export function ReplayTimeline({
                       {session.title}
                     </span>
                     {isDemoSession ? (
-                      <span className="status-badge">Demo</span>
+                      <span className="status-badge" data-tone="primary">
+                        示例数据
+                      </span>
                     ) : null}
+                    <span className="status-badge">{scenarioLabel}</span>
                     {session.meetingSummary ? (
                       <span className="status-badge" data-tone="active">
                         有总结
+                      </span>
+                    ) : null}
+                    {session.meetingMinutes ? (
+                      <span className="status-badge" data-tone="active">
+                        有纪要
                       </span>
                     ) : null}
                   </div>
@@ -86,24 +96,24 @@ export function ReplayTimeline({
                     {formatClock(session.startedAt)} - {formatClock(session.endedAt)}
                   </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div className="theme-inline-card-strong rounded-[18px] px-3 py-2">
-                      <p className="theme-quiet text-[11px] uppercase tracking-[0.16em]">
+                    <div className="theme-inline-card-strong rounded-[var(--radius-card)] px-3 py-2">
+                      <p className="theme-quiet text-[11px] font-semibold tracking-[0.08em] uppercase">
                         转写
                       </p>
                       <p className="theme-title mt-1 text-sm">
                         {session.transcriptSegments.length}
                       </p>
                     </div>
-                    <div className="theme-inline-card-strong rounded-[18px] px-3 py-2">
-                      <p className="theme-quiet text-[11px] uppercase tracking-[0.16em]">
+                    <div className="theme-inline-card-strong rounded-[var(--radius-card)] px-3 py-2">
+                      <p className="theme-quiet text-[11px] font-semibold tracking-[0.08em] uppercase">
                         快照
                       </p>
                       <p className="theme-title mt-1 text-sm">
                         {session.analysisSnapshots.length}
                       </p>
                     </div>
-                    <div className="theme-inline-card-strong rounded-[18px] px-3 py-2">
-                      <p className="theme-quiet text-[11px] uppercase tracking-[0.16em]">
+                    <div className="theme-inline-card-strong rounded-[var(--radius-card)] px-3 py-2">
+                      <p className="theme-quiet text-[11px] font-semibold tracking-[0.08em] uppercase">
                         标记
                       </p>
                       <p className="theme-title mt-1 text-sm">
@@ -115,7 +125,7 @@ export function ReplayTimeline({
 
                 {!isDemoSession ? (
                   <button
-                    className="theme-button-danger rounded-full border px-3 py-1 text-xs transition"
+                    className="btn-danger text-xs"
                     onClick={() => onDeleteSession(session.id)}
                     type="button"
                   >
@@ -129,7 +139,7 @@ export function ReplayTimeline({
       </div>
 
       {selectedSession ? (
-        <div className="theme-inline-card-strong mt-5 rounded-[24px] p-4">
+        <div className="theme-inline-card-strong mt-5 rounded-[var(--radius-card)] p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="theme-title text-sm font-semibold">当前回放位置</p>
@@ -145,7 +155,7 @@ export function ReplayTimeline({
           </div>
 
           <input
-            className="theme-range mt-4 h-2 w-full cursor-pointer appearance-none rounded-full accent-cyan-500"
+            className="theme-range mt-4 h-2 w-full cursor-pointer appearance-none rounded-md accent-[color:var(--accent)]"
             max={selectedSession.endedAt}
             min={selectedSession.startedAt}
             onChange={(event) => onChangeTimestamp(Number(event.currentTarget.value))}
@@ -164,7 +174,7 @@ export function ReplayTimeline({
             <div className="mt-3 flex flex-wrap gap-2">
               {selectedSession.analysisSnapshots.map((snapshot) => (
                 <button
-                  className="theme-button-primary rounded-full border px-3 py-1 text-xs transition"
+                  className="btn-secondary text-xs"
                   key={snapshot.id}
                   onClick={() => onJumpToSnapshot(snapshot)}
                   type="button"

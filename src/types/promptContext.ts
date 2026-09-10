@@ -1,4 +1,5 @@
 import type { MindMapSnapshot } from './mindmap'
+import type { MeetingScenarioId } from '../scenarios'
 import type { TranscriptSegment } from './transcript'
 
 export interface SummaryAssemblyContext {
@@ -11,6 +12,7 @@ export interface SummaryAssemblyContext {
 }
 
 export interface AnalysisPromptContext {
+  scenarioId?: MeetingScenarioId
   questionContext?: string
   roleContext?: string
   phaseContext?: string

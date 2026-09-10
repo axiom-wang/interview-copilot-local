@@ -1,6 +1,7 @@
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
   PhaseConsensusAnalysisBundle,
@@ -44,6 +45,7 @@ const normalizeSummaryAssemblyContext = (
 }
 
 const normalizePromptContext = (context: AnalysisPromptContext | undefined) => ({
+  scenarioId: context?.scenarioId,
   questionContext: context?.questionContext?.trim() || undefined,
   roleContext: context?.roleContext?.trim() || undefined,
   phaseContext: context?.phaseContext?.trim() || undefined,
@@ -63,6 +65,7 @@ const buildRequestKey = (
 
   return [
     ...segments.map((segment) => `${segment.id}:${segment.timestamp}`),
+    `scenario:${normalizedContext.scenarioId ?? ''}`,
     `q:${normalizedContext.questionContext ?? ''}`,
     `r:${normalizedContext.roleContext ?? ''}`,
     `p:${normalizedContext.phaseContext ?? ''}`,
@@ -72,12 +75,14 @@ const buildRequestKey = (
 
 const postJson = async <T extends Record<string, unknown>>(
   endpoint: string,
-  body: TranscriptRequest | InterviewQuestionRequest,
+  body: TranscriptRequest | InterviewQuestionRequest | Record<string, never>,
+  headers?: Record<string, string>,
 ) => {
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(headers ?? {}),
     },
     body: JSON.stringify(body),
   })
@@ -99,6 +104,8 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
   readonly id = 'openai-responses-http'
   readonly label = 'OpenAI Responses API'
 
+  private modelHeaders: Record<string, string> = {}
+
   private lastRealtimeRequestKey: string | null = null
   private lastRealtimePromise: Promise<PhaseConsensusAnalysisBundle> | null = null
 
@@ -111,8 +118,45 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
   private lastSummaryRequestKey: string | null = null
   private lastSummaryPromise: Promise<MeetingSummary> | null = null
 
+  private lastMinutesRequestKey: string | null = null
+  private lastMinutesPromise: Promise<MeetingMinutes> | null = null
+
   private lastQaRequestKey: string | null = null
   private lastQaPromise: Promise<InterviewQaAnswer> | null = null
+
+  setModelConfig(config: {
+    apiKey?: string
+    model?: string
+    baseURL?: string
+  }) {
+    const headers: Record<string, string> = {}
+
+    if (config.apiKey?.trim()) {
+      headers['x-model-api-key'] = config.apiKey.trim()
+    }
+
+    if (config.model?.trim()) {
+      headers['x-model-name'] = config.model.trim()
+    }
+
+    if (config.baseURL?.trim()) {
+      headers['x-model-base-url'] = config.baseURL.trim().replace(/\/$/, '')
+    }
+
+    this.modelHeaders = headers
+    this.lastRealtimeRequestKey = null
+    this.lastRealtimePromise = null
+    this.lastHintsRequestKey = null
+    this.lastHintsPromise = null
+    this.lastMindMapRequestKey = null
+    this.lastMindMapPromise = null
+    this.lastSummaryRequestKey = null
+    this.lastSummaryPromise = null
+    this.lastMinutesRequestKey = null
+    this.lastMinutesPromise = null
+    this.lastQaRequestKey = null
+    this.lastQaPromise = null
+  }
 
   private async ensureRealtimeBundle(
     segments: TranscriptSegment[],
@@ -133,6 +177,7 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
       },
+      this.modelHeaders,
     )
       .then((result) => result.bundle)
       .catch((error) => {
@@ -166,6 +211,7 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
       },
+      this.modelHeaders,
     )
       .then((result) => result.hints)
       .catch((error) => {
@@ -199,6 +245,7 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
       },
+      this.modelHeaders,
     )
       .then((result) => result.snapshot)
       .catch((error) => {
@@ -232,6 +279,7 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
       },
+      this.modelHeaders,
     )
       .then((result) => result.summary)
       .catch((error) => {
@@ -267,6 +315,7 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
       },
+      this.modelHeaders,
     )
       .then((result) => result.answer)
       .catch((error) => {
@@ -279,6 +328,48 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
       })
 
     return this.lastQaPromise
+  }
+
+  private async ensureMeetingMinutes(
+    segments: TranscriptSegment[],
+    context?: AnalysisPromptContext,
+  ) {
+    const normalizedContext = normalizePromptContext(context)
+    const requestKey = buildRequestKey(segments, normalizedContext)
+    const cachedMinutesPromise = this.lastMinutesPromise
+
+    if (this.lastMinutesRequestKey === requestKey && cachedMinutesPromise) {
+      return cachedMinutesPromise
+    }
+
+    this.lastMinutesRequestKey = requestKey
+    this.lastMinutesPromise = postJson<{ minutes: MeetingMinutes }>(
+      '/api/analysis/meeting-minutes',
+      {
+        segments,
+        ...normalizedContext,
+      },
+      this.modelHeaders,
+    )
+      .then((result) => result.minutes)
+      .catch((error) => {
+        if (this.lastMinutesRequestKey === requestKey) {
+          this.lastMinutesRequestKey = null
+          this.lastMinutesPromise = null
+        }
+
+        throw error
+      })
+
+    return this.lastMinutesPromise
+  }
+
+  async probeConnection() {
+    return postJson<{ model: string; baseURL: string }>(
+      '/api/analysis/probe',
+      {},
+      this.modelHeaders,
+    )
   }
 
   async detectPhase(
@@ -316,6 +407,13 @@ export class HttpOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ): Promise<MeetingSummary> {
     return this.ensureMeetingSummary(segments, context)
+  }
+
+  async generateMeetingMinutes(
+    segments: TranscriptSegment[],
+    context?: AnalysisPromptContext,
+  ): Promise<MeetingMinutes> {
+    return this.ensureMeetingMinutes(segments, context)
   }
 
   async answerInterviewQuestion(

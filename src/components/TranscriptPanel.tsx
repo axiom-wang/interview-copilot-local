@@ -68,7 +68,7 @@ const getSpeakerLabel = (
 }
 
 const actionButtonClassName =
-  'rounded-full border px-2.5 py-1 text-xs transition focus-visible:opacity-100'
+  'rounded-md border px-2.5 py-1 text-xs transition focus-visible:opacity-100'
 
 export function TranscriptPanel({
   title,
@@ -103,11 +103,11 @@ export function TranscriptPanel({
 
   return (
     <section className="panel-card flex h-full min-h-[520px] flex-col overflow-hidden">
-      <div className="theme-header-surface sticky top-0 z-10 border-b px-5 py-4 backdrop-blur">
+      <div className="theme-header-surface sticky top-0 z-10 border-b px-5 py-4">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="kicker theme-muted text-[11px]">Transcript</p>
-            <h2 className="theme-title mt-2 font-heading text-2xl">{title}</h2>
+            <h2 className="theme-title mt-2 text-2xl font-semibold">{title}</h2>
             {showDescription ? (
               <p className="theme-muted mt-2 max-w-3xl text-sm leading-6">
                 {description}
@@ -118,7 +118,7 @@ export function TranscriptPanel({
           <div className="flex flex-wrap items-center gap-2">
             {onExportAll ? (
               <button
-                className="theme-button-primary rounded-full border px-3 py-1.5 text-xs transition disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-secondary text-xs"
                 disabled={segments.length === 0}
                 onClick={onExportAll}
                 type="button"
@@ -150,7 +150,7 @@ export function TranscriptPanel({
 
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto px-5 py-4">
         {segments.length === 0 ? (
-          <div className="panel-empty theme-muted flex h-full items-center justify-center rounded-[24px] p-8 text-center text-sm leading-7">
+          <div className="panel-empty theme-muted flex h-full items-center justify-center rounded-[var(--radius-card)] p-8 text-center text-sm leading-7">
             {emptyMessage}
           </div>
         ) : null}
@@ -162,12 +162,12 @@ export function TranscriptPanel({
           return (
             <article
               className={clsx(
-                'group rounded-[20px] border px-3.5 py-2 transition',
+                'group rounded-[var(--radius-card)] border px-3.5 py-2 transition',
                 pinnedIds.has(segment.id)
-                  ? 'border-amber-300/24 bg-amber-300/8'
+                  ? 'border-[color:var(--warning-border)] bg-[color:var(--warning-soft)]'
                   : segment.isFinal
                     ? 'theme-inline-card'
-                    : 'border-cyan-300/14 bg-cyan-300/8',
+                    : 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]',
               )}
               key={segment.id}
             >
@@ -190,10 +190,7 @@ export function TranscriptPanel({
 
                 <div className="flex flex-wrap items-center justify-end gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
                   <button
-                    className={clsx(
-                      actionButtonClassName,
-                      'theme-button-primary',
-                    )}
+                    className={clsx(actionButtonClassName, 'btn-secondary')}
                     onClick={() => {
                       void copySegmentText(segment)
                     }}
@@ -203,10 +200,7 @@ export function TranscriptPanel({
                   </button>
                   {onDeleteSegment ? (
                     <button
-                      className={clsx(
-                        actionButtonClassName,
-                        'theme-button-danger',
-                      )}
+                      className={clsx(actionButtonClassName, 'btn-danger')}
                       onClick={() => onDeleteSegment(segment.id)}
                       type="button"
                     >
@@ -215,10 +209,7 @@ export function TranscriptPanel({
                   ) : null}
                   {onMarkAsMe && !profile?.isMe ? (
                     <button
-                      className={clsx(
-                        actionButtonClassName,
-                        'theme-button-success',
-                      )}
+                      className={clsx(actionButtonClassName, 'btn-secondary')}
                       onClick={() => onMarkAsMe(segment.speaker)}
                       type="button"
                     >
@@ -227,10 +218,7 @@ export function TranscriptPanel({
                   ) : null}
                   {onRenameSpeaker ? (
                     <button
-                      className={clsx(
-                        actionButtonClassName,
-                        'theme-button-magenta',
-                      )}
+                      className={clsx(actionButtonClassName, 'btn-ghost')}
                       onClick={() => {
                         const nextName = window.prompt(
                           '请输入发言人名称（留空则清除名称）',
@@ -254,10 +242,7 @@ export function TranscriptPanel({
                   ) : null}
                   {onClearSpeakerBinding && profile?.displayName ? (
                     <button
-                      className={clsx(
-                        actionButtonClassName,
-                        'theme-button-neutral',
-                      )}
+                      className={clsx(actionButtonClassName, 'btn-ghost')}
                       onClick={() => onClearSpeakerBinding(segment.speaker)}
                       type="button"
                     >

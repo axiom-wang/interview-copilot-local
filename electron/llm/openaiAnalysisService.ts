@@ -1,18 +1,21 @@
 import { buildAnswerInterviewQuestionPrompt } from '../../src/prompts/answerInterviewQuestion'
 import { buildDetectPhasePrompt } from '../../src/prompts/detectPhase'
 import { buildExtractConsensusPrompt } from '../../src/prompts/extractConsensus'
+import { buildGenerateMeetingMinutesPrompt } from '../../src/prompts/generateMeetingMinutes'
 import { buildGenerateMeetingSummaryPrompt } from '../../src/prompts/generateMeetingSummary'
 import { buildGenerateMindMapPrompt } from '../../src/prompts/generateMindMap'
 import { buildSpeakingHintsPrompt } from '../../src/prompts/speakingHints'
 import { answerInterviewQuestionSchema } from '../../src/schemas/answerInterviewQuestion.schema'
 import { detectPhaseSchema } from '../../src/schemas/detectPhase.schema'
 import { extractConsensusSchema } from '../../src/schemas/extractConsensus.schema'
+import { generateMeetingMinutesSchema } from '../../src/schemas/generateMeetingMinutes.schema'
 import { generateMeetingSummarySchema } from '../../src/schemas/generateMeetingSummary.schema'
 import { generateMindMapSchema } from '../../src/schemas/generateMindMap.schema'
 import { speakingHintsSchema } from '../../src/schemas/speakingHints.schema'
 import type {
   AnalysisBundle,
   InterviewQaAnswer,
+  MeetingMinutes,
   MeetingSummary,
   PhaseConsensusAnalysisBundle,
   SpeakingHints,
@@ -20,10 +23,14 @@ import type {
 import type { MindMapSnapshot } from '../../src/types/mindmap'
 import type { AnalysisPromptContext } from '../../src/types/promptContext'
 import type { TranscriptSegment } from '../../src/types/transcript'
-import { getOpenAiRuntimeConfig } from './openaiConfig'
+import {
+  getOpenAiRuntimeConfig,
+  type OpenAiRuntimeConfigOverride,
+} from './openaiConfig'
 import {
   parseConsensusAnalysis,
   parseInterviewQaAnswer,
+  parseMeetingMinutes,
   parseMeetingSummary,
   parseMindMapSnapshot,
   parsePhaseAnalysis,
@@ -85,8 +92,11 @@ const normalizeErrorText = (
   return `请求失败（${status}）：${normalizedBody}`
 }
 
-const fetchStructuredResponse = async (body: Record<string, unknown>) => {
-  const config = getOpenAiRuntimeConfig()
+const fetchStructuredResponse = async (
+  body: Record<string, unknown>,
+  configOverride?: OpenAiRuntimeConfigOverride,
+) => {
+  const config = getOpenAiRuntimeConfig(configOverride)
   let lastError: Error | null = null
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
@@ -154,21 +164,25 @@ const createStructuredResponse = async <T>(
   schemaName: string,
   schema: JsonSchema,
   parser: (value: unknown) => T,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ) => {
-  const config = getOpenAiRuntimeConfig()
-  const payload = await fetchStructuredResponse({
-    model: config.model,
-    store: false,
-    input: prompt,
-    text: {
-      format: {
-        type: 'json_schema',
-        name: schemaName,
-        strict: true,
-        schema,
+  const config = getOpenAiRuntimeConfig(configOverride)
+  const payload = await fetchStructuredResponse(
+    {
+      model: config.model,
+      store: false,
+      input: prompt,
+      text: {
+        format: {
+          type: 'json_schema',
+          name: schemaName,
+          strict: true,
+          schema,
+        },
       },
     },
-  })
+    configOverride,
+  )
 
   const outputText =
     typeof payload.output_text === 'string' && payload.output_text.trim()
@@ -188,6 +202,7 @@ const createStructuredResponse = async <T>(
 export const analyzeTranscriptRealtimeBundle = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<PhaseConsensusAnalysisBundle> => {
   const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
@@ -198,12 +213,14 @@ export const analyzeTranscriptRealtimeBundle = async (
       'detect_phase',
       detectPhaseSchema,
       (value) => parsePhaseAnalysis(value, updatedAt),
+      configOverride,
     ),
     createStructuredResponse(
       buildExtractConsensusPrompt(analysisSegments, context),
       'extract_consensus_and_tensions',
       extractConsensusSchema,
       (value) => parseConsensusAnalysis(value, updatedAt),
+      configOverride,
     ),
   ])
 
@@ -216,6 +233,7 @@ export const analyzeTranscriptRealtimeBundle = async (
 export const generateSpeakingHintsOnly = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<SpeakingHints> => {
   const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
@@ -225,12 +243,14 @@ export const generateSpeakingHintsOnly = async (
     'generate_speaking_hints',
     speakingHintsSchema,
     (value) => parseSpeakingHints(value, updatedAt),
+    configOverride,
   )
 }
 
 export const generateTranscriptMindMap = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<MindMapSnapshot> => {
   const mindMapSegments = getRecentSegmentsByWindow(segments, 3 * 60 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
@@ -240,12 +260,14 @@ export const generateTranscriptMindMap = async (
     'generate_mind_map',
     generateMindMapSchema,
     (value) => parseMindMapSnapshot(value, updatedAt),
+    configOverride,
   )
 }
 
 export const generateMeetingSummaryOnly = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<MeetingSummary> => {
   const summarySegments = segments.filter((segment) => segment.text.trim().length > 0)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
@@ -267,6 +289,38 @@ export const generateMeetingSummaryOnly = async (
     'generate_meeting_summary',
     generateMeetingSummarySchema,
     (value) => parseMeetingSummary(value, updatedAt),
+    configOverride,
+  )
+}
+
+export const generateMeetingMinutesOnly = async (
+  segments: TranscriptSegment[],
+  context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
+): Promise<MeetingMinutes> => {
+  const minutesSegments = segments.filter(
+    (segment) => segment.text.trim().length > 0,
+  )
+  const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
+  const summaryAssemblyContext = {
+    ...(context?.summaryAssemblyContext ?? {}),
+    transcript:
+      context?.summaryAssemblyContext?.transcript &&
+      context.summaryAssemblyContext.transcript.length > 0
+        ? context.summaryAssemblyContext.transcript
+        : minutesSegments,
+  }
+  const promptContext: AnalysisPromptContext = {
+    ...context,
+    summaryAssemblyContext,
+  }
+
+  return createStructuredResponse(
+    buildGenerateMeetingMinutesPrompt(minutesSegments, promptContext),
+    'generate_meeting_minutes',
+    generateMeetingMinutesSchema,
+    (value) => parseMeetingMinutes(value, updatedAt),
+    configOverride,
   )
 }
 
@@ -274,6 +328,7 @@ export const answerInterviewQuestionOnly = async (
   question: string,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<InterviewQaAnswer> => {
   const questionSegments = segments.filter((segment) => segment.text.trim().length > 0)
   const updatedAt = questionSegments.at(-1)?.timestamp ?? Date.now()
@@ -283,17 +338,49 @@ export const answerInterviewQuestionOnly = async (
     'answer_interview_question',
     answerInterviewQuestionSchema,
     (value) => parseInterviewQaAnswer(value, updatedAt),
+    configOverride,
   )
+}
+
+export const probeOpenAiConnection = async (
+  configOverride?: OpenAiRuntimeConfigOverride,
+) => {
+  const config = getOpenAiRuntimeConfig(configOverride)
+  const response = await fetch(`${config.baseURL}/models`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(
+      normalizeErrorText(
+        response.status,
+        response.statusText,
+        errorText,
+        response.headers.get('content-type'),
+      ),
+    )
+  }
+
+  return {
+    ok: true as const,
+    model: config.model,
+    baseURL: config.baseURL,
+  }
 }
 
 export const analyzeTranscriptBundle = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
+  configOverride?: OpenAiRuntimeConfigOverride,
 ): Promise<AnalysisBundle> => {
   const [bundle, speakingHints, mindMapSnapshot] = await Promise.all([
-    analyzeTranscriptRealtimeBundle(segments, context),
-    generateSpeakingHintsOnly(segments, context),
-    generateTranscriptMindMap(segments, context),
+    analyzeTranscriptRealtimeBundle(segments, context, configOverride),
+    generateSpeakingHintsOnly(segments, context, configOverride),
+    generateTranscriptMindMap(segments, context, configOverride),
   ])
 
   return {
