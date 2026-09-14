@@ -11,6 +11,10 @@ interface MindMapPanelProps {
   isStale?: boolean
   onGenerate?: () => Promise<boolean> | boolean | void
   disableGenerate?: boolean
+  /** Rendered inside a tab panel: the tab label already names the panel. */
+  embedded?: boolean
+  /** `launcher` renders only the action buttons plus the full-screen overlay. */
+  presentation?: 'panel' | 'launcher'
 }
 
 type FlowNodeData = Record<string, unknown> & {
@@ -95,6 +99,8 @@ export function MindMapPanel({
   isStale = false,
   onGenerate,
   disableGenerate = false,
+  embedded = false,
+  presentation = 'panel',
 }: MindMapPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const canExpand = Boolean(snapshot)
@@ -137,46 +143,159 @@ export function MindMapPanel({
   }
 
   const gridColor = getThemeToken('--viz-grid', 'rgba(148, 163, 184, 0.14)')
+  const showHeader = !embedded || Boolean(snapshot) || Boolean(onGenerate)
 
-  return (
-    <section className={clsx('panel-card p-5', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="kicker theme-muted text-[11px]">产出预览</p>
-          <h2 className="theme-title mt-2 text-2xl font-semibold">思维导图</h2>
-          <p className="theme-muted mt-2 text-sm">
-            直接在应用内预览讨论结构，必要时再放大查看。
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {snapshot ? (
-            <span className="status-badge">生成于 {formatTimestamp(snapshot.capturedAt)}</span>
-          ) : null}
-          {isStale && snapshot ? (
-            <span className="status-badge" data-tone="warning">
-              内容可能过期
-            </span>
-          ) : null}
-          {onGenerate ? (
-            <button
-              className="btn-secondary"
-              disabled={disableGenerate || isGenerating}
-              onClick={() => {
-                void handleGenerate()
-              }}
-              type="button"
+  const overlay =
+    snapshot && expanded ? (
+      <div
+        className="theme-overlay fixed inset-0 z-[1200] flex items-center justify-center p-4 md:p-6"
+        onClick={() => {
+          setIsExpanded(false)
+        }}
+      >
+        <div
+          className="theme-overlay-card panel-card mx-auto flex h-[calc(100vh-32px)] w-full max-w-[1800px] flex-col overflow-hidden border md:h-[calc(100vh-48px)]"
+          onClick={(event) => {
+            event.stopPropagation()
+          }}
+        >
+          <div className="theme-divider flex items-center justify-between gap-3 border-b px-5 py-4">
+            <div>
+              <p className="kicker theme-muted text-[11px]">Full Preview</p>
+              <h3 className="theme-title mt-2 text-lg font-semibold">
+                {snapshot.topic || '当前讨论导图'}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              {onGenerate ? (
+                <button
+                  className="btn-secondary"
+                  disabled={disableGenerate || isGenerating}
+                  onClick={() => {
+                    void handleGenerate()
+                  }}
+                  type="button"
+                >
+                  {isGenerating ? '生成中...' : '重新生成'}
+                </button>
+              ) : null}
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setIsExpanded(false)
+                }}
+                type="button"
+              >
+                关闭
+              </button>
+            </div>
+          </div>
+          <div className="theme-viz-surface-strong flex-1">
+            <ReactFlow
+              defaultViewport={{ x: 180, y: 90, zoom: 0.95 }}
+              edges={edges}
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              nodes={nodes}
+              nodesDraggable={false}
+              panOnDrag
+              zoomOnScroll
             >
-              {isGenerating ? '生成中...' : '生成 / 刷新并查看'}
-            </button>
-          ) : null}
+              <Background color={gridColor} gap={22} />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          </div>
         </div>
       </div>
+    ) : null
+
+  if (presentation === 'launcher') {
+    return (
+      <>
+        <button
+          className="btn-secondary text-xs"
+          disabled={isGenerating || (!snapshot && (disableGenerate || !onGenerate))}
+          onClick={() => {
+            if (snapshot) {
+              setIsExpanded(true)
+              return
+            }
+
+            void handleGenerate()
+          }}
+          type="button"
+        >
+          {isGenerating ? '生成中...' : snapshot ? '查看思维导图' : '生成思维导图'}
+        </button>
+        {snapshot && isStale ? (
+          <span className="status-badge" data-tone="warning">
+            导图可能过期
+          </span>
+        ) : null}
+        {overlay}
+      </>
+    )
+  }
+
+  return (
+    <section
+      className={clsx(
+        'panel-card flex min-h-0 flex-col overflow-hidden',
+        embedded ? 'p-4' : 'p-5',
+        className,
+      )}
+    >
+      {showHeader ? (
+        <div
+          className={clsx(
+            'flex shrink-0 flex-wrap gap-3',
+            embedded
+              ? 'items-center justify-end'
+              : 'items-start justify-between',
+          )}
+        >
+          {embedded ? null : (
+            <div>
+              <p className="kicker theme-muted text-[11px]">产出预览</p>
+              <h2 className="theme-title mt-2 text-2xl font-semibold">思维导图</h2>
+              <p className="theme-muted mt-2 text-sm">
+                直接在应用内预览讨论结构，必要时再放大查看。
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            {snapshot ? (
+              <span className="status-badge">
+                生成于 {formatTimestamp(snapshot.capturedAt)}
+              </span>
+            ) : null}
+            {isStale && snapshot ? (
+              <span className="status-badge" data-tone="warning">
+                内容可能过期
+              </span>
+            ) : null}
+            {onGenerate ? (
+              <button
+                className={clsx('btn-secondary', embedded && 'text-xs')}
+                disabled={disableGenerate || isGenerating}
+                onClick={() => {
+                  void handleGenerate()
+                }}
+                type="button"
+              >
+                {isGenerating ? '生成中...' : '生成 / 刷新并查看'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       <div
         className={clsx(
-          'theme-viz-surface group mt-5 h-[320px] overflow-hidden rounded-[var(--radius-card)] border',
+          'theme-viz-surface group h-[320px] min-h-[180px] flex-1 overflow-hidden rounded-[var(--radius-card)] border',
           'theme-divider',
+          showHeader ? (embedded ? 'mt-3' : 'mt-5') : 'mt-0',
           canExpand ? 'cursor-zoom-in' : '',
         )}
         onClick={() => {
@@ -221,54 +340,7 @@ export function MindMapPanel({
         )}
       </div>
 
-      {snapshot && expanded ? (
-        <div
-          className="theme-overlay fixed inset-0 z-[1200] flex items-center justify-center p-4 md:p-6"
-          onClick={() => {
-            setIsExpanded(false)
-          }}
-        >
-          <div
-            className="theme-overlay-card panel-card mx-auto flex h-[calc(100vh-32px)] w-full max-w-[1800px] flex-col overflow-hidden border md:h-[calc(100vh-48px)]"
-            onClick={(event) => {
-              event.stopPropagation()
-            }}
-          >
-            <div className="theme-divider flex items-center justify-between border-b px-5 py-4">
-              <div>
-                <p className="kicker theme-muted text-[11px]">Full Preview</p>
-                <h3 className="theme-title mt-2 text-lg font-semibold">
-                  {snapshot.topic || '当前讨论导图'}
-                </h3>
-              </div>
-              <button
-                className="btn-ghost"
-                onClick={() => {
-                  setIsExpanded(false)
-                }}
-                type="button"
-              >
-                关闭
-              </button>
-            </div>
-            <div className="theme-viz-surface-strong flex-1">
-              <ReactFlow
-                defaultViewport={{ x: 180, y: 90, zoom: 0.95 }}
-                edges={edges}
-                fitView
-                fitViewOptions={{ padding: 0.2 }}
-                nodes={nodes}
-                nodesDraggable={false}
-                panOnDrag
-                zoomOnScroll
-              >
-                <Background color={gridColor} gap={22} />
-                <Controls showInteractive={false} />
-              </ReactFlow>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {overlay}
     </section>
   )
 }

@@ -190,9 +190,21 @@ A cool slate paper field with a single indigo accent. Semantic greens, ambers, a
 
 App chrome is a two-column product grid: sidebar `{spacing.sidebar}` + fluid main. App bar is `{spacing.appbar}` with `1.25rem` horizontal padding. Main content pads `1rem` (`1.25rem` from `md`).
 
-Live Assist is `xl:grid-cols-[minmax(0,1fr)_minmax(380px,420px)]` with `1rem` gaps. Transcript stays left; phase, hints, and tabbed analysis stay right. Columns want `min-h-[640px]`. Login is a 960px split: hero hidden below that breakpoint.
+The sidebar is collapsible at ≥960px: a `«` ghost button in the sidebar header hides it entirely (`.app-shell[data-sidebar="collapsed"]`), and a `»` button appears at the far left of the app bar to bring it back. The state persists in `localStorage`. Below 960px the sidebar stays a drawer behind the 菜单 button.
 
-Rhythm: `gap-4` between workbench stacks, `gap-2` in the app-bar action row, `0.25rem` inside the tab list.
+Live Assist has two column counts, driven by the **measured width of the layout grid** (`ResizeObserver`, not a viewport media query) so collapsing the sidebar can gain a column. Below `1340px` of content width it is two columns; at or above it is three: 转写 / 阶段 + 发言建议 / 共识分歧 ↔ AI 问答 + 产出. 共识分歧 and AI 问答 always share one tab stack; the 产出 row stays under that stack. In three-column mode the middle column is only phase + hints. At `xl`, 10px drag rails replace the fixed gaps: vertical rails adjust column widths, and in two-column mode the horizontal rail adjusts 发言建议 against the tab stack. A rail must track the pointer one-to-one: column widths are ratios of the full grid width, but the hints height is stored in **pixels** inside its own flexible zone (`.live-resizable-zone` = hints / rail / `minmax(0, 1fr)`), because a ratio of the whole column would lag the cursor by the height of the phase and 产出 rows, and `minmax()` px floors would make the rail stick and jump. Arrow keys move a focused rail (Shift for a larger step), and double-click restores that rail. `重置布局` restores every track. Values persist in `localStorage`; the stored height is kept even when a short window has to clamp it, so it returns when there is room again. Below `xl`, rails disappear and panels return to the normal stacked page flow.
+
+思维导图 and 会议总结 are **产出**, not panels: they live as buttons on one `产出` row at the bottom of the analysis column and open the existing full-screen overlay (which carries the view switcher and 重新生成). Never render them as a thumbnail inside a 420px column — a mind map at that size is unreadable.
+
+Live Assist column proportions are user-adjustable rather than fixed. Transcript stays left, stacked `gap-3` under at most one notice: the setup callout is a single row (message + `前往模型设置`), and the runtime strip is suppressed while that callout already states what is missing. The live transcript uses the compact header (one row: `text-base` title, export, count badges — no `Transcript` kicker, no `text-2xl` headline). The right column is a compact phase strip (`shrink-0`), then speaking hints and tabbed analysis sharing the user-selected height with internal scroll; below `xl` the blocks stack at fixed `min-h` so the 15 / 30 / 60 cards stay visible without a nested scroll. Do not stack full briefing cards for phase and hints on the live floor. Live app-bar actions are state-switched: idle shows Session Prep + Start; listening shows Pause/Resume + Stop; Pin/Save appear only when there is transcript.
+
+Compact speaking hints are a one-line header (title + function-type badge + stale badge + timestamp + `生成建议`), a single accent-labelled `现在开口` line, then the three timing cards at `leading-5`. The full-density version (kicker + headline + description + badge row) is for wide standalone use only.
+
+Panels rendered inside a tab stack are **embedded**: the tab label is the panel title, so they drop their own kicker and `text-2xl` headline, pad `1rem` instead of `1.25rem`, and keep only their status badges and action button on the first row. This applies in both modes.
+
+Replay uses the same two-column workbench: a one-line phase strip plus one tabbed analysis stack (共识分歧 / 会议总结 / 思维导图 / 发言建议) that owns the rest of the right column height with internal scroll. At `xl`, the divider between transcript and analysis adjusts their width, the divider below the phase strip adjusts the height shared with the active analysis panel, and the divider below the toolbar adjusts the height shared with the whole workbench. All dividers support pointer drag, arrow-key adjustment, double-click reset, and persist their proportions locally; the toolbar also exposes `重置布局`. Session picker, scrubber, and both export buttons sit on one toolbar row above the grid. The transcript search field lives inline in the transcript header beside the count badges. Below `xl` the two columns stack and the page scrolls normally. Login is a 960px split: hero hidden below that breakpoint.
+
+Rhythm: `gap-4` between workbench stacks (`gap-3` inside the live right column), `gap-2` in the app-bar action row, `0.25rem` inside the tab list.
 
 ## Elevation & Depth
 
@@ -257,6 +269,11 @@ At ≥960px, left pane is the only large indigo gradient in the product. Right p
 
 ### Do:
 - **Do** keep transcript on the left and analysis on the right at `xl`.
+- **Do** keep the phase read-out as a one-line strip in both modes; give remaining right-column height to the tabbed analysis stack.
+- **Do** let the tab label be the panel title: no kicker + headline repeated inside a tab.
+- **Do** put "generate then read in full" products (mind map, summary) behind the 产出 row and its overlay, not in a cramped inline preview.
+- **Do** measure the container, not the viewport, when a layout can gain space from the collapsing sidebar.
+- **Do** say a runtime condition once — a setup callout and a status strip must not repeat the same sentence.
 - **Do** use Indigo Signal for at most one primary action in a cluster.
 - **Do** lift briefing cards with `--shadow-md`; keep sidebar and app bar flat.
 - **Do** mark live/system state with semantic washes and 8px dots, not decorative charts.

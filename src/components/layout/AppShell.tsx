@@ -143,6 +143,16 @@ function SessionPrepDrawer({
   )
 }
 
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'interview-copilot-local/sidebar-collapsed'
+
+const readStoredSidebarCollapsed = () => {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const activeView = useAppStore((state) => state.activeView)
   const setActiveView = useAppStore((state) => state.setActiveView)
@@ -164,7 +174,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const hasFullConfig = useSettingsStore((state) => state.hasFullConfig)
   const [prepOpen, setPrepOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readStoredSidebarCollapsed)
   const [elapsedSec, setElapsedSec] = useState(0)
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        SIDEBAR_COLLAPSED_STORAGE_KEY,
+        sidebarCollapsed ? '1' : '0',
+      )
+    } catch {
+      // ignore storage failures; the collapse state stays session-only
+    }
+  }, [sidebarCollapsed])
 
   useEffect(() => {
     if (!user) {
@@ -218,7 +240,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : '00:00'
 
   return (
-    <div className="app-shell">
+    <div
+      className="app-shell"
+      data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}
+    >
       {navOpen ? (
         <button
           aria-label="关闭导航"
@@ -229,9 +254,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : null}
 
       <aside className="sidebar" data-open={navOpen}>
-        <div className="border-b border-[color:var(--sidebar-border)] px-5 py-5">
-          <p className="kicker theme-muted text-[10px]">Meeting Assistant</p>
-          <h1 className="theme-title mt-2 text-lg font-semibold">会议智能助手</h1>
+        <div className="flex items-start justify-between gap-2 border-b border-[color:var(--sidebar-border)] px-5 py-5">
+          <div className="min-w-0">
+            <p className="kicker theme-muted text-[10px]">Meeting Assistant</p>
+            <h1 className="theme-title mt-2 text-lg font-semibold">会议智能助手</h1>
+          </div>
+          <button
+            aria-label="收起侧栏"
+            className="sidebar-collapse btn-ghost shrink-0 px-2"
+            onClick={() => setSidebarCollapsed(true)}
+            title="收起侧栏"
+            type="button"
+          >
+            «
+          </button>
         </div>
 
         <nav className="flex flex-1 flex-col gap-1 p-3">
@@ -278,7 +314,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
         <header className="app-bar">
           <div className="flex min-w-0 items-center gap-3">
             <button
@@ -287,6 +323,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               type="button"
             >
               菜单
+            </button>
+            <button
+              aria-label="展开侧栏"
+              className="sidebar-expand btn-ghost px-2"
+              onClick={() => setSidebarCollapsed(false)}
+              title="展开侧栏"
+              type="button"
+            >
+              »
             </button>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -320,60 +365,72 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   会话准备
                 </button>
-                <button
-                  className="btn-primary"
-                  disabled={!canStart}
-                  onClick={() => void startStream()}
-                  title={
-                    !supportsLiveAssist
-                      ? '实时转写服务未配置'
-                      : !hasFullConfig()
-                        ? '请先完成模型设置'
-                        : undefined
-                  }
-                  type="button"
-                >
-                  开始
-                </button>
-                <button
-                  className="btn-secondary"
-                  disabled={!isStreaming}
-                  onClick={() => void togglePause()}
-                  type="button"
-                >
-                  {isPaused ? '继续' : '暂停'}
-                </button>
-                <button
-                  className="btn-secondary"
-                  disabled={!isStreaming}
-                  onClick={stopStream}
-                  type="button"
-                >
-                  停止
-                </button>
-                <button
-                  className="btn-ghost"
-                  disabled={liveSegments.length === 0}
-                  onClick={pinCurrentSegment}
-                  type="button"
-                >
-                  标记
-                </button>
-                <button
-                  className="btn-ghost"
-                  disabled={liveSegments.length === 0}
-                  onClick={saveCurrentSession}
-                  type="button"
-                >
-                  保存
-                </button>
+                {isStreaming ? (
+                  <>
+                    <button
+                      className={isPaused ? 'btn-primary' : 'btn-secondary'}
+                      onClick={() => void togglePause()}
+                      type="button"
+                    >
+                      {isPaused ? '继续' : '暂停'}
+                    </button>
+                    <button
+                      className="btn-secondary"
+                      onClick={stopStream}
+                      type="button"
+                    >
+                      停止
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="btn-primary"
+                    disabled={!canStart}
+                    onClick={() => void startStream()}
+                    title={
+                      !supportsLiveAssist
+                        ? '实时转写服务未配置'
+                        : !hasFullConfig()
+                          ? '请先完成模型设置'
+                          : undefined
+                    }
+                    type="button"
+                  >
+                    开始
+                  </button>
+                )}
+                {liveSegments.length > 0 ? (
+                  <>
+                    <button
+                      className="btn-ghost"
+                      onClick={pinCurrentSegment}
+                      type="button"
+                    >
+                      标记
+                    </button>
+                    <button
+                      className="btn-ghost"
+                      onClick={saveCurrentSession}
+                      type="button"
+                    >
+                      保存
+                    </button>
+                  </>
+                ) : null}
               </>
             ) : null}
             <SystemStatusPopover />
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-auto p-4 md:p-5">{children}</main>
+        <main
+          className={clsx(
+            'min-h-0 flex-1 p-4 md:p-5',
+            activeView === 'settings' ? 'overflow-auto' : 'overflow-auto xl:overflow-hidden',
+          )}
+        >
+          {children}
+        </main>
       </div>
 
       <SessionPrepDrawer open={prepOpen} onClose={() => setPrepOpen(false)} />

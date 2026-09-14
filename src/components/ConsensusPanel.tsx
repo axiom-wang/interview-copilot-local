@@ -9,6 +9,9 @@ interface ConsensusPanelProps {
   detailSegments?: TranscriptSegment[]
   speakerProfiles?: Record<string, SpeakerProfile>
   isLoading?: boolean
+  className?: string
+  /** Rendered inside a tab panel: the tab label already names the panel. */
+  embedded?: boolean
 }
 
 type ConsensusSectionKey = 'consensus' | 'tensions' | 'missing'
@@ -238,9 +241,9 @@ const ConsensusSection = ({
                     onClick={() => onToggleItem(itemKey)}
                     type="button"
                   >
-                    <span className="leading-6">{item}</span>
-                    <span className="theme-muted text-xs">
-                      {isExpanded ? '收起证据' : '查看证据'}
+                    <span className="min-w-0 leading-6">{item}</span>
+                    <span className="theme-muted shrink-0 whitespace-nowrap text-xs">
+                      {isExpanded ? '收起' : '证据'}
                     </span>
                   </button>
                 ) : (
@@ -293,15 +296,31 @@ export function ConsensusPanel({
   detailSegments,
   speakerProfiles = {},
   isLoading = false,
+  className,
+  embedded = false,
 }: ConsensusPanelProps) {
   const [expandedItemKey, setExpandedItemKey] = useState<string | null>(null)
+  const shellClassName = clsx(
+    'panel-card flex min-h-0 flex-col overflow-hidden',
+    embedded ? 'p-4' : 'p-5',
+    className,
+  )
+  const header = embedded ? null : (
+    <>
+      <p className="kicker theme-muted shrink-0 text-[11px]">共识 / 分歧</p>
+      <h2 className="theme-title mt-2 shrink-0 text-2xl font-semibold">讨论快照</h2>
+    </>
+  )
+  const bodyClassName = clsx(
+    'min-h-0 flex-1 overflow-y-auto',
+    embedded ? 'mt-0' : 'mt-5',
+  )
 
   if (isLoading && !analysis) {
     return (
-      <section className="panel-card p-5">
-        <p className="kicker theme-muted text-[11px]">共识 / 分歧</p>
-        <h2 className="theme-title mt-2 text-2xl font-semibold">讨论快照</h2>
-        <div className="mt-5 space-y-4">
+      <section className={shellClassName}>
+        {header}
+        <div className={clsx(bodyClassName, 'space-y-4')}>
           <div className="panel-skeleton h-28 rounded-[var(--radius-card)]" />
           <div className="panel-skeleton h-28 rounded-[var(--radius-card)]" />
           <div className="panel-skeleton h-28 rounded-[var(--radius-card)]" />
@@ -311,12 +330,11 @@ export function ConsensusPanel({
   }
 
   return (
-    <section className="panel-card p-5">
-      <p className="kicker theme-muted text-[11px]">共识 / 分歧</p>
-      <h2 className="theme-title mt-2 text-2xl font-semibold">讨论快照</h2>
+    <section className={shellClassName}>
+      {header}
 
       {analysis ? (
-        <div className="mt-5 space-y-4">
+        <div className={clsx(bodyClassName, 'space-y-4')}>
           <ConsensusSection
             detailSegments={detailSegments}
             expandedItemKey={expandedItemKey}
@@ -349,7 +367,12 @@ export function ConsensusPanel({
           />
         </div>
       ) : (
-        <div className="panel-empty theme-muted mt-5 rounded-[var(--radius-card)] p-5 text-sm leading-7">
+        <div
+          className={clsx(
+            bodyClassName,
+            'panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7',
+          )}
+        >
           这里会在转写推进后持续汇总当前已达成的共识、尚未解决的分歧，以及缺失的信息。
         </div>
       )}

@@ -244,7 +244,9 @@ button:disabled {
 .app-shell {
   display: grid;
   grid-template-columns: 1fr;
+  height: 100vh;
   min-height: 100vh;
+  overflow: hidden;
   background: var(--app-bg);
 }
 
@@ -273,6 +275,11 @@ button:disabled {
 
 .sidebar-toggle {
   display: inline-flex;
+}
+
+button.sidebar-collapse,
+button.sidebar-expand {
+  display: none;
 }
 
 @media (max-width: 959px) {
@@ -304,6 +311,22 @@ button:disabled {
   button.sidebar-toggle {
     display: none;
   }
+
+  button.sidebar-collapse {
+    display: inline-flex;
+  }
+
+  .app-shell[data-sidebar="collapsed"] {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell[data-sidebar="collapsed"] > .sidebar {
+    display: none;
+  }
+
+  .app-shell[data-sidebar="collapsed"] button.sidebar-expand {
+    display: inline-flex;
+  }
 }
 
 .app-bar {
@@ -330,6 +353,32 @@ button:disabled {
   border-radius: var(--radius-panel);
   background: var(--panel-surface);
   box-shadow: var(--shadow-md);
+}
+
+.live-assist-grid {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+}
+
+.live-resizable-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+@media (min-width: 1280px) {
+  .live-assist-grid {
+    grid-template-columns: var(--live-grid-columns);
+    gap: 0;
+  }
+
+  .live-resizable-zone {
+    display: grid;
+    grid-template-rows: var(--live-zone-rows);
+    gap: 0;
+    overflow: hidden;
+  }
 }
 
 .panel-card--soft {
@@ -664,6 +713,128 @@ button:disabled {
   background: var(--accent);
 }
 
+.replay-page-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.replay-workbench {
+  display: grid;
+  gap: 1rem;
+}
+
+.replay-analysis-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.resize-handle {
+  display: none;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  touch-action: none;
+}
+
+.resize-handle__line {
+  position: absolute;
+  border-radius: var(--radius-pill);
+  background: var(--input-border);
+  transition:
+    width 160ms ease,
+    height 160ms ease,
+    background-color 160ms ease;
+}
+
+.resize-handle:hover .resize-handle__line,
+.resize-handle:focus-visible .resize-handle__line,
+.resize-handle--dragging .resize-handle__line {
+  background: var(--accent);
+}
+
+.resize-handle--vertical {
+  cursor: col-resize;
+}
+
+.resize-handle--vertical .resize-handle__line {
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+}
+
+.resize-handle--vertical:hover .resize-handle__line,
+.resize-handle--vertical:focus-visible .resize-handle__line,
+.resize-handle--vertical.resize-handle--dragging .resize-handle__line {
+  width: 4px;
+}
+
+.resize-handle--horizontal {
+  cursor: row-resize;
+}
+
+.resize-handle--horizontal .resize-handle__line {
+  top: 50%;
+  left: 50%;
+  width: 36px;
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+
+.resize-handle--horizontal:hover .resize-handle__line,
+.resize-handle--horizontal:focus-visible .resize-handle__line,
+.resize-handle--horizontal.resize-handle--dragging .resize-handle__line {
+  height: 4px;
+}
+
+@media (min-width: 1280px) {
+  .replay-page-layout {
+    display: grid;
+    grid-template-rows:
+      minmax(
+        82px,
+        min(var(--replay-transport-height), calc(100% - 352px))
+      )
+      12px
+      minmax(340px, 1fr);
+    gap: 0;
+  }
+
+  .replay-workbench {
+    grid-template-columns:
+      clamp(
+        420px,
+        calc(var(--replay-transcript-ratio) - 6px),
+        calc(100% - 332px)
+      )
+      12px
+      minmax(320px, 1fr);
+    gap: 0;
+  }
+
+  .replay-analysis-stack {
+    display: grid;
+    grid-template-rows:
+      minmax(
+        48px,
+        min(var(--replay-phase-height), calc(100% - 292px))
+      )
+      12px
+      minmax(280px, 1fr);
+    gap: 0;
+  }
+
+  .resize-handle {
+    display: block;
+  }
+}
+
 .tabs-list {
   display: flex;
   gap: 0.25rem;
@@ -681,6 +852,7 @@ button:disabled {
   padding: 0.5rem 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
+  white-space: nowrap;
   color: var(--text-muted);
 }
 

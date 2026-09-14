@@ -37,7 +37,7 @@ export function Tabs({ items, defaultTabId, className }: TabsProps) {
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1" role="tabpanel">
+      <div className="min-h-0 flex-1 overflow-hidden" role="tabpanel">
         {activeItem.content}
       </div>
     </div>

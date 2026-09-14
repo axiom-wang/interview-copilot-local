@@ -16,6 +16,10 @@ interface SummaryPreviewPanelProps {
   onGenerateMinutes?: () => Promise<boolean> | boolean | void
   disableGenerate?: boolean
   scenarioId?: MeetingScenarioId
+  /** Rendered inside a tab panel: the tab label already names the panel. */
+  embedded?: boolean
+  /** `launcher` renders only the action buttons plus the full-screen overlay. */
+  presentation?: 'panel' | 'launcher'
 }
 
 type SummaryView = 'speech' | 'minutes'
@@ -144,6 +148,8 @@ export function SummaryPreviewPanel({
   onGenerateMinutes,
   disableGenerate = false,
   scenarioId,
+  embedded = false,
+  presentation = 'panel',
 }: SummaryPreviewPanelProps) {
   const activeScenarioId = useAppStore((state) => state.scenarioId)
   const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
@@ -175,6 +181,49 @@ export function SummaryPreviewPanel({
     if (shouldOpen !== false) setIsExpanded(true)
   }
 
+  const statusBadges = activeResult ? (
+    <>
+      <span className="status-badge">
+        生成于 {formatTimestamp(activeResult.updatedAt)}
+      </span>
+      {isActiveStale ? (
+        <span className="status-badge" data-tone="warning">
+          内容可能过期
+        </span>
+      ) : null}
+    </>
+  ) : null
+
+  const generateButton = activeGenerate ? (
+    <button
+      className={clsx('btn-secondary', embedded && 'text-xs')}
+      disabled={disableGenerate || isActiveGenerating}
+      onClick={() => void handleGenerate()}
+      type="button"
+    >
+      {isActiveGenerating ? '生成中...' : '生成 / 刷新并查看'}
+    </button>
+  ) : null
+
+  const viewSwitcher = (
+    <div className="tabs-list w-fit shrink-0">
+      {([
+        ['speech', '口播稿'],
+        ['minutes', '结构化纪要'],
+      ] as const).map(([id, label]) => (
+        <button
+          className="tabs-trigger"
+          data-active={activeView === id}
+          key={id}
+          onClick={() => setActiveView(id)}
+          type="button"
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
   const content = activeView === 'speech'
     ? summary && (
         <SpeechContent
@@ -184,55 +233,128 @@ export function SummaryPreviewPanel({
       )
     : minutes && <MinutesContent minutes={minutes} />
 
-  return (
-    <section className={clsx('panel-card p-5', className)}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="kicker theme-muted text-[11px]">会议总结</p>
-          <h2 className="theme-title mt-2 text-2xl font-semibold">
-            {activeView === 'speech' ? profile.spokenSummaryLabel : '标准会议纪要'}
-          </h2>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {activeResult ? (
-            <span className="status-badge">
-              生成于 {formatTimestamp(activeResult.updatedAt)}
-            </span>
-          ) : null}
-          {isActiveStale && activeResult ? (
-            <span className="status-badge" data-tone="warning">内容可能过期</span>
-          ) : null}
-          {activeGenerate ? (
+  const overlay = isExpanded ? (
+    <div
+      className="theme-overlay fixed inset-0 z-[1200] flex items-center justify-center px-4 py-6"
+      onClick={() => setIsExpanded(false)}
+    >
+      <div
+        className="theme-overlay-card panel-card flex h-[88vh] w-[92vw] max-w-[1180px] flex-col overflow-hidden border"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="theme-divider flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <h3 className="theme-title text-lg font-semibold">
+              {activeView === 'speech' ? profile.spokenSummaryLabel : '标准会议纪要'}
+            </h3>
+            {viewSwitcher}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {statusBadges}
+            {generateButton}
             <button
-              className="btn-secondary"
-              disabled={disableGenerate || isActiveGenerating}
-              onClick={() => void handleGenerate()}
+              className="btn-ghost"
+              onClick={() => setIsExpanded(false)}
               type="button"
             >
-              {isActiveGenerating ? '生成中...' : '生成 / 刷新并查看'}
+              关闭
             </button>
-          ) : null}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {content ?? (
+            <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7">
+              {activeView === 'speech'
+                ? '尚未生成口播总结，点击“生成 / 刷新并查看”。'
+                : '尚未生成标准会议纪要，点击“生成 / 刷新并查看”。'}
+            </div>
+          )}
         </div>
       </div>
+    </div>
+  ) : null
 
-      <div className="tabs-list mt-4 w-fit">
-        {([
-          ['speech', '口播稿'],
-          ['minutes', '结构化纪要'],
-        ] as const).map(([id, label]) => (
-          <button
-            className="tabs-trigger"
-            data-active={activeView === id}
-            key={id}
-            onClick={() => setActiveView(id)}
-            type="button"
-          >
-            {label}
-          </button>
-        ))}
+  if (presentation === 'launcher') {
+    return (
+      <>
+        <button
+          className="btn-secondary text-xs"
+          disabled={
+            isActiveGenerating || (!activeResult && (disableGenerate || !activeGenerate))
+          }
+          onClick={() => {
+            if (activeResult) {
+              setIsExpanded(true)
+              return
+            }
+
+            void handleGenerate()
+          }}
+          type="button"
+        >
+          {isActiveGenerating
+            ? '生成中...'
+            : activeResult
+              ? '查看会议总结'
+              : '生成会议总结'}
+        </button>
+        {activeResult && isActiveStale ? (
+          <span className="status-badge" data-tone="warning">
+            总结可能过期
+          </span>
+        ) : null}
+        {overlay}
+      </>
+    )
+  }
+
+  return (
+    <section
+      className={clsx(
+        'panel-card flex min-h-0 flex-col overflow-hidden',
+        embedded ? 'p-4' : 'p-5',
+        className,
+      )}
+    >
+      {embedded ? null : (
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="kicker theme-muted text-[11px]">会议总结</p>
+            <h2 className="theme-title mt-2 text-2xl font-semibold">
+              {activeView === 'speech' ? profile.spokenSummaryLabel : '标准会议纪要'}
+            </h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {statusBadges}
+            {generateButton}
+          </div>
+        </div>
+      )}
+
+      <div
+        className={clsx(
+          'flex shrink-0 flex-wrap items-center justify-between gap-2',
+          embedded ? 'mt-0' : 'mt-4',
+        )}
+      >
+        {viewSwitcher}
+        {embedded ? (
+          <div className="flex flex-wrap items-center gap-2">{generateButton}</div>
+        ) : null}
       </div>
 
-      <div className="mt-5">
+      {embedded && statusBadges ? (
+        <div className="mt-2 flex shrink-0 flex-wrap items-center gap-2">
+          {statusBadges}
+        </div>
+      ) : null}
+
+      <div
+        className={clsx(
+          'min-h-0 flex-1 overflow-y-auto',
+          embedded ? 'mt-3' : 'mt-5',
+        )}
+      >
         {isActiveGenerating && !activeResult ? (
           <div className="panel-skeleton h-40 rounded-[var(--radius-card)]" />
         ) : content ? (
@@ -258,33 +380,7 @@ export function SummaryPreviewPanel({
         )}
       </div>
 
-      {activeResult && isExpanded ? (
-        <div
-          className="theme-overlay fixed inset-0 z-[1200] flex items-center justify-center px-4 py-6"
-          onClick={() => setIsExpanded(false)}
-        >
-          <div
-            className="theme-overlay-card panel-card flex h-[88vh] w-[92vw] max-w-[1180px] flex-col overflow-hidden border"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="theme-divider flex items-center justify-between border-b px-5 py-4">
-              <h3 className="theme-title text-lg font-semibold">
-                {activeView === 'speech'
-                  ? profile.spokenSummaryLabel
-                  : '标准会议纪要'}
-              </h3>
-              <button
-                className="btn-ghost"
-                onClick={() => setIsExpanded(false)}
-                type="button"
-              >
-                关闭
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-5 py-5">{content}</div>
-          </div>
-        </div>
-      ) : null}
+      {overlay}
     </section>
   )
 }

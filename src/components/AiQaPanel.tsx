@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { resolveScenarioProfile, type MeetingScenarioId } from '../scenarios'
 import { useAppStore } from '../store/useAppStore'
 import type { InterviewQaTurn } from '../types/analysis'
@@ -19,6 +20,10 @@ interface AiQaPanelProps {
   onAsk: () => void
   onClearHistory: () => void
   scenarioId?: MeetingScenarioId
+  className?: string
+  /** Rendered inside a tab panel: the tab label already names the panel. */
+  embedded?: boolean
+  density?: 'full' | 'compact'
 }
 
 export function AiQaPanel({
@@ -31,33 +36,65 @@ export function AiQaPanel({
   onAsk,
   onClearHistory,
   scenarioId,
+  className,
+  embedded = false,
+  density = 'full',
 }: AiQaPanelProps) {
   const activeScenarioId = useAppStore((state) => state.scenarioId)
   const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
+  const compact = density === 'compact'
 
   return (
-    <section className="panel-card p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="kicker theme-muted text-[11px]">AI 问答</p>
-          <h2 className="theme-title mt-2 text-2xl font-semibold">问一句就能接着说</h2>
-          <p className="theme-muted mt-2 text-sm">
-            AI 只使用当前讨论转写和已应用的上下文，不会读取额外外部信息。
-          </p>
+    <section
+      className={clsx(
+        'panel-card flex min-h-0 flex-col overflow-hidden',
+        embedded || compact ? 'p-4' : 'p-5',
+        className,
+      )}
+    >
+      {embedded ? null : compact ? (
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+          <h2 className="theme-title text-base font-semibold">AI 问答</h2>
+          <button
+            className="btn-ghost px-3 py-1.5 text-xs"
+            disabled={history.length === 0}
+            onClick={onClearHistory}
+            type="button"
+          >
+            清空记录
+          </button>
         </div>
-        <button
-          className="btn-ghost"
-          disabled={history.length === 0}
-          onClick={onClearHistory}
-          type="button"
-        >
-          清空记录
-        </button>
-      </div>
+      ) : (
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="kicker theme-muted text-[11px]">AI 问答</p>
+            <h2 className="theme-title mt-2 text-2xl font-semibold">问一句就能接着说</h2>
+            <p className="theme-muted mt-2 text-sm">
+              AI 只使用当前讨论转写和已应用的上下文，不会读取额外外部信息。
+            </p>
+          </div>
+          <button
+            className="btn-ghost"
+            disabled={history.length === 0}
+            onClick={onClearHistory}
+            type="button"
+          >
+            清空记录
+          </button>
+        </div>
+      )}
 
-      <div className="mt-5 space-y-4">
+      <div
+        className={clsx(
+          'shrink-0 space-y-3',
+          embedded ? 'mt-0' : compact ? 'mt-3' : 'mt-5 space-y-4',
+        )}
+      >
         <textarea
-          className="theme-input min-h-[132px] w-full rounded-[var(--radius-card)] px-4 py-3 text-sm leading-7 outline-none transition"
+          className={clsx(
+            'theme-input w-full rounded-[var(--radius-card)] px-4 py-3 text-sm leading-6 outline-none transition',
+            embedded || compact ? 'min-h-[64px]' : 'min-h-[88px] leading-7',
+          )}
           onChange={(event) => onQuestionDraftChange(event.currentTarget.value)}
           placeholder="例如：如果现在轮到我发言，我应该怎么先承接前面的讨论，再给出一个有判断的观点？"
           value={questionDraft}
@@ -78,9 +115,19 @@ export function AiQaPanel({
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-end gap-2">
+          {embedded ? (
+            <button
+              className="btn-ghost text-xs"
+              disabled={history.length === 0}
+              onClick={onClearHistory}
+              type="button"
+            >
+              清空记录
+            </button>
+          ) : null}
           <button
-            className="btn-primary"
+            className={clsx('btn-primary', compact && 'px-3 py-1.5 text-xs')}
             disabled={disableAsk || isAnswering}
             onClick={onAsk}
             type="button"
@@ -91,13 +138,18 @@ export function AiQaPanel({
       </div>
 
       {error ? (
-        <div className="sheet-danger mt-4 text-sm">
+        <div className="sheet-danger mt-4 shrink-0 text-sm">
           {error}
         </div>
       ) : null}
 
       {history.length > 0 ? (
-        <div className="mt-5 space-y-4">
+        <div
+          className={clsx(
+            'min-h-0 flex-1 space-y-4 overflow-y-auto',
+            embedded || compact ? 'mt-3' : 'mt-5',
+          )}
+        >
           {history.map((item) => (
             <article
               className="theme-inline-card-strong rounded-[var(--radius-card)] p-4"
@@ -144,7 +196,12 @@ export function AiQaPanel({
           ))}
         </div>
       ) : (
-        <div className="panel-empty theme-muted mt-5 rounded-[var(--radius-card)] p-5 text-sm leading-7">
+        <div
+          className={clsx(
+            'panel-empty theme-muted min-h-0 flex-1 overflow-y-auto rounded-[var(--radius-card)] p-5 text-sm leading-7',
+            embedded || compact ? 'mt-3' : 'mt-5',
+          )}
+        >
           输入问题后点击“提问”，这里会把 AI 的结论、依据和可直接说出口的话分层展示出来。
         </div>
       )}
