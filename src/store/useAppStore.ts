@@ -36,6 +36,7 @@ import type {
   SpeakingHints,
 } from '../types/analysis'
 import type { MindMapSnapshot } from '../types/mindmap'
+import type { ModelSettings } from '../settings/types'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { ReplaySnapshot, SessionRecord } from '../types/session'
 import type { SpeakerProfile } from '../types/speaker'
@@ -102,19 +103,7 @@ interface AppState {
   statusMessage: string | null
   lastUpdatedAt: number | null
   initialize: () => void
-  applyModelSettings: (settings: {
-    ast: {
-      appId: string
-      accessToken: string
-      resourceId: string
-      wsUrl: string
-    }
-    llm: {
-      apiKey: string
-      model: string
-      baseURL: string
-    }
-  }) => void
+  applyModelSettings: (settings: ModelSettings) => void
   setActiveView: (view: AppView) => void
   setMode: (mode: AppMode) => void
   startStream: () => Promise<void>
@@ -918,19 +907,7 @@ const getWebStatusMessage = (isEmbedded: boolean) =>
     ? '当前为网页嵌入模式。请先在设置中配置模型，并确保实时转写服务可用。'
     : '请先在设置中配置语音转写与文本分析模型，再开始实时辅助。'
 
-const applyModelSettingsToProviders = (settings: {
-  ast: {
-    appId: string
-    accessToken: string
-    resourceId: string
-    wsUrl: string
-  }
-  llm: {
-    apiKey: string
-    model: string
-    baseURL: string
-  }
-}) => {
+const applyModelSettingsToProviders = (settings: ModelSettings) => {
   const astProvider = astProviders['bytedance-ast']
   if (
     astProvider instanceof RemoteByteDanceAstProvider ||

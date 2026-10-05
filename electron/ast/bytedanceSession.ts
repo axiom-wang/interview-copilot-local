@@ -2,7 +2,10 @@ import { randomUUID } from 'node:crypto'
 import protobuf from 'protobufjs'
 import WebSocket from 'ws'
 import type { TranscriptSegment } from '../../src/types/transcript'
-import { getByteDanceAstRuntimeConfig } from './bytedanceConfig'
+import {
+  getByteDanceAstAuthHeaders,
+  getByteDanceAstRuntimeConfig,
+} from './bytedanceConfig'
 import astSchema from './protos/ast-schema.json'
 
 const START_TIMEOUT_MS = 8000
@@ -15,8 +18,7 @@ type ByteDanceStartOptions = {
   sourceLanguage?: string
   targetLanguage?: string
   credentials?: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }
@@ -251,9 +253,7 @@ export class ByteDanceAstSession {
     await new Promise<void>((resolve, reject) => {
       const socket = new WebSocket(config.wsUrl, {
         headers: {
-          'X-Api-App-Key': config.appId,
-          'X-Api-Access-Key': config.accessToken,
-          'X-Api-Resource-Id': config.resourceId,
+          ...getByteDanceAstAuthHeaders(config),
           'X-Api-Connect-Id': this.connectionId,
         },
         handshakeTimeout: START_TIMEOUT_MS,

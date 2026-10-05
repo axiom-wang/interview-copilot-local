@@ -29,8 +29,7 @@ type StartSessionRequest = {
   sourceLanguage?: string
   targetLanguage?: string
   credentials?: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }
@@ -67,8 +66,7 @@ export const registerAstIpcHandlers = () => {
     async (
       _event,
       request?: {
-        appId?: string
-        accessToken?: string
+        apiKey?: string
         resourceId?: string
         wsUrl?: string
       },

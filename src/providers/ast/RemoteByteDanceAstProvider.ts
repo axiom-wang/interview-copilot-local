@@ -37,8 +37,7 @@ export class RemoteByteDanceAstProvider implements AstProvider {
   private readonly audioCapture = new AudioCaptureService()
   private readonly wsUrl: string
   private credentials: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   } = {}
@@ -61,14 +60,12 @@ export class RemoteByteDanceAstProvider implements AstProvider {
   }
 
   setCredentials(credentials: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }) {
     this.credentials = {
-      appId: credentials.appId?.trim() || undefined,
-      accessToken: credentials.accessToken?.trim() || undefined,
+      apiKey: credentials.apiKey?.trim() || undefined,
       resourceId: credentials.resourceId?.trim() || undefined,
       wsUrl: credentials.wsUrl?.trim() || undefined,
     }

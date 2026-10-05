@@ -153,8 +153,7 @@ contextBridge.exposeInMainWorld('interviewCopilot', {
       request,
     ) as Promise<AnswerInterviewQuestionResult>,
   smokeTestByteDanceAstConnection: (request?: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }) =>

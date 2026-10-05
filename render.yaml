@@ -17,7 +17,5 @@ services:
         value: wss://openspeech.bytedance.com/api/v4/ast/v2/translate
       - key: BYTEDANCE_RESOURCE_ID
         value: volc.service_type.10053
-      - key: BYTEDANCE_APP_ID
-        sync: false
-      - key: BYTEDANCE_ACCESS_TOKEN
+      - key: BYTEDANCE_API_KEY
         sync: false

@@ -1,6 +1,5 @@
 export interface AstModelSettings {
-  appId: string
-  accessToken: string
+  apiKey: string
   resourceId: string
   wsUrl: string
 }
@@ -17,8 +16,7 @@ export interface ModelSettings {
 }
 
 export const DEFAULT_AST_SETTINGS: AstModelSettings = {
-  appId: '',
-  accessToken: '',
+  apiKey: '',
   resourceId: 'volc.service_type.10053',
   wsUrl: 'wss://openspeech.bytedance.com/api/v4/ast/v2/translate',
 }
@@ -35,7 +33,7 @@ export const DEFAULT_MODEL_SETTINGS: ModelSettings = {
 }
 
 export const isAstConfigured = (settings: AstModelSettings) =>
-  Boolean(settings.appId.trim() && settings.accessToken.trim())
+  Boolean(settings.apiKey.trim())
 
 export const isLlmConfigured = (settings: LlmModelSettings) =>
   Boolean(settings.apiKey.trim() && settings.model.trim())

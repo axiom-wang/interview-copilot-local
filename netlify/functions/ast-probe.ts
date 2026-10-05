@@ -17,15 +17,13 @@ export default async (request: Request) => {
 
   try {
     const body = (await request.json().catch(() => ({}))) as {
-      appId?: string
-      accessToken?: string
+      apiKey?: string
       resourceId?: string
       wsUrl?: string
     }
 
     await smokeTestByteDanceAstConnection({
-      appId: body.appId,
-      accessToken: body.accessToken,
+      apiKey: body.apiKey,
       resourceId: body.resourceId,
       wsUrl: body.wsUrl,
     })

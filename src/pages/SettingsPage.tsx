@@ -34,8 +34,7 @@ export function SettingsPage() {
     try {
       if (window.interviewCopilot?.smokeTestByteDanceAstConnection) {
         const result = await window.interviewCopilot.smokeTestByteDanceAstConnection({
-          appId: draft.ast.appId,
-          accessToken: draft.ast.accessToken,
+          apiKey: draft.ast.apiKey,
           resourceId: draft.ast.resourceId,
           wsUrl: draft.ast.wsUrl,
         })
@@ -49,13 +48,21 @@ export function SettingsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(draft.ast),
         })
-        const payload = (await response.json()) as {
-          ok: boolean
-          error?: string
+        const raw = await response.text()
+        let payload: { ok?: boolean; error?: string } | null = null
+
+        if (raw) {
+          try {
+            payload = JSON.parse(raw) as { ok?: boolean; error?: string }
+          } catch {
+            throw new Error('语音转写连接测试没有返回有效结果。')
+          }
         }
 
-        if (!response.ok || !payload.ok) {
-          throw new Error(payload.error || '语音转写连接测试失败。')
+        if (!response.ok || !payload?.ok) {
+          throw new Error(
+            payload?.error || `语音转写连接测试失败（${response.status}）。`,
+          )
         }
       }
 
@@ -116,31 +123,19 @@ export function SettingsPage() {
 
             <div className="space-y-3">
               <label className="block space-y-1.5 text-sm">
-                <span className="theme-muted">App ID</span>
+                <span className="theme-muted">API Key</span>
                 <input
                   className="theme-input w-full px-3 py-2"
                   onChange={(event) =>
-                    updateAstDraft({ appId: event.currentTarget.value })
-                  }
-                  placeholder="应用 ID"
-                  type="text"
-                  value={draft.ast.appId}
-                />
-              </label>
-              <label className="block space-y-1.5 text-sm">
-                <span className="theme-muted">Access Token</span>
-                <input
-                  className="theme-input w-full px-3 py-2"
-                  onChange={(event) =>
-                    updateAstDraft({ accessToken: event.currentTarget.value })
+                    updateAstDraft({ apiKey: event.currentTarget.value })
                   }
                   placeholder={
-                    draft.ast.accessToken && !showAstSecrets
-                      ? maskSecret(draft.ast.accessToken)
-                      : '访问令牌'
+                    draft.ast.apiKey && !showAstSecrets
+                      ? maskSecret(draft.ast.apiKey)
+                      : '语音控制台 API Key'
                   }
                   type={showAstSecrets ? 'text' : 'password'}
-                  value={draft.ast.accessToken}
+                  value={draft.ast.apiKey}
                 />
               </label>
               <label className="block space-y-1.5 text-sm">

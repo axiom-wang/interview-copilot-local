@@ -45,21 +45,18 @@ export class RendererByteDanceAstProvider implements AstProvider {
   private reconnectInFlight: Promise<void> | null = null
 
   private credentials: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   } = {}
 
   setCredentials(credentials: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }) {
     this.credentials = {
-      appId: credentials.appId?.trim() || undefined,
-      accessToken: credentials.accessToken?.trim() || undefined,
+      apiKey: credentials.apiKey?.trim() || undefined,
       resourceId: credentials.resourceId?.trim() || undefined,
       wsUrl: credentials.wsUrl?.trim() || undefined,
     }

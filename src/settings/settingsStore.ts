@@ -12,8 +12,7 @@ const asString = (value: unknown, fallback = '') =>
   typeof value === 'string' ? value : fallback
 
 const normalizeAst = (value: Partial<AstModelSettings> | undefined): AstModelSettings => ({
-  appId: asString(value?.appId),
-  accessToken: asString(value?.accessToken),
+  apiKey: asString(value?.apiKey),
   resourceId: asString(value?.resourceId, DEFAULT_MODEL_SETTINGS.ast.resourceId),
   wsUrl: asString(value?.wsUrl, DEFAULT_MODEL_SETTINGS.ast.wsUrl),
 })

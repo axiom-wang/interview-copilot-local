@@ -76,8 +76,7 @@ Web 模式下，分析请求走 Netlify Functions；Electron 主进程通过受�
 
    VITE_FORCE_MOCK_AUTH=true
 
-   BYTEDANCE_APP_ID=
-   BYTEDANCE_ACCESS_TOKEN=
+   BYTEDANCE_API_KEY=
    BYTEDANCE_WS_URL=wss://openspeech.bytedance.com/api/v4/ast/v2/translate
    BYTEDANCE_RESOURCE_ID=volc.service_type.10053
    ```

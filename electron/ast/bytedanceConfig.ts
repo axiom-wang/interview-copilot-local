@@ -42,20 +42,25 @@ const loadEnvFromFile = () => {
 loadEnvFromFile()
 
 export interface ByteDanceAstRuntimeConfig {
-  appId: string
-  accessToken: string
+  apiKey: string
   resourceId: string
   wsUrl: string
 }
+
+export const getByteDanceAstAuthHeaders = (
+  config: Pick<ByteDanceAstRuntimeConfig, 'apiKey' | 'resourceId'>,
+) => ({
+  'X-Api-Key': config.apiKey,
+  'X-Api-Resource-Id': config.resourceId,
+})
 
 export type ByteDanceAstRuntimeConfigOverride = Partial<ByteDanceAstRuntimeConfig>
 
 export const getByteDanceAstRuntimeConfig = (
   override?: ByteDanceAstRuntimeConfigOverride,
 ): ByteDanceAstRuntimeConfig => {
-  const appId = override?.appId?.trim() || process.env.BYTEDANCE_APP_ID?.trim()
-  const accessToken =
-    override?.accessToken?.trim() || process.env.BYTEDANCE_ACCESS_TOKEN?.trim()
+  const apiKey =
+    override?.apiKey?.trim() || process.env.BYTEDANCE_API_KEY?.trim()
   const resourceId =
     override?.resourceId?.trim() ||
     process.env.BYTEDANCE_RESOURCE_ID?.trim() ||
@@ -65,17 +70,12 @@ export const getByteDanceAstRuntimeConfig = (
     process.env.BYTEDANCE_WS_URL?.trim() ||
     DEFAULT_WS_URL
 
-  if (!appId) {
-    throw new Error('缺少字节同传 App ID，请先在设置中配置语音转写模型。')
-  }
-
-  if (!accessToken) {
-    throw new Error('缺少字节同传 Access Token，请先在设置中配置语音转写模型。')
+  if (!apiKey) {
+    throw new Error('缺少字节同传 API Key，请先在设置中配置语音转写模型。')
   }
 
   return {
-    appId,
-    accessToken,
+    apiKey,
     resourceId,
     wsUrl,
   }

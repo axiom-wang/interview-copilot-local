@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import electron from 'vite-plugin-electron/simple'
+import { astProbeDevPlugin } from './vite/astProbePlugin'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -9,6 +10,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [
+      astProbeDevPlugin(),
       react(),
       tailwindcss(),
       ...(isWebBuild

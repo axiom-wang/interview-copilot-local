@@ -94,8 +94,7 @@ interface StartByteDanceAstSessionRequest {
   sourceLanguage?: string
   targetLanguage?: string
   credentials?: {
-    appId?: string
-    accessToken?: string
+    apiKey?: string
     resourceId?: string
     wsUrl?: string
   }
@@ -138,8 +137,7 @@ declare global {
         request: InterviewQuestionRequest,
       ) => Promise<AnswerInterviewQuestionResult>
       smokeTestByteDanceAstConnection?: (request?: {
-        appId?: string
-        accessToken?: string
+        apiKey?: string
         resourceId?: string
         wsUrl?: string
       }) => Promise<SmokeTestByteDanceAstResult>

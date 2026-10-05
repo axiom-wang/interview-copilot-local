@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http'
 import WebSocket, { type ErrorEvent } from 'ws'
 import {
+  getByteDanceAstAuthHeaders,
   getByteDanceAstRuntimeConfig,
   type ByteDanceAstRuntimeConfigOverride,
 } from './bytedanceConfig'
@@ -14,63 +15,69 @@ export const smokeTestByteDanceAstConnection = async (
 
   return new Promise<void>((resolve, reject) => {
     const socket = new WebSocket(config.wsUrl, {
-      headers: {
-        'X-Api-App-Key': config.appId,
-        'X-Api-Access-Key': config.accessToken,
-        'X-Api-Resource-Id': config.resourceId,
-      },
+      headers: getByteDanceAstAuthHeaders(config),
       handshakeTimeout: CONNECTION_TIMEOUT_MS,
     })
+    let settled = false
 
-    const timeout = setTimeout(() => {
-      socket.terminate()
-      reject(new Error('字节同传 WebSocket 连接超时。'))
-    }, CONNECTION_TIMEOUT_MS)
-
-    const cleanup = () => {
-      clearTimeout(timeout)
+    const stopSocket = () => {
       socket.removeAllListeners()
+      socket.on('error', () => {})
+      socket.terminate()
     }
 
-    socket.once('open', () => {
-      cleanup()
-      socket.close()
+    const succeed = () => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeout)
+      stopSocket()
       resolve()
+    }
+
+    const fail = (error: Error) => {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      clearTimeout(timeout)
+      stopSocket()
+      reject(error)
+    }
+
+    const timeout = setTimeout(() => {
+      fail(new Error('字节同传 WebSocket 连接超时。'))
+    }, CONNECTION_TIMEOUT_MS)
+
+    socket.once('open', () => {
+      succeed()
     })
 
     socket.once('error', (error: ErrorEvent) => {
-      cleanup()
-      socket.terminate()
-      reject(error)
+      fail(error instanceof Error ? error : new Error('字节同传 WebSocket 连接失败。'))
     })
 
     socket.once(
       'unexpected-response',
       (_request: IncomingMessage, response: IncomingMessage) => {
-        cleanup()
-        socket.terminate()
-
-        if (response.statusCode === 403) {
-          reject(
+        if (response.statusCode === 401 || response.statusCode === 403) {
+          fail(
             new Error(
-              '字节同传握手返回 403 Forbidden。通常表示 AST 2.0 服务未开通、当前 Access Token 未获授权，或 Resource ID 与已开通服务不匹配。',
+              `字节同传握手返回 ${response.statusCode}。通常表示 API Key 无效、AST 2.0 服务未开通，或 Resource ID 与已开通服务不匹配。`,
             ),
           )
           return
         }
 
-        reject(
+        fail(
           new Error(
             `字节同传握手失败：${response.statusCode ?? 'unknown'} ${response.statusMessage ?? ''}`.trim(),
           ),
         )
       },
     )
-
-    socket.once('close', (code: number) => {
-      if (code !== 1000) {
-        cleanup()
-      }
-    })
   })
 }
