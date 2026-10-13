@@ -36,6 +36,11 @@ import type {
 import type { MindMapSnapshot } from '../../meeting/types/mindmap'
 import type { ModelSettings } from '../../meeting/settings/types'
 import { useSettingsStore } from './useSettingsStore'
+import {
+  hintsAutoRefreshDelayMs,
+  persistHintsAutoRefresh,
+  readHintsAutoRefresh,
+} from './hintsAutoRefresh'
 import type { AnalysisPromptContext } from '../../meeting/types/promptContext'
 import type { ReplaySnapshot, SessionRecord } from '../../meeting/types/session'
 import type { SpeakerProfile } from '../../meeting/types/speaker'
@@ -70,6 +75,7 @@ interface AppState {
   speakerStability: 'unknown' | 'stable' | 'unstable'
   currentSessionId: string | null
   currentSessionStartedAt: number | null
+  currentSessionEndedAt: number | null
   liveSegments: TranscriptSegment[]
   speakerProfiles: Record<string, SpeakerProfile>
   speakerOrder: string[]
@@ -79,6 +85,7 @@ interface AppState {
   speakingHints: SpeakingHints | null
   speakingHintsStale: boolean
   lastHintsUpdatedAt: number | null
+  autoRefreshHints: boolean
   mindMap: MindMapSnapshot | null
   mindMapStale: boolean
   meetingSummary: MeetingSummary | null
@@ -108,6 +115,8 @@ interface AppState {
   startStream: () => Promise<void>
   togglePause: () => Promise<void>
   stopStream: () => Promise<void>
+  startNewMeeting: () => void
+  setAutoRefreshHints: (enabled: boolean) => void
   bindSpeakerNameFromIntro: (
     speakerId: string,
     name: string,
@@ -118,7 +127,8 @@ interface AppState {
   clearSpeakerBinding: (speakerId: string) => void
   deleteLiveSegment: (segmentId: string) => void
   pinCurrentSegment: () => void
-  saveCurrentSession: () => void
+  togglePinnedSegment: (segmentId: string) => void
+  saveCurrentSession: (options?: { createIfMissing?: boolean }) => void
   deleteSession: (sessionId: string) => void
   selectSession: (sessionId: string) => void
   setReplayTimestamp: (timestamp: number) => void
@@ -154,6 +164,9 @@ let minutesRunToken = 0
 let aiQuestionRunToken = 0
 let streamRunToken = 0
 let analysisTimeoutId: number | null = null
+let hintsRefreshTimeoutId: number | null = null
+let lastHintsRequestedAt: number | null = null
+let queueAutoHintsRefresh = () => {}
 const ignoredLiveSegmentIds = new Set<string>()
 
 const ANALYSIS_DEBOUNCE_MS = 1500
@@ -764,6 +777,29 @@ const clearAnalysisTimer = () => {
   }
 }
 
+const clearHintsRefreshTimer = () => {
+  if (hintsRefreshTimeoutId !== null) {
+    window.clearTimeout(hintsRefreshTimeoutId)
+    hintsRefreshTimeoutId = null
+  }
+}
+
+const latestFinalSegmentTimestamp = (segments: TranscriptSegment[]) => {
+  let latest: number | null = null
+
+  for (const segment of segments) {
+    if (!segment.isFinal || !segment.text.trim()) {
+      continue
+    }
+
+    if (latest === null || segment.timestamp > latest) {
+      latest = segment.timestamp
+    }
+  }
+
+  return latest
+}
+
 const scheduleAnalysis = (callback: () => void) => {
   if (llmProvider.automaticAnalysis) {
     if (analysisTimeoutId !== null) return
@@ -893,8 +929,13 @@ const getInputSourceLabel = (
 const getRuntimeEnvironment = (): RuntimeEnvironment => getMeetingRuntime().environment
 
 const configureProvidersForRuntime = () => {
+  // Login rebuilds the providers after settings were applied, because child
+  // effects run first. Re-read the saved settings here or the new speech
+  // provider starts with an empty API key.
+  const settings = useSettingsStore.getState().settings
   astProviders['volc-asr'] = getMeetingRuntime().createAstProvider()
-  llmProvider = getMeetingRuntime().createLlmProvider(DEFAULT_MODEL_SETTINGS.llm)
+  astProviders['volc-asr'].setCredentials(settings.ast)
+  llmProvider = getMeetingRuntime().createLlmProvider(settings.llm)
 }
 
 const getIsEmbedded = () => {
@@ -1057,6 +1098,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   speakerStability: 'unknown',
   currentSessionId: null,
   currentSessionStartedAt: null,
+  currentSessionEndedAt: null,
   liveSegments: [],
   speakerProfiles: {},
   speakerOrder: [],
@@ -1066,6 +1108,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   speakingHints: null,
   speakingHintsStale: false,
   lastHintsUpdatedAt: null,
+  autoRefreshHints: true,
   mindMap: null,
   mindMapStale: false,
   meetingSummary: null,
@@ -1126,6 +1169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       questionContext,
       roleContext,
       scenarioId,
+      autoRefreshHints: readHintsAutoRefresh(),
       aiQaHistory: [],
       aiQaError: null,
       savedSessions: sessions,
@@ -1202,11 +1246,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const selectedProviderId = get().selectedAstProviderId
     const selectedProvider = astProviders[selectedProviderId]
     const runtimeEnvironment = get().runtimeEnvironment
+    selectedProvider.setCredentials(useSettingsStore.getState().settings.ast)
 
     stopAllAstProviders()
     void getMeetingRuntime().resetAnalysisSession()
     clearAnalysisTimer()
+    clearHintsRefreshTimer()
     ignoredLiveSegmentIds.clear()
+    lastHintsRequestedAt = null
 
     set({
       mode: 'live',
@@ -1226,6 +1273,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       speakerStability: 'unknown',
       currentSessionId: `session-${crypto.randomUUID()}`,
       currentSessionStartedAt: sessionStartedAt,
+      currentSessionEndedAt: null,
       liveSegments: [],
       speakerProfiles: {},
       speakerOrder: [],
@@ -1392,6 +1440,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorMessage: null,
           statusMessage: '已继续收音，转写连接已重建并恢复。',
         })
+        queueAutoHintsRefresh()
       } catch (error) {
         set({
           isPaused: true,
@@ -1406,6 +1455,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       await activeProvider.pause?.()
       clearAnalysisTimer()
+      clearHintsRefreshTimer()
       set({
         isPaused: true,
         listeningStatusLabel: '已暂停',
@@ -1427,8 +1477,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     mindMapRunToken += 1
     summaryRunToken += 1
     minutesRunToken += 1
-    aiQuestionRunToken += 1
     clearAnalysisTimer()
+    clearHintsRefreshTimer()
     void getMeetingRuntime().resetAnalysisSession()
     ignoredLiveSegmentIds.clear()
     set({
@@ -1439,7 +1489,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       isGeneratingMindMap: false,
       isGeneratingSummary: false,
       isGeneratingMinutes: false,
-      isAnsweringQuestion: false,
       activeAstProviderId: get().selectedAstProviderId,
       listeningStatusLabel: '未监听',
       speakerStability: 'unknown',
@@ -1447,10 +1496,66 @@ export const useAppStore = create<AppState>((set, get) => ({
       mindMapStale: false,
       summaryStale: false,
       minutesStale: false,
-      aiQaHistory: [],
-      aiQaError: null,
+      currentSessionEndedAt: Date.now(),
       statusMessage: '转写已停止。',
     })
+    get().saveCurrentSession()
+  },
+  startNewMeeting: () => {
+    const state = get()
+
+    if (state.isStreaming) {
+      return
+    }
+
+    // Persist edits made after stopping, but never resurrect a session the user deleted.
+    if (state.savedSessions.some((session) => session.id === state.currentSessionId)) {
+      state.saveCurrentSession()
+    }
+    clearAnalysisTimer()
+    clearHintsRefreshTimer()
+    ignoredLiveSegmentIds.clear()
+    lastHintsRequestedAt = null
+    aiQuestionRunToken += 1
+    set({
+      currentSessionId: null,
+      currentSessionStartedAt: null,
+      currentSessionEndedAt: null,
+      liveSegments: [],
+      speakerProfiles: {},
+      speakerOrder: [],
+      pinnedSegmentIds: [],
+      phaseAnalysis: null,
+      consensusAnalysis: null,
+      speakingHints: null,
+      speakingHintsStale: false,
+      lastHintsUpdatedAt: null,
+      mindMap: null,
+      mindMapStale: false,
+      meetingSummary: null,
+      summaryStale: false,
+      lastSummaryUpdatedAt: null,
+      meetingMinutes: null,
+      minutesStale: false,
+      analysisSnapshots: [],
+      aiQaHistory: [],
+      aiQaError: null,
+      isAnsweringQuestion: false,
+      errorMessage: null,
+      statusMessage: null,
+      lastUpdatedAt: null,
+    })
+  },
+  setAutoRefreshHints: (enabled) => {
+    persistHintsAutoRefresh(enabled)
+    set({ autoRefreshHints: enabled })
+
+    if (enabled) {
+      queueAutoHintsRefresh()
+      return
+    }
+
+    clearHintsRefreshTimer()
   },
   bindSpeakerNameFromIntro: (speakerId, name, confidence) => {
     const normalizedName = normalizeSpeakerName(name)
@@ -1668,14 +1773,34 @@ export const useAppStore = create<AppState>((set, get) => ({
         : [...state.pinnedSegmentIds, pinned.segmentId],
     }))
   },
-  saveCurrentSession: () => {
+  togglePinnedSegment: (segmentId) => {
+    if (!get().liveSegments.some((segment) => segment.id === segmentId)) {
+      return
+    }
+
+    set((state) => ({
+      pinnedSegmentIds: state.pinnedSegmentIds.includes(segmentId)
+        ? state.pinnedSegmentIds.filter((id) => id !== segmentId)
+        : [...state.pinnedSegmentIds, segmentId],
+    }))
+  },
+  saveCurrentSession: (options) => {
     const state = get()
 
     if (!state.liveSegments.length || !state.currentSessionId) {
       return
     }
 
-    const endedAt = state.liveSegments.at(-1)?.timestamp ?? Date.now()
+    const alreadySaved = state.savedSessions.some(
+      (session) => session.id === state.currentSessionId,
+    )
+
+    if (!alreadySaved && options?.createIfMissing === false) {
+      return
+    }
+
+    const endedAt =
+      state.currentSessionEndedAt ?? state.liveSegments.at(-1)?.timestamp ?? Date.now()
     const pinnedSegments = state.liveSegments
       .filter((segment) => state.pinnedSegmentIds.includes(segment.id))
       .map((segment) => createPinnedSegment(segment, '实时辅助中标记'))
@@ -1704,7 +1829,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       savedSessions,
       selectedSessionId: session.id,
       replayTimestamp: session.endedAt,
-      statusMessage: '会话已保存到本地回放库。',
+      ...(alreadySaved ? {} : { statusMessage: '会话已保存到本地回放库。' }),
     })
   },
   deleteSession: (sessionId) => {
@@ -1951,6 +2076,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         isAnalyzing: false,
         lastUpdatedAt: timestamp,
       }))
+
+      queueAutoHintsRefresh()
     } catch (error) {
       if (activeToken !== analysisRunToken) {
         return
@@ -1972,8 +2099,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
 
+    clearHintsRefreshTimer()
     speakingHintsRunToken += 1
     const activeToken = speakingHintsRunToken
+    lastHintsRequestedAt = Date.now()
 
     set({
       isRefreshingHints: true,
@@ -1994,11 +2123,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       const timestamp = segments.at(-1)?.timestamp ?? Date.now()
+      const hintsBasedOnSegmentAt = latestFinalSegmentTimestamp(segments) ?? timestamp
 
       set((currentState) => ({
         speakingHints: result.hints,
         speakingHintsStale: false,
-        lastHintsUpdatedAt: timestamp,
+        lastHintsUpdatedAt: hintsBasedOnSegmentAt,
         analysisProviderLabel: result.providerLabel,
         analysisSnapshots: upsertSnapshot(
           currentState.analysisSnapshots,
@@ -2029,6 +2159,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRefreshingHints: false,
         statusMessage: '发言建议已刷新。',
       }))
+      queueAutoHintsRefresh()
     } catch (error) {
       if (activeToken !== speakingHintsRunToken) {
         return
@@ -2038,6 +2169,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRefreshingHints: false,
         errorMessage: toErrorMessage(error),
       })
+      queueAutoHintsRefresh()
     }
   },
   generateMindMap: async () => {
@@ -2140,6 +2272,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           statusMessage: '思维导图已更新。',
         }
       })
+      get().saveCurrentSession({ createIfMissing: false })
     } catch (error) {
       if (activeToken !== mindMapRunToken) {
         return
@@ -2193,6 +2326,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isGeneratingSummary: false,
         statusMessage: '总结发言已更新。',
       }))
+      get().saveCurrentSession({ createIfMissing: false })
     } catch (error) {
       if (activeToken !== summaryRunToken) {
         return
@@ -2246,6 +2380,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         isGeneratingMinutes: false,
         statusMessage: '会议纪要已更新。',
       }))
+      get().saveCurrentSession({ createIfMissing: false })
     } catch (error) {
       if (activeToken !== minutesRunToken) {
         return
@@ -2262,3 +2397,32 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 }))
+
+queueAutoHintsRefresh = () => {
+  clearHintsRefreshTimer()
+  const latest = useAppStore.getState()
+  const delay = hintsAutoRefreshDelayMs({
+    enabled: latest.autoRefreshHints,
+    isStreaming: latest.isStreaming,
+    isPaused: latest.isPaused,
+    isRefreshing: latest.isRefreshingHints,
+    latestFinalSegmentAt: latestFinalSegmentTimestamp(latest.liveSegments),
+    hintsBasedOnSegmentAt: latest.speakingHints ? latest.lastHintsUpdatedAt : null,
+    lastRequestedAt: lastHintsRequestedAt,
+    now: Date.now(),
+  })
+
+  if (delay === null) {
+    return
+  }
+
+  if (delay === 0) {
+    void useAppStore.getState().refreshSpeakingHints()
+    return
+  }
+
+  hintsRefreshTimeoutId = window.setTimeout(() => {
+    hintsRefreshTimeoutId = null
+    queueAutoHintsRefresh()
+  }, delay)
+}

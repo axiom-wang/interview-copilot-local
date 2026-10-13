@@ -213,7 +213,7 @@ export function MindMapPanel({
     return (
       <>
         <button
-          className="btn-secondary text-xs"
+          className="btn-secondary"
           disabled={isGenerating || (!snapshot && (disableGenerate || !onGenerate))}
           onClick={() => {
             if (snapshot) {

@@ -4,61 +4,54 @@ import { HintsPanel } from '../components/HintsPanel'
 import { MindMapPanel } from '../components/MindMapPanel'
 import { PhasePanel } from '../components/PhasePanel'
 import { ReplayTransportBar } from '../components/ReplayTransportBar'
+import { SessionList } from '../components/SessionList'
+import { formatSessionDuration } from '../components/sessionFormat'
 import { SummaryPreviewPanel } from '../components/SummaryPreviewPanel'
 import { TranscriptPanel } from '../components/TranscriptPanel'
+import { ActionMenu } from '../components/ui/ActionMenu'
 import { ResizeHandle } from '../components/ui/ResizeHandle'
 import { Tabs } from '../components/ui/Tabs'
+import { resolveScenarioProfile } from '../../meeting/scenarios'
 import {
   exportSessionAsJson,
   exportSessionAsMarkdown,
 } from '../../meeting/services/sessionExport'
 import { useAppStore } from '../store/useAppStore'
+import type { ReplaySnapshot, SessionRecord } from '../../meeting/types/session'
 import type { SpeakerProfile } from '../../meeting/types/speaker'
 
 const REPLAY_LAYOUT_STORAGE_KEY = 'interview-copilot-local/replay-layout'
-const DEFAULT_TRANSCRIPT_RATIO = 64
-const DEFAULT_PHASE_HEIGHT = 60
-const DEFAULT_TRANSPORT_HEIGHT = 82
-
-interface ReplayLayoutSettings {
-  transcriptRatio: number
-  phaseHeight: number
-  transportHeight: number
-}
+const DEFAULT_TRANSCRIPT_RATIO = 58
+const MIN_TRANSCRIPT_RATIO = 40
+const MAX_TRANSCRIPT_RATIO = 72
 
 const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value))
 
-const readReplayLayout = (): ReplayLayoutSettings => {
+const readTranscriptRatio = () => {
   try {
     const stored = JSON.parse(
-      window.localStorage.getItem(REPLAY_LAYOUT_STORAGE_KEY) ?? '',
-    ) as Partial<ReplayLayoutSettings>
+      window.localStorage.getItem(REPLAY_LAYOUT_STORAGE_KEY) ?? '{}',
+    ) as { transcriptRatio?: unknown }
 
-    return {
-      transcriptRatio: clamp(
-        Number(stored.transcriptRatio) || DEFAULT_TRANSCRIPT_RATIO,
-        42,
-        72,
-      ),
-      phaseHeight: clamp(
-        Number(stored.phaseHeight) || DEFAULT_PHASE_HEIGHT,
-        48,
-        260,
-      ),
-      transportHeight: clamp(
-        Number(stored.transportHeight) || DEFAULT_TRANSPORT_HEIGHT,
-        82,
-        180,
-      ),
-    }
+    return clamp(
+      Number(stored.transcriptRatio) || DEFAULT_TRANSCRIPT_RATIO,
+      MIN_TRANSCRIPT_RATIO,
+      MAX_TRANSCRIPT_RATIO,
+    )
   } catch {
-    return {
-      transcriptRatio: DEFAULT_TRANSCRIPT_RATIO,
-      phaseHeight: DEFAULT_PHASE_HEIGHT,
-      transportHeight: DEFAULT_TRANSPORT_HEIGHT,
-    }
+    return DEFAULT_TRANSCRIPT_RATIO
   }
+}
+
+const formatDateRange = (session: SessionRecord) => {
+  const day = new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(session.startedAt)
+  const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  return `${day} ${time.format(session.startedAt)}–${time.format(session.endedAt)}`
 }
 
 const getSpeakerDisplayName = (
@@ -78,272 +71,262 @@ const getSpeakerDisplayName = (
   return profile.displayName ?? speakerId
 }
 
-export function ReplayPage() {
-  const sessions = useAppStore((state) => state.savedSessions)
-  const selectedSessionId = useAppStore((state) => state.selectedSessionId)
+const latestSnapshotAt = (snapshots: ReplaySnapshot[], timestamp: number) =>
+  snapshots
+    .filter((snapshot) => snapshot.timestamp <= timestamp)
+    .reduce<ReplaySnapshot | null>(
+      (latest, snapshot) =>
+        !latest || snapshot.timestamp >= latest.timestamp ? snapshot : latest,
+      null,
+    ) ?? snapshots[0] ?? null
+
+function TimelineView({ session }: { session: SessionRecord }) {
   const replayTimestamp = useAppStore((state) => state.replayTimestamp)
-  const selectSession = useAppStore((state) => state.selectSession)
-  const deleteSession = useAppStore((state) => state.deleteSession)
   const setReplayTimestamp = useAppStore((state) => state.setReplayTimestamp)
   const [searchTerm, setSearchTerm] = useState('')
-  const [layout, setLayout] = useState(readReplayLayout)
-  const pageLayoutRef = useRef<HTMLDivElement>(null)
-  const workbenchRef = useRef<HTMLDivElement>(null)
-  const analysisStackRef = useRef<HTMLDivElement>(null)
+  const [transcriptRatio, setTranscriptRatio] = useState(readTranscriptRatio)
+  const gridRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(REPLAY_LAYOUT_STORAGE_KEY, JSON.stringify(layout))
+      window.localStorage.setItem(
+        REPLAY_LAYOUT_STORAGE_KEY,
+        JSON.stringify({ transcriptRatio }),
+      )
     } catch {
       // Keep the resized layout for this session if browser storage is unavailable.
     }
-  }, [layout])
+  }, [transcriptRatio])
 
   const resizeColumns = useCallback((delta: number) => {
-    const width = workbenchRef.current?.clientWidth ?? 0
+    const width = gridRef.current?.clientWidth ?? 0
     if (width === 0) return
-
-    setLayout((current) => ({
-      ...current,
-      transcriptRatio: clamp(
-        current.transcriptRatio + (delta / width) * 100,
-        42,
-        72,
-      ),
-    }))
+    setTranscriptRatio((current) =>
+      clamp(current + (delta / width) * 100, MIN_TRANSCRIPT_RATIO, MAX_TRANSCRIPT_RATIO),
+    )
   }, [])
 
-  const resizePhase = useCallback((delta: number) => {
-    const height = analysisStackRef.current?.clientHeight ?? 0
-    const maximum = Math.max(48, height - 280)
+  const activeTimestamp = clamp(
+    replayTimestamp ?? session.endedAt,
+    session.startedAt,
+    session.endedAt,
+  )
+  const visibleSegments = session.transcriptSegments.filter(
+    (segment) => segment.timestamp <= activeTimestamp,
+  )
+  const speakerProfiles = session.speakerProfiles ?? {}
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
+  const filteredSegments = normalizedSearchTerm
+    ? visibleSegments.filter((segment) =>
+        `${getSpeakerDisplayName(segment.speaker, speakerProfiles)} ${segment.speaker} ${segment.text}`
+          .toLowerCase()
+          .includes(normalizedSearchTerm),
+      )
+    : visibleSegments
+  const activeSnapshot = latestSnapshotAt(session.analysisSnapshots, activeTimestamp)
+  const pinnedSegments = session.pinnedSegments.map((pin) => {
+    const segment = session.transcriptSegments.find((item) => item.id === pin.segmentId)
+    return segment
+      ? {
+          ...pin,
+          note: `${getSpeakerDisplayName(segment.speaker, speakerProfiles)} @ ${new Intl.DateTimeFormat(
+            'zh-CN',
+            { hour: '2-digit', minute: '2-digit' },
+          ).format(segment.timestamp)}`,
+        }
+      : pin
+  })
 
-    setLayout((current) => ({
-      ...current,
-      phaseHeight: clamp(current.phaseHeight + delta, 48, maximum),
-    }))
-  }, [])
+  return (
+    <div className="flex min-h-0 flex-col gap-3 lg:h-full">
+      <ReplayTransportBar
+        className="shrink-0"
+        onChangeTimestamp={setReplayTimestamp}
+        replayTimestamp={activeTimestamp}
+        session={session}
+      />
+      <div
+        className="replay-timeline min-h-0 lg:flex-1"
+        ref={gridRef}
+        style={{ '--replay-transcript-ratio': `${transcriptRatio}%` } as CSSProperties}
+      >
+        <TranscriptPanel
+          emptyMessage={
+            searchTerm ? '没有匹配的转写片段。' : '这个时间点之前还没有转写内容。'
+          }
+          headerControls={
+            <input
+              aria-label="搜索转写"
+              className="theme-input w-full px-2.5 py-1 text-sm"
+              onChange={(event) => setSearchTerm(event.currentTarget.value)}
+              placeholder="搜索内容或发言人"
+              type="search"
+              value={searchTerm}
+            />
+          }
+          pinnedSegments={pinnedSegments}
+          searchTerm={searchTerm}
+          segments={filteredSegments}
+          speakerProfiles={speakerProfiles}
+          title="转写"
+        />
+        <ResizeHandle
+          ariaLabel="调整转写与分析区域宽度"
+          onDelta={resizeColumns}
+          onReset={() => setTranscriptRatio(DEFAULT_TRANSCRIPT_RATIO)}
+          orientation="vertical"
+        />
+        <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full">
+          <PhasePanel
+            className="shrink-0"
+            phaseAnalysis={activeSnapshot?.phaseAnalysis ?? null}
+            scenarioId={session.scenarioId}
+            variant="compact"
+          />
+          <HintsPanel
+            className="min-h-[320px] lg:min-h-0 lg:flex-1"
+            hints={activeSnapshot?.speakingHints ?? null}
+            lastUpdatedAt={activeSnapshot?.timestamp ?? null}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
 
-  const resizeTransport = useCallback((delta: number) => {
-    const height = pageLayoutRef.current?.clientHeight ?? 0
-    const maximum = Math.max(82, height - 340)
+function SessionDetail({ session }: { session: SessionRecord }) {
+  const deleteSession = useAppStore((state) => state.deleteSession)
+  const isDemo = session.id === 'session-demo'
+  const finalSnapshot = latestSnapshotAt(session.analysisSnapshots, session.endedAt)
+  const mindMapSnapshot =
+    finalSnapshot?.mindMapSnapshot ?? session.mindMapSnapshots?.at(-1) ?? null
 
-    setLayout((current) => ({
-      ...current,
-      transportHeight: clamp(current.transportHeight + delta, 82, maximum),
-    }))
-  }, [])
+  return (
+    <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full">
+      <header className="flex shrink-0 flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="theme-title truncate text-lg font-semibold">{session.title}</h1>
+          <p className="theme-muted mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
+            <span>{resolveScenarioProfile(session.scenarioId).label}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tabular-nums">{formatDateRange(session)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatSessionDuration(session)}</span>
+            <span aria-hidden="true">·</span>
+            <span>{session.transcriptSegments.length} 段发言</span>
+            {isDemo ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>示例数据</span>
+              </>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <ActionMenu
+            items={[
+              { label: 'Markdown', onSelect: () => exportSessionAsMarkdown(session) },
+              { label: 'JSON', onSelect: () => exportSessionAsJson(session) },
+            ]}
+            label="导出会话"
+            triggerText="导出"
+          />
+          {!isDemo ? (
+            <button
+              className="btn-ghost text-xs text-[color:var(--danger-text)] hover:bg-[color:var(--danger-soft)]"
+              onClick={() => {
+                if (window.confirm('确认删除这场会议吗？删除后无法恢复。')) {
+                  deleteSession(session.id)
+                }
+              }}
+              type="button"
+            >
+              删除
+            </button>
+          ) : null}
+        </div>
+      </header>
 
-  const resetLayout = useCallback(() => {
-    setLayout({
-      transcriptRatio: DEFAULT_TRANSCRIPT_RATIO,
-      phaseHeight: DEFAULT_PHASE_HEIGHT,
-      transportHeight: DEFAULT_TRANSPORT_HEIGHT,
-    })
-  }, [])
+      <Tabs
+        className="min-h-[520px] lg:min-h-0 lg:flex-1"
+        defaultTabId={session.meetingSummary || session.meetingMinutes ? 'summary' : 'timeline'}
+        items={[
+          {
+            id: 'summary',
+            label: '总结与纪要',
+            content: (
+              <SummaryPreviewPanel
+                className="h-full"
+                embedded
+                minutes={session.meetingMinutes ?? null}
+                scenarioId={session.scenarioId}
+                summary={session.meetingSummary ?? null}
+              />
+            ),
+          },
+          {
+            id: 'timeline',
+            label: '时间线回放',
+            content: <TimelineView session={session} />,
+          },
+          {
+            id: 'consensus',
+            label: '共识分歧',
+            content: (
+              <ConsensusPanel
+                analysis={finalSnapshot?.consensusAnalysis ?? null}
+                className="h-full"
+                detailSegments={session.transcriptSegments}
+                embedded
+                speakerProfiles={session.speakerProfiles ?? {}}
+              />
+            ),
+          },
+          {
+            id: 'mindmap',
+            label: '思维导图',
+            content: (
+              <MindMapPanel className="h-full" embedded snapshot={mindMapSnapshot} />
+            ),
+          },
+        ]}
+      />
+    </div>
+  )
+}
+
+export function ReplayPage() {
+  const sessions = useAppStore((state) => state.savedSessions)
+  const selectedSessionId = useAppStore((state) => state.selectedSessionId)
+  const selectSession = useAppStore((state) => state.selectSession)
+  const setActiveView = useAppStore((state) => state.setActiveView)
 
   const selectedSession =
     sessions.find((session) => session.id === selectedSessionId) ?? sessions[0] ?? null
 
-  const activeReplayTimestamp = replayTimestamp ?? selectedSession?.endedAt ?? null
-
-  const visibleSegments = selectedSession
-    ? selectedSession.transcriptSegments.filter(
-        (segment) => segment.timestamp <= (activeReplayTimestamp ?? selectedSession.endedAt),
-      )
-    : []
-
-  const speakerProfiles = selectedSession?.speakerProfiles ?? {}
-
-  const filteredSegments = (() => {
-    const normalizedSearchTerm = searchTerm.trim().toLowerCase()
-
-    if (!normalizedSearchTerm) {
-      return visibleSegments
-    }
-
-    return visibleSegments.filter((segment) => {
-      const displayName = getSpeakerDisplayName(segment.speaker, speakerProfiles)
-      return `${displayName} ${segment.speaker} ${segment.text}`
-        .toLowerCase()
-        .includes(normalizedSearchTerm)
-    })
-  })()
-
-  const activeSnapshot = selectedSession
-    ? selectedSession.analysisSnapshots
-        .filter(
-          (snapshot) => snapshot.timestamp <= (activeReplayTimestamp ?? selectedSession.endedAt),
-        )
-        .at(-1) ?? selectedSession.analysisSnapshots[0] ?? null
-    : null
-
-  if (!selectedSession || activeReplayTimestamp === null) {
+  if (!selectedSession) {
     return (
-      <div className="panel-card panel-empty flex min-h-[480px] flex-col items-center justify-center px-6 text-center">
-        <p className="kicker theme-muted text-[11px]">Replay</p>
-        <h2 className="theme-title mt-2 text-lg font-semibold">还没有可回放的会话</h2>
+      <div className="panel-card panel-empty mx-auto flex min-h-[420px] max-w-2xl flex-col items-center justify-center px-6 text-center">
+        <h2 className="theme-title text-lg font-semibold">还没有历史会话</h2>
         <p className="theme-muted mt-2 max-w-md text-sm leading-6">
-          保存一场实时辅助后，可在这里按时间线复盘。
+          每场会议结束时会自动保存到这里，之后可以查看总结与纪要，或按时间线回看当时的建议。
         </p>
+        <button className="btn-primary mt-5" onClick={() => setActiveView('live')} type="button">
+          准备一场会议
+        </button>
       </div>
     )
   }
 
   return (
-    <div
-      className="replay-page-layout min-h-0 xl:h-full"
-      ref={pageLayoutRef}
-      style={
-        {
-          '--replay-transport-height': `${layout.transportHeight}px`,
-        } as CSSProperties
-      }
-    >
-      <div className="min-h-0">
-        <ReplayTransportBar
-          onChangeTimestamp={setReplayTimestamp}
-          onDeleteSession={(sessionId) => {
-            if (window.confirm('确认删除这条已保存会话吗？删除后无法恢复。')) {
-              deleteSession(sessionId)
-            }
-          }}
-          onExportJson={() => exportSessionAsJson(selectedSession)}
-          onExportMarkdown={() => exportSessionAsMarkdown(selectedSession)}
-          onResetLayout={resetLayout}
-          onSelectSession={selectSession}
-          replayTimestamp={activeReplayTimestamp}
-          selectedSessionId={selectedSession.id}
-          sessions={sessions}
-        />
-      </div>
-
-      <ResizeHandle
-        ariaLabel="调整回放工具栏与内容区域高度"
-        onDelta={resizeTransport}
-        onReset={resetLayout}
-        orientation="horizontal"
+    <div className="replay-layout min-h-0 lg:h-full">
+      <SessionList
+        className="max-h-72 lg:max-h-none"
+        onSelect={selectSession}
+        selectedSessionId={selectedSession.id}
+        sessions={sessions}
       />
-
-      <div
-        className="replay-workbench min-h-0 xl:flex-1 xl:overflow-hidden"
-        ref={workbenchRef}
-        style={
-          {
-            '--replay-transcript-ratio': `${layout.transcriptRatio}%`,
-          } as CSSProperties
-        }
-      >
-        <div className="min-h-0 min-w-0 xl:h-full">
-          <TranscriptPanel
-            emptyMessage={
-              searchTerm
-                ? '当前搜索条件下没有匹配的转写片段。'
-                : '当前回放时间点还没有转写内容。'
-            }
-            headerControls={
-              <label className="theme-input block w-full px-3 py-2">
-                <span className="sr-only">搜索转写</span>
-                <input
-                  className="theme-title w-full bg-transparent text-sm outline-none placeholder:text-[color:var(--text-muted)]"
-                  onChange={(event) => setSearchTerm(event.currentTarget.value)}
-                  placeholder="搜索转写内容或发言人"
-                  type="search"
-                  value={searchTerm}
-                />
-              </label>
-            }
-            pinnedSegments={selectedSession.pinnedSegments}
-            searchTerm={searchTerm}
-            segments={filteredSegments}
-            speakerProfiles={speakerProfiles}
-            title="回放转写"
-          />
-        </div>
-
-        <ResizeHandle
-          ariaLabel="调整转写与分析区域宽度"
-          onDelta={resizeColumns}
-          onReset={resetLayout}
-          orientation="vertical"
-        />
-
-        <div
-          className="replay-analysis-stack min-h-0 min-w-0 xl:h-full xl:overflow-hidden"
-          ref={analysisStackRef}
-          style={
-            {
-              '--replay-phase-height': `${layout.phaseHeight}px`,
-            } as CSSProperties
-          }
-        >
-          <PhasePanel
-            className="min-h-0"
-            phaseAnalysis={activeSnapshot?.phaseAnalysis ?? null}
-            scenarioId={selectedSession.scenarioId}
-            variant="compact"
-          />
-          <ResizeHandle
-            ariaLabel="调整阶段与分析区域高度"
-            onDelta={resizePhase}
-            onReset={resetLayout}
-            orientation="horizontal"
-          />
-          <Tabs
-            className="min-h-[320px] xl:min-h-0"
-            defaultTabId="consensus"
-            items={[
-              {
-                id: 'consensus',
-                label: '共识分歧',
-                content: (
-                  <ConsensusPanel
-                    analysis={activeSnapshot?.consensusAnalysis ?? null}
-                    className="h-full"
-                    detailSegments={visibleSegments}
-                    embedded
-                    speakerProfiles={speakerProfiles}
-                  />
-                ),
-              },
-              {
-                id: 'summary',
-                label: '会议总结',
-                content: (
-                  <SummaryPreviewPanel
-                    className="h-full"
-                    embedded
-                    minutes={selectedSession.meetingMinutes ?? null}
-                    scenarioId={selectedSession.scenarioId}
-                    summary={selectedSession.meetingSummary ?? null}
-                  />
-                ),
-              },
-              {
-                id: 'mindmap',
-                label: '思维导图',
-                content: (
-                  <MindMapPanel
-                    className="h-full"
-                    embedded
-                    snapshot={activeSnapshot?.mindMapSnapshot ?? null}
-                  />
-                ),
-              },
-              {
-                id: 'hints',
-                label: '发言建议',
-                content: (
-                  <HintsPanel
-                    className="h-full"
-                    embedded
-                    hints={activeSnapshot?.speakingHints ?? null}
-                  />
-                ),
-              },
-            ]}
-          />
-        </div>
-      </div>
+      <SessionDetail key={selectedSession.id} session={selectedSession} />
     </div>
   )
 }

@@ -23,30 +23,23 @@ const sectionMeta: Record<
   {
     title: string
     emptyText: string
-    containerClassName: string
-    badgeTone?: 'active' | 'warning' | 'danger'
+    dotClassName: string
   }
 > = {
   consensus: {
     title: '已形成共识',
     emptyText: '还没有明确共识。',
-    containerClassName:
-      'border-[color:var(--success-border)] bg-[color:var(--success-soft)]',
-    badgeTone: 'active',
+    dotClassName: 'bg-[color:var(--success)]',
   },
   tensions: {
     title: '仍有分歧',
     emptyText: '当前没有明显分歧。',
-    containerClassName:
-      'border-[color:var(--warning-border)] bg-[color:var(--warning-soft)]',
-    badgeTone: 'warning',
+    dotClassName: 'bg-[color:var(--warning)]',
   },
   missing: {
     title: '关键缺口',
     emptyText: '当前没有明显缺口。',
-    containerClassName:
-      'border-[color:var(--danger-border)] bg-[color:var(--danger-soft)]',
-    badgeTone: 'danger',
+    dotClassName: 'bg-[color:var(--danger)]',
   },
 }
 
@@ -204,21 +197,15 @@ const ConsensusSection = ({
   const meta = sectionMeta[sectionKey]
 
   return (
-    <div
-      className={clsx(
-        'rounded-[var(--radius-card)] border p-4',
-        meta.containerClassName,
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
+    <div>
+      <div className="flex items-center gap-2">
+        <span className={clsx('inline-block h-2 w-2 rounded-full', meta.dotClassName)} />
         <p className="theme-title text-sm font-semibold">{meta.title}</p>
-        <span className="status-badge" data-tone={meta.badgeTone}>
-          {items.length} 条
-        </span>
+        <span className="theme-muted text-xs tabular-nums">{items.length}</span>
       </div>
 
       {items.length > 0 ? (
-        <ul className="mt-4 space-y-3">
+        <ul className="mt-1.5">
           {items.map((item) => {
             const itemKey = `${sectionKey}:${item}`
             const isInteractive = Boolean(detailSegments?.length)
@@ -229,54 +216,42 @@ const ConsensusSection = ({
                 : []
 
             return (
-              <li className="space-y-3" key={itemKey}>
+              <li key={itemKey}>
                 {isInteractive ? (
                   <button
+                    aria-expanded={isExpanded}
                     className={clsx(
-                      'flex w-full items-center justify-between gap-3 rounded-[var(--radius-card)] border px-4 py-3 text-left text-sm transition',
+                      '-mx-2 flex w-[calc(100%+1rem)] items-start justify-between gap-3 rounded-[var(--radius-control)] px-2 py-1.5 text-left text-sm transition',
                       isExpanded
-                        ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-[color:var(--accent-text)]'
-                        : 'theme-inline-card-hover theme-inline-card theme-body',
+                        ? 'bg-[color:var(--surface-inline-hover)] text-[color:var(--text-primary)]'
+                        : 'theme-body hover:bg-[color:var(--surface-inline)]',
                     )}
                     onClick={() => onToggleItem(itemKey)}
                     type="button"
                   >
                     <span className="min-w-0 leading-6">{item}</span>
-                    <span className="theme-muted shrink-0 whitespace-nowrap text-xs">
-                      {isExpanded ? '收起' : '证据'}
+                    <span className="theme-quiet shrink-0 pt-0.5 whitespace-nowrap text-xs">
+                      {isExpanded ? '收起' : '原话'}
                     </span>
                   </button>
                 ) : (
-                  <div className="theme-inline-card theme-body rounded-[var(--radius-card)] px-4 py-3 text-sm leading-6">
-                    {item}
-                  </div>
+                  <p className="theme-body py-1.5 text-sm leading-6">{item}</p>
                 )}
 
                 {isInteractive && isExpanded ? (
-                  <div className="theme-inline-card-strong rounded-[var(--radius-card)] p-3">
+                  <div className="theme-divider mt-1 mb-2 ml-1 space-y-2.5 border-l pl-3">
                     {matchedSegments.length > 0 ? (
-                      <div className="space-y-3">
-                        {matchedSegments.map(({ segment }) => (
-                          <article
-                            className="theme-inline-card rounded-[var(--radius-card)] px-4 py-3"
-                            key={`${itemKey}-${segment.id}`}
-                          >
-                            <div className="theme-muted flex flex-wrap items-center gap-2 text-xs">
-                              <span className="status-badge">
-                                {getSpeakerLabel(segment.speaker, speakerProfiles)}
-                              </span>
-                              <span>{formatTime(segment.timestamp)}</span>
-                            </div>
-                            <p className="theme-title mt-3 text-sm leading-7">
-                              {segment.text}
-                            </p>
-                          </article>
-                        ))}
-                      </div>
+                      matchedSegments.map(({ segment }) => (
+                        <blockquote key={`${itemKey}-${segment.id}`}>
+                          <p className="theme-muted text-xs">
+                            {getSpeakerLabel(segment.speaker, speakerProfiles)} ·{' '}
+                            <span className="tabular-nums">{formatTime(segment.timestamp)}</span>
+                          </p>
+                          <p className="theme-title mt-0.5 text-sm leading-6">{segment.text}</p>
+                        </blockquote>
+                      ))
                     ) : (
-                      <p className="theme-muted text-sm">
-                        暂时没有定位到足够直接的原文证据。
-                      </p>
+                      <p className="theme-muted text-sm">暂时没有定位到足够直接的原文。</p>
                     )}
                   </div>
                 ) : null}
@@ -285,7 +260,7 @@ const ConsensusSection = ({
           })}
         </ul>
       ) : (
-        <p className="theme-body mt-4 text-sm leading-7">{meta.emptyText}</p>
+        <p className="theme-muted mt-1.5 text-sm leading-6">{meta.emptyText}</p>
       )}
     </div>
   )
@@ -306,10 +281,7 @@ export function ConsensusPanel({
     className,
   )
   const header = embedded ? null : (
-    <>
-      <p className="kicker theme-muted shrink-0 text-[11px]">共识 / 分歧</p>
-      <h2 className="theme-title mt-2 shrink-0 text-2xl font-semibold">讨论快照</h2>
-    </>
+    <h2 className="theme-title shrink-0 text-base font-semibold">共识与分歧</h2>
   )
   const bodyClassName = clsx(
     'min-h-0 flex-1 overflow-y-auto',
@@ -334,7 +306,7 @@ export function ConsensusPanel({
       {header}
 
       {analysis ? (
-        <div className={clsx(bodyClassName, 'space-y-4')}>
+        <div className={clsx(bodyClassName, 'space-y-5')}>
           <ConsensusSection
             detailSegments={detailSegments}
             expandedItemKey={expandedItemKey}
@@ -373,7 +345,7 @@ export function ConsensusPanel({
             'panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7',
           )}
         >
-          这里会在转写推进后持续汇总当前已达成的共识、尚未解决的分歧，以及缺失的信息。
+          讨论推进后，这里会汇总已经达成的共识、还没解决的分歧和缺少的信息。点开任一条可以看到对应原话。
         </div>
       )}
     </section>

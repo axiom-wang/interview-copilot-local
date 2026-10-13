@@ -47,7 +47,7 @@ export function AiQaPanel({
   return (
     <section
       className={clsx(
-        'panel-card flex min-h-0 flex-col overflow-hidden',
+        'panel-card flex min-h-0 w-full min-w-0 max-w-full flex-col overflow-y-auto',
         embedded || compact ? 'p-4' : 'p-5',
         className,
       )}
@@ -86,7 +86,7 @@ export function AiQaPanel({
 
       <div
         className={clsx(
-          'shrink-0 space-y-3',
+          'min-w-0 shrink-0 space-y-3',
           embedded ? 'mt-0' : compact ? 'mt-3' : 'mt-5 space-y-4',
         )}
       >
@@ -100,8 +100,8 @@ export function AiQaPanel({
           value={questionDraft}
         />
 
-        <div className="-mx-1 overflow-x-auto pb-1">
-          <div className="flex min-w-max gap-2 px-1">
+        <div className="min-w-0 overflow-x-auto pb-1">
+          <div className="flex w-max gap-2">
             {profile.quickQuestions.map((item) => (
               <button
                 className="btn-secondary text-xs"
@@ -146,7 +146,7 @@ export function AiQaPanel({
       {history.length > 0 ? (
         <div
           className={clsx(
-            'min-h-0 flex-1 space-y-4 overflow-y-auto',
+            'min-h-24 flex-1 space-y-4 overflow-y-auto',
             embedded || compact ? 'mt-3' : 'mt-5',
           )}
         >
@@ -198,7 +198,7 @@ export function AiQaPanel({
       ) : (
         <div
           className={clsx(
-            'panel-empty theme-muted min-h-0 flex-1 overflow-y-auto rounded-[var(--radius-card)] p-5 text-sm leading-7',
+            'panel-empty theme-muted min-h-24 flex-1 overflow-y-auto rounded-[var(--radius-card)] p-5 text-sm leading-7',
             embedded || compact ? 'mt-3' : 'mt-5',
           )}
         >

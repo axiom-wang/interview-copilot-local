@@ -8,7 +8,7 @@ export const JD_TET_PROFILE: MeetingScenarioProfile = {
   roleContextEnabled: false,
   contextTitle: '题目与案例材料',
   topicContextLabel: '题目内容',
-  topicHelp: '粘贴完整题目、数据和任务要求，点击“应用”后参与分析。',
+  topicHelp: '粘贴完整题目、数据和任务要求，开始会议后参与分析。',
   topicPlaceholder: '在这里粘贴你提供的题目原文，包括背景材料、数据、需要回答的问题和限制条件。',
   preparationNote: '无需预设角色。根据讨论需要补充观点、比较方案或推动收口；题目由你提供，不会自动填入示例案例。',
   roleContextLabel: '参与背景',

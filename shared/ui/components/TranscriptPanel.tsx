@@ -10,10 +10,10 @@ import {
 import type { PinnedSegment } from '../../meeting/types/session'
 import type { SpeakerProfile } from '../../meeting/types/speaker'
 import type { TranscriptSegment } from '../../meeting/types/transcript'
+import { ActionMenu, type ActionMenuItem } from './ui/ActionMenu'
 
 interface TranscriptPanelProps {
   title: string
-  description?: string
   segments: TranscriptSegment[]
   pinnedSegments?: PinnedSegment[]
   emptyMessage?: string
@@ -27,8 +27,18 @@ interface TranscriptPanelProps {
   onRenameSpeaker?: (speakerId: string, name?: string) => void
   onClearSpeakerBinding?: (speakerId: string) => void
   onDeleteSegment?: (segmentId: string) => void
+  onTogglePin?: (segmentId: string) => void
   onExportAll?: () => void
 }
+
+interface SpeakerGroup {
+  id: string
+  speaker: string
+  startedAt: number
+  segments: TranscriptSegment[]
+}
+
+const GROUP_GAP_MS = 60_000
 
 const formatTime = (timestamp: number) =>
   new Intl.DateTimeFormat('zh-CN', {
@@ -51,7 +61,7 @@ const renderHighlightedText = (text: string, searchTerm: string) => {
 
   return parts.map((part, index) =>
     index % 2 === 1 ? (
-      <mark className="theme-mark rounded px-1" key={`${part}-${index}`}>
+      <mark className="theme-mark rounded px-0.5" key={`${part}-${index}`}>
         {part}
       </mark>
     ) : (
@@ -77,12 +87,32 @@ const getSpeakerLabel = (
   return profile.displayName ?? speakerId
 }
 
-const actionButtonClassName =
-  'rounded-md border px-2.5 py-1 text-xs transition focus-visible:opacity-100'
+const groupBySpeaker = (segments: TranscriptSegment[]) =>
+  segments.reduce<SpeakerGroup[]>((groups, segment) => {
+    const last = groups.at(-1)
+    const lastSegment = last?.segments.at(-1)
+
+    if (
+      last &&
+      lastSegment &&
+      last.speaker === segment.speaker &&
+      segment.timestamp - lastSegment.timestamp <= GROUP_GAP_MS
+    ) {
+      last.segments.push(segment)
+      return groups
+    }
+
+    groups.push({
+      id: segment.id,
+      speaker: segment.speaker,
+      startedAt: segment.timestamp,
+      segments: [segment],
+    })
+    return groups
+  }, [])
 
 export function TranscriptPanel({
   title,
-  description = '',
   segments,
   pinnedSegments = [],
   emptyMessage = '开始转写后，这里会显示实时滚动的内容。',
@@ -96,22 +126,21 @@ export function TranscriptPanel({
   onRenameSpeaker,
   onClearSpeakerBinding,
   onDeleteSegment,
+  onTogglePin,
   onExportAll,
 }: TranscriptPanelProps) {
   const pinnedIds = new Set(pinnedSegments.map((segment) => segment.segmentId))
   const [copiedSegmentId, setCopiedSegmentId] = useState<string | null>(null)
   const [stuckToBottom, setStuckToBottom] = useState(true)
-  const [highlightedSegmentId, setHighlightedSegmentId] = useState<string | null>(
-    null,
-  )
-  const [renameSegmentId, setRenameSegmentId] = useState<string | null>(null)
+  const [highlightedSegmentId, setHighlightedSegmentId] = useState<string | null>(null)
+  const [renameGroupId, setRenameGroupId] = useState<string | null>(null)
   const [renameSpeakerId, setRenameSpeakerId] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
-  const showDescription = description.trim().length > 0
   const compact = density === 'compact'
   const listRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
   const renameInputRef = useRef<HTMLInputElement>(null)
+  const groups = groupBySpeaker(segments)
 
   useEffect(() => {
     const list = listRef.current
@@ -121,8 +150,7 @@ export function TranscriptPanel({
     }
 
     const handleScroll = () => {
-      const distanceFromBottom =
-        list.scrollHeight - list.scrollTop - list.clientHeight
+      const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight
       const nextStuck = distanceFromBottom < 48
       stickToBottomRef.current = nextStuck
       setStuckToBottom(nextStuck)
@@ -139,21 +167,19 @@ export function TranscriptPanel({
     }
 
     const list = listRef.current
-    if (!list) {
-      return
+    if (list) {
+      list.scrollTop = list.scrollHeight
     }
-
-    list.scrollTop = list.scrollHeight
   }, [followLatest, segments])
 
   useEffect(() => {
-    if (!renameSegmentId) {
+    if (!renameGroupId) {
       return
     }
 
     renameInputRef.current?.focus()
     renameInputRef.current?.select()
-  }, [renameSegmentId])
+  }, [renameGroupId])
 
   const copySegmentText = async (segment: TranscriptSegment) => {
     try {
@@ -168,7 +194,7 @@ export function TranscriptPanel({
   }
 
   const cancelRename = () => {
-    setRenameSegmentId(null)
+    setRenameGroupId(null)
     setRenameSpeakerId(null)
     setRenameDraft('')
   }
@@ -209,81 +235,94 @@ export function TranscriptPanel({
     }, 1600)
   }
 
-  const showJumpToLatest =
-    followLatest && !stuckToBottom && segments.length > 0
+  const showJumpToLatest = followLatest && !stuckToBottom && segments.length > 0
+
+  const speakerMenuItems = (group: SpeakerGroup): ActionMenuItem[] => {
+    const profile = speakerProfiles[group.speaker]
+    const items: ActionMenuItem[] = []
+
+    if (onMarkAsMe && !profile?.isMe) {
+      items.push({ label: '这是我', onSelect: () => onMarkAsMe(group.speaker) })
+    }
+    if (onRenameSpeaker) {
+      items.push({
+        label: '改名',
+        onSelect: () => {
+          setRenameGroupId(group.id)
+          setRenameSpeakerId(group.speaker)
+          setRenameDraft(profile?.displayName ?? '')
+        },
+      })
+    }
+    if (onClearSpeakerBinding && (profile?.displayName || profile?.isMe)) {
+      items.push({ label: '解除绑定', onSelect: () => onClearSpeakerBinding(group.speaker) })
+    }
+
+    return items
+  }
+
+  const segmentMenuItems = (segment: TranscriptSegment): ActionMenuItem[] => {
+    const items: ActionMenuItem[] = [
+      {
+        label: copiedSegmentId === segment.id ? '已复制' : '复制',
+        onSelect: () => void copySegmentText(segment),
+      },
+    ]
+
+    if (onTogglePin) {
+      items.push({
+        label: pinnedIds.has(segment.id) ? '取消标记' : '标记',
+        onSelect: () => onTogglePin(segment.id),
+      })
+    }
+    if (onDeleteSegment) {
+      items.push({ label: '删除', onSelect: () => onDeleteSegment(segment.id), tone: 'danger' })
+    }
+
+    return items
+  }
 
   return (
     <section
       className={clsx(
-        'panel-card flex h-[70vh] min-h-0 flex-col overflow-hidden xl:h-full',
+        'panel-card flex h-[70vh] min-h-0 flex-col overflow-hidden lg:h-full',
         className,
       )}
     >
       <div
         className={clsx(
           'theme-header-surface shrink-0 border-b',
-          compact ? 'px-4 py-3' : 'px-5 py-4',
+          compact ? 'px-4 py-3' : 'px-5 py-3.5',
         )}
       >
-        <div
-          className={clsx(
-            'flex flex-col gap-3 lg:flex-row lg:gap-4',
-            compact
-              ? 'lg:items-center lg:justify-between'
-              : 'lg:items-start lg:justify-between',
-          )}
-        >
-          <div className={clsx(compact && 'flex items-center gap-2')}>
-            {compact ? null : (
-              <p className="kicker theme-muted text-[11px]">Transcript</p>
-            )}
-            <h2
-              className={clsx(
-                'theme-title font-semibold',
-                compact ? 'text-base' : 'mt-2 text-2xl',
-              )}
-            >
-              {title}
-            </h2>
-            {showDescription ? (
-              <p className="theme-muted mt-2 max-w-3xl text-sm leading-6">
-                {description}
-              </p>
-            ) : null}
-          </div>
-
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <h2 className="theme-title text-sm font-semibold">{title}</h2>
+          <span className="theme-muted text-xs tabular-nums">
+            {segments.length} 段
+            {pinnedSegments.length > 0 ? ` · ${pinnedSegments.length} 处标记` : ''}
+          </span>
           {headerControls ? (
-            <div className="min-w-0 lg:max-w-sm lg:flex-1 lg:self-center">
+            <div className="order-last w-full min-w-0 md:order-none md:ml-auto md:w-auto md:max-w-xs md:flex-1">
               {headerControls}
             </div>
           ) : null}
-
-          <div
-            className={clsx(
-              'flex flex-wrap items-center gap-2',
-              headerControls && 'lg:self-center',
-            )}
-          >
-            {onExportAll ? (
-              <button
-                className="btn-secondary text-xs"
-                disabled={segments.length === 0}
-                onClick={onExportAll}
-                type="button"
-              >
-                导出转写
-              </button>
-            ) : null}
-            <span className="status-badge">{segments.length} 条片段</span>
-            <span className="status-badge">{pinnedSegments.length} 条标记</span>
-          </div>
+          {onExportAll ? (
+            <button
+              className={clsx('btn-ghost px-2 py-1 text-xs', !headerControls && 'ml-auto')}
+              disabled={segments.length === 0}
+              onClick={onExportAll}
+              type="button"
+            >
+              导出
+            </button>
+          ) : null}
         </div>
 
         {pinnedSegments.length > 0 ? (
-          <div className={clsx('flex flex-wrap gap-2', compact ? 'mt-3' : 'mt-4')}>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {pinnedSegments.map((segment) => (
               <button
-                className="status-badge hover:bg-[color:var(--surface-inline-hover)]"
+                className="status-badge hover:brightness-95"
                 data-tone="warning"
                 key={segment.id}
                 onClick={() => scrollToSegment(segment.segmentId)}
@@ -300,7 +339,7 @@ export function TranscriptPanel({
         <div
           className={clsx(
             'flex h-full min-h-0 flex-col overflow-y-auto',
-            compact ? 'gap-2 px-4 py-3' : 'gap-3 px-5 py-4',
+            compact ? 'gap-3 px-4 py-3' : 'gap-4 px-5 py-4',
           )}
           ref={listRef}
         >
@@ -310,101 +349,37 @@ export function TranscriptPanel({
             </div>
           ) : null}
 
-          {segments.map((segment) => {
-            const profile = speakerProfiles[segment.speaker]
-            const speakerLabel = getSpeakerLabel(segment.speaker, speakerProfiles)
-            const isRenaming = renameSegmentId === segment.id
+          {groups.map((group) => {
+            const profile = speakerProfiles[group.speaker]
+            const isRenaming = renameGroupId === group.id
+            const speakerItems = speakerMenuItems(group)
 
             return (
-              <article
-                className={clsx(
-                  'group rounded-[var(--radius-card)] border px-3.5 py-2 transition',
-                  highlightedSegmentId === segment.id
-                    ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]'
-                    : pinnedIds.has(segment.id)
-                      ? 'border-[color:var(--warning-border)] bg-[color:var(--warning-soft)]'
-                      : segment.isFinal
-                        ? 'theme-inline-card'
-                        : 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)]',
-                )}
-                id={`transcript-segment-${segment.id}`}
-                key={segment.id}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="theme-muted flex flex-wrap items-center gap-1.5 text-[11px]">
-                    <span className="status-badge">{speakerLabel}</span>
-                    <span>{formatTime(segment.timestamp)}</span>
-                    <span
-                      className="status-badge"
-                      data-tone={segment.isFinal ? 'active' : 'primary'}
-                    >
-                      {segment.isFinal ? '已定稿' : '识别中'}
-                    </span>
-                    {pinnedIds.has(segment.id) ? (
-                      <span className="status-badge" data-tone="warning">
-                        已标记
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-end gap-1 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                    <button
-                      className={clsx(actionButtonClassName, 'btn-secondary')}
-                      onClick={() => {
-                        void copySegmentText(segment)
-                      }}
-                      type="button"
-                    >
-                      {copiedSegmentId === segment.id ? '已复制' : '复制'}
-                    </button>
-                    {onDeleteSegment ? (
-                      <button
-                        className={clsx(actionButtonClassName, 'btn-danger')}
-                        onClick={() => onDeleteSegment(segment.id)}
-                        type="button"
-                      >
-                        删除
-                      </button>
-                    ) : null}
-                    {onMarkAsMe && !profile?.isMe ? (
-                      <button
-                        className={clsx(actionButtonClassName, 'btn-secondary')}
-                        onClick={() => onMarkAsMe(segment.speaker)}
-                        type="button"
-                      >
-                        设为我
-                      </button>
-                    ) : null}
-                    {onRenameSpeaker && !isRenaming ? (
-                      <button
-                        className={clsx(actionButtonClassName, 'btn-ghost')}
-                        onClick={() => {
-                          setRenameSegmentId(segment.id)
-                          setRenameSpeakerId(segment.speaker)
-                          setRenameDraft(profile?.displayName ?? '')
-                        }}
-                        type="button"
-                      >
-                        改名
-                      </button>
-                    ) : null}
-                    {onClearSpeakerBinding && profile?.displayName ? (
-                      <button
-                        className={clsx(actionButtonClassName, 'btn-ghost')}
-                        onClick={() => onClearSpeakerBinding(segment.speaker)}
-                        type="button"
-                      >
-                        解绑
-                      </button>
-                    ) : null}
-                  </div>
+              <article className="min-w-0" key={group.id}>
+                <div className="group/speaker flex items-center gap-2">
+                  <span
+                    className={clsx(
+                      'truncate text-xs font-semibold',
+                      profile?.isMe ? 'text-[color:var(--accent-text)]' : 'theme-title',
+                    )}
+                  >
+                    {getSpeakerLabel(group.speaker, speakerProfiles)}
+                  </span>
+                  <span className="theme-quiet text-[11px] tabular-nums">
+                    {formatTime(group.startedAt)}
+                  </span>
+                  <ActionMenu
+                    className="opacity-100 transition md:opacity-0 md:group-hover/speaker:opacity-100 md:focus-within:opacity-100 md:data-[open=true]:opacity-100"
+                    items={speakerItems}
+                    label="说话人操作"
+                  />
                 </div>
 
                 {isRenaming ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
                     <input
                       aria-label="发言人名称"
-                      className="theme-input min-w-[10rem] flex-1 px-3 py-1.5 text-sm"
+                      className="theme-input min-w-[10rem] flex-1 px-2.5 py-1 text-sm"
                       onChange={(event) => setRenameDraft(event.currentTarget.value)}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
@@ -420,26 +395,55 @@ export function TranscriptPanel({
                       ref={renameInputRef}
                       value={renameDraft}
                     />
-                    <button
-                      className="btn-primary px-3 py-1.5 text-xs"
-                      onClick={commitRename}
-                      type="button"
-                    >
+                    <button className="btn-primary px-2.5 py-1 text-xs" onClick={commitRename} type="button">
                       确认
                     </button>
-                    <button
-                      className="btn-ghost px-3 py-1.5 text-xs"
-                      onClick={cancelRename}
-                      type="button"
-                    >
+                    <button className="btn-ghost px-2.5 py-1 text-xs" onClick={cancelRename} type="button">
                       取消
                     </button>
                   </div>
                 ) : null}
 
-                <p className="theme-title mt-1.5 text-[13px] leading-5">
-                  {renderHighlightedText(segment.text, searchTerm)}
-                </p>
+                <div className="mt-1 space-y-0.5">
+                  {group.segments.map((segment) => {
+                    const pinned = pinnedIds.has(segment.id)
+
+                    return (
+                      <div
+                        className={clsx(
+                          'group/segment -mx-2 flex items-start gap-1 rounded-[var(--radius-control)] px-2 py-1 transition-colors',
+                          highlightedSegmentId === segment.id
+                            ? 'bg-[color:var(--accent-soft)]'
+                            : pinned
+                              ? 'bg-[color:var(--warning-soft)]'
+                              : 'hover:bg-[color:var(--surface-inline)]',
+                        )}
+                        id={`transcript-segment-${segment.id}`}
+                        key={segment.id}
+                      >
+                        <p
+                          className={clsx(
+                            'min-w-0 flex-1 text-sm leading-6',
+                            segment.isFinal ? 'theme-body' : 'theme-muted',
+                          )}
+                        >
+                          {renderHighlightedText(segment.text, searchTerm)}
+                          {!segment.isFinal ? (
+                            <span className="ml-1.5 inline-flex items-center gap-1 align-middle text-[11px] text-[color:var(--accent-text)]">
+                              <span className="inline-block h-1.5 w-1.5 rounded-full bg-[color:var(--accent)]" />
+                              识别中
+                            </span>
+                          ) : null}
+                        </p>
+                        <ActionMenu
+                          className="shrink-0 opacity-100 transition md:opacity-0 md:group-hover/segment:opacity-100 md:focus-within:opacity-100 md:data-[open=true]:opacity-100"
+                          items={segmentMenuItems(segment)}
+                          label="片段操作"
+                        />
+                      </div>
+                    )
+                  })}
+                </div>
               </article>
             )
           })}

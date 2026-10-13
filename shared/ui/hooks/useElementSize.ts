@@ -1,24 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 /**
  * Tracks an element's own size so layout can react to the space it actually
- * has — including when the sidebar collapses, which a viewport media query
- * would miss.
+ * has, which a viewport media query would miss. The node may mount later, so
+ * observation follows the element, not the first effect run.
  */
 export function useElementSize<T extends HTMLElement>() {
-  const ref = useRef<T>(null)
+  const [element, setElement] = useState<T | null>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
+  const ref = useCallback((node: T | null) => {
+    setElement(node)
+  }, [])
 
   useEffect(() => {
-    const element = ref.current
-
     if (!element) {
       return
     }
 
-    const rect = element.getBoundingClientRect()
-    setSize({ width: rect.width, height: rect.height })
-
+    // ResizeObserver reports the initial size as soon as observation starts.
     const observer = new ResizeObserver((entries) => {
       const entry = entries[0]
 
@@ -32,7 +31,7 @@ export function useElementSize<T extends HTMLElement>() {
 
     observer.observe(element)
     return () => observer.disconnect()
-  }, [])
+  }, [element])
 
   return { ref, width: size.width, height: size.height }
 }

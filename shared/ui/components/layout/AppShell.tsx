@@ -1,82 +1,174 @@
 import clsx from 'clsx'
-import { useEffect, useState } from 'react'
-import { PromptContextInputs } from '../PromptContextInputs'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { resolveScenarioProfile } from '../../../meeting/scenarios'
+import { ContextFields, ScenarioPicker } from '../PromptContextInputs'
+import { applyPendingContext, useHasPendingContext } from '../promptContext'
+import { useDismiss } from '../../hooks/useDismiss'
 import { useAppStore } from '../../store/useAppStore'
 import { useAuthStore } from '../../store/useAuthStore'
 import { useSettingsStore } from '../../store/useSettingsStore'
 
-function SystemStatusPopover() {
+const formatElapsed = (seconds: number) =>
+  `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+
+type Health = 'ok' | 'warning' | 'error'
+
+const healthDotClass: Record<Health, string> = {
+  ok: 'bg-[color:var(--success)]',
+  warning: 'bg-[color:var(--warning)]',
+  error: 'bg-[color:var(--danger)]',
+}
+
+function StatusRow({ label, value, health }: { label: string; value: string; health?: Health }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1">
+      <span className="theme-muted">{label}</span>
+      <span className="theme-title flex min-w-0 items-center gap-1.5 text-right">
+        {health ? (
+          <span className={clsx('inline-block h-1.5 w-1.5 shrink-0 rounded-full', healthDotClass[health])} />
+        ) : null}
+        <span className="truncate">{value}</span>
+      </span>
+    </div>
+  )
+}
+
+function SystemStatusButton() {
   const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+  const ref = useRef<HTMLDivElement>(null)
+  useDismiss(ref, open, close)
   const astProviderLabel = useAppStore((state) => state.astProviderLabel)
   const analysisProviderLabel = useAppStore((state) => state.analysisProviderLabel)
-  const inputSourceLabel = useAppStore((state) => state.inputSourceLabel)
   const listeningStatusLabel = useAppStore((state) => state.listeningStatusLabel)
   const speakerStability = useAppStore((state) => state.speakerStability)
   const runtimeEnvironment = useAppStore((state) => state.runtimeEnvironment)
+  const errorMessage = useAppStore((state) => state.errorMessage)
   const isAnalyzing = useAppStore((state) => state.isAnalyzing)
-  const liveSegments = useAppStore((state) => state.liveSegments)
-  const hasFullConfig = useSettingsStore((state) => state.hasFullConfig)
+  const setActiveView = useAppStore((state) => state.setActiveView)
+  const hasAstConfig = useSettingsStore((state) => state.hasAstConfig)
+  const hasLlmConfig = useSettingsStore((state) => state.hasLlmConfig)
 
-  const stabilityLabel =
-    speakerStability === 'unstable'
-      ? '识别不稳定'
-      : speakerStability === 'stable'
-        ? '识别稳定'
-        : '等待识别'
+  const configured = hasAstConfig() && hasLlmConfig()
+  const health: Health = errorMessage
+    ? 'error'
+    : !configured || speakerStability === 'unstable'
+      ? 'warning'
+      : 'ok'
+  const label = errorMessage ? '有异常' : !configured ? '待配置' : '就绪'
 
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button
-        className="btn-secondary"
+        aria-expanded={open}
+        className="btn-ghost gap-2 px-2.5"
+        onClick={() => setOpen((value) => !value)}
+        title="系统状态"
+        type="button"
+      >
+        <span className={clsx('inline-block h-2 w-2 rounded-full', healthDotClass[health])} />
+        <span className="hidden text-xs sm:inline">{label}</span>
+      </button>
+      {open ? (
+        <div className="panel-card absolute right-0 z-30 mt-2 w-72 p-3 text-xs">
+          <StatusRow
+            health={hasAstConfig() ? 'ok' : 'warning'}
+            label="语音转写"
+            value={hasAstConfig() ? astProviderLabel : '未配置'}
+          />
+          <StatusRow
+            health={hasLlmConfig() ? 'ok' : 'warning'}
+            label="文本分析"
+            value={hasLlmConfig() ? analysisProviderLabel : '未配置'}
+          />
+          <StatusRow label="收音" value={listeningStatusLabel} />
+          <StatusRow
+            health={speakerStability === 'unstable' ? 'warning' : undefined}
+            label="说话人识别"
+            value={
+              speakerStability === 'unstable'
+                ? '不稳定'
+                : speakerStability === 'stable'
+                  ? '稳定'
+                  : '等待识别'
+            }
+          />
+          <StatusRow label="分析" value={isAnalyzing ? '刷新中' : '待命'} />
+          <StatusRow label="运行环境" value={runtimeEnvironment === 'electron' ? '桌面端' : '网页端'} />
+          {errorMessage ? (
+            <p className="mt-2 rounded-[var(--radius-control)] bg-[color:var(--danger-soft)] px-2.5 py-2 leading-5 text-[color:var(--danger-text)]">
+              {errorMessage}
+            </p>
+          ) : null}
+          {!configured ? (
+            <button
+              className="btn-primary mt-2 w-full text-xs"
+              onClick={() => {
+                setActiveView('settings')
+                close()
+              }}
+              type="button"
+            >
+              前往模型设置
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function UserMenu() {
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+  const ref = useRef<HTMLDivElement>(null)
+  useDismiss(ref, open, close)
+  const user = useAuthStore((state) => state.user)
+  const logout = useAuthStore((state) => state.logout)
+  const activeView = useAppStore((state) => state.activeView)
+  const setActiveView = useAppStore((state) => state.setActiveView)
+  const displayName = user?.name || user?.email || '用户'
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        aria-expanded={open}
+        aria-label="账户菜单"
+        className={clsx(
+          'flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition',
+          activeView === 'settings' || open
+            ? 'border-[color:var(--accent-border)] bg-[color:var(--accent-soft)] text-[color:var(--accent-text)]'
+            : 'border-[color:var(--panel-border)] bg-[color:var(--surface-inline)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-inline-hover)]',
+        )}
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
-        系统状态
+        {displayName.slice(0, 1).toUpperCase()}
       </button>
       {open ? (
-        <div className="panel-card absolute right-0 z-30 mt-2 w-72 space-y-2 p-3 text-xs shadow-[var(--shadow-md)]">
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">运行环境</span>
-            <span>{runtimeEnvironment === 'electron' ? '桌面端' : '网页端'}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">模型配置</span>
-            <span>{hasFullConfig() ? '已完成' : '未完成'}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">语音转写</span>
-            <span>{astProviderLabel}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">文本分析</span>
-            <span>{analysisProviderLabel}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">输入源</span>
-            <span>{inputSourceLabel}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">监听状态</span>
-            <span>{listeningStatusLabel}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">识别稳定度</span>
-            <span>{stabilityLabel}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">分析状态</span>
-            <span>{isAnalyzing ? '刷新中' : '待命'}</span>
-          </div>
-          <div className="flex justify-between gap-3">
-            <span className="theme-muted">转写片段</span>
-            <span>{liveSegments.length}</span>
+        <div className="panel-card absolute right-0 z-30 mt-2 w-60 p-1.5 text-sm">
+          <div className="theme-divider border-b px-2.5 pt-1.5 pb-2.5">
+            <p className="theme-title truncate font-medium">{displayName}</p>
+            {user?.email && user.email !== displayName ? (
+              <p className="theme-muted truncate text-xs">{user.email}</p>
+            ) : null}
           </div>
           <button
-            className="btn-ghost w-full"
-            onClick={() => setOpen(false)}
+            className="btn-ghost mt-1 w-full justify-start"
+            onClick={() => {
+              setActiveView('settings')
+              close()
+            }}
             type="button"
           >
-            关闭
+            模型设置
+          </button>
+          <button
+            className="btn-ghost w-full justify-start"
+            onClick={() => void logout()}
+            type="button"
+          >
+            退出登录
           </button>
         </div>
       ) : null}
@@ -84,23 +176,17 @@ function SystemStatusPopover() {
   )
 }
 
-function SessionPrepDrawer({
-  open,
-  onClose,
-}: {
-  open: boolean
-  onClose: () => void
-}) {
-  const questionContextDraft = useAppStore((state) => state.questionContextDraft)
-  const roleContextDraft = useAppStore((state) => state.roleContextDraft)
-  const questionContext = useAppStore((state) => state.questionContext)
-  const roleContext = useAppStore((state) => state.roleContext)
-  const setQuestionContextDraft = useAppStore((state) => state.setQuestionContextDraft)
-  const setRoleContextDraft = useAppStore((state) => state.setRoleContextDraft)
-  const applyQuestionContext = useAppStore((state) => state.applyQuestionContext)
-  const applyRoleContext = useAppStore((state) => state.applyRoleContext)
-  const clearQuestionContext = useAppStore((state) => state.clearQuestionContext)
-  const clearRoleContext = useAppStore((state) => state.clearRoleContext)
+function ContextDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const hasPending = useHasPendingContext()
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose, open])
 
   if (!open) {
     return null
@@ -109,48 +195,100 @@ function SessionPrepDrawer({
   return (
     <div className="theme-overlay fixed inset-0 z-40 flex justify-end">
       <button
-        aria-label="关闭会话准备"
+        aria-label="关闭会议背景"
         className="h-full flex-1 cursor-default bg-transparent"
         onClick={onClose}
         type="button"
       />
-      <aside className="panel-card h-full w-full max-w-lg overflow-y-auto rounded-none border-y-0 border-r-0 p-5 shadow-[var(--shadow-md)]">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="kicker theme-muted text-[11px]">Session Prep</p>
-            <h2 className="theme-title mt-1 text-lg font-semibold">会话准备</h2>
-          </div>
+      <aside className="panel-card flex h-full w-full max-w-lg flex-col rounded-none border-y-0 border-r-0">
+        <div className="theme-divider flex items-center justify-between border-b px-5 py-4">
+          <h2 className="theme-title text-base font-semibold">会议背景</h2>
           <button className="btn-ghost" onClick={onClose} type="button">
             关闭
           </button>
         </div>
-        <PromptContextInputs
-          appliedQuestionContext={questionContext}
-          appliedRoleContext={roleContext}
-          collapsed={false}
-          onApplyQuestionContext={applyQuestionContext}
-          onApplyRoleContext={applyRoleContext}
-          onClearQuestionContext={clearQuestionContext}
-          onClearRoleContext={clearRoleContext}
-          onQuestionContextDraftChange={setQuestionContextDraft}
-          onRoleContextDraftChange={setRoleContextDraft}
-          onToggleCollapsed={() => undefined}
-          questionContextDraft={questionContextDraft}
-          roleContextDraft={roleContextDraft}
-        />
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-5">
+          <ScenarioPicker />
+          <ContextFields compact />
+        </div>
+        <div className="theme-divider flex items-center justify-between gap-3 border-t px-5 py-3">
+          <span className="theme-muted text-xs">
+            {hasPending ? '有未应用的修改' : '已与当前分析同步'}
+          </span>
+          <button
+            className="btn-primary"
+            disabled={!hasPending}
+            onClick={() => {
+              applyPendingContext()
+              onClose()
+            }}
+            type="button"
+          >
+            应用到后续分析
+          </button>
+        </div>
       </aside>
     </div>
   )
 }
 
-const SIDEBAR_COLLAPSED_STORAGE_KEY = 'interview-copilot-local/sidebar-collapsed'
+function RecordingIndicator() {
+  const isStreaming = useAppStore((state) => state.isStreaming)
+  const isPaused = useAppStore((state) => state.isPaused)
+  const currentSessionStartedAt = useAppStore((state) => state.currentSessionStartedAt)
+  const scenarioId = useAppStore((state) => state.scenarioId)
+  const activeView = useAppStore((state) => state.activeView)
+  const setActiveView = useAppStore((state) => state.setActiveView)
+  const [elapsedSec, setElapsedSec] = useState(0)
 
-const readStoredSidebarCollapsed = () => {
-  try {
-    return window.localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === '1'
-  } catch {
-    return false
+  useEffect(() => {
+    if (!isStreaming || !currentSessionStartedAt) {
+      return
+    }
+
+    const tick = () => {
+      setElapsedSec(Math.max(0, Math.floor((Date.now() - currentSessionStartedAt) / 1000)))
+    }
+
+    const first = window.setTimeout(tick, 0)
+    const timer = isPaused ? null : window.setInterval(tick, 1000)
+    return () => {
+      window.clearTimeout(first)
+      if (timer !== null) window.clearInterval(timer)
+    }
+  }, [isStreaming, isPaused, currentSessionStartedAt])
+
+  if (!isStreaming) {
+    return null
   }
+
+  return (
+    <button
+      className={clsx(
+        'flex min-w-0 items-center gap-2 rounded-[var(--radius-control)] px-2 py-1 text-sm',
+        activeView !== 'live' && 'hover:bg-[color:var(--surface-inline)]',
+      )}
+      disabled={activeView === 'live'}
+      onClick={() => setActiveView('live')}
+      title={activeView === 'live' ? undefined : '返回当前会议'}
+      type="button"
+    >
+      <span
+        className={clsx(
+          'recording-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full',
+          isPaused ? 'bg-[color:var(--warning)]' : 'bg-[color:var(--danger)]',
+        )}
+        data-paused={isPaused}
+      />
+      <span className="theme-title font-semibold tabular-nums">{formatElapsed(elapsedSec)}</span>
+      <span className="theme-muted hidden md:inline">
+        {isPaused ? '已暂停' : '收音中'}
+      </span>
+      <span className="status-badge hidden truncate lg:inline-flex">
+        {resolveScenarioProfile(scenarioId).label}
+      </span>
+    </button>
+  )
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -158,35 +296,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const setActiveView = useAppStore((state) => state.setActiveView)
   const isStreaming = useAppStore((state) => state.isStreaming)
   const isPaused = useAppStore((state) => state.isPaused)
-  const supportsLiveAssist = useAppStore((state) => state.supportsLiveAssist)
   const liveSegments = useAppStore((state) => state.liveSegments)
-  const currentSessionStartedAt = useAppStore((state) => state.currentSessionStartedAt)
-  const startStream = useAppStore((state) => state.startStream)
   const togglePause = useAppStore((state) => state.togglePause)
   const stopStream = useAppStore((state) => state.stopStream)
   const pinCurrentSegment = useAppStore((state) => state.pinCurrentSegment)
-  const saveCurrentSession = useAppStore((state) => state.saveCurrentSession)
   const applyModelSettings = useAppStore((state) => state.applyModelSettings)
   const user = useAuthStore((state) => state.user)
-  const logout = useAuthStore((state) => state.logout)
   const settings = useSettingsStore((state) => state.settings)
   const loadForUser = useSettingsStore((state) => state.loadForUser)
-  const hasFullConfig = useSettingsStore((state) => state.hasFullConfig)
-  const [prepOpen, setPrepOpen] = useState(false)
-  const [navOpen, setNavOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(readStoredSidebarCollapsed)
-  const [elapsedSec, setElapsedSec] = useState(0)
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(
-        SIDEBAR_COLLAPSED_STORAGE_KEY,
-        sidebarCollapsed ? '1' : '0',
-      )
-    } catch {
-      // ignore storage failures; the collapse state stays session-only
-    }
-  }, [sidebarCollapsed])
+  const [contextOpen, setContextOpen] = useState(false)
+  const closeContext = useCallback(() => setContextOpen(false), [])
 
   useEffect(() => {
     if (!user) {
@@ -200,241 +319,87 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     applyModelSettings(settings)
   }, [applyModelSettings, settings])
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => setNavOpen(false), 0)
-    return () => window.clearTimeout(timer)
-  }, [activeView])
-
-  useEffect(() => {
-    if (!isStreaming || isPaused || !currentSessionStartedAt) {
-      return
-    }
-
-    const tick = () => {
-      setElapsedSec(
-        Math.max(0, Math.floor((Date.now() - currentSessionStartedAt) / 1000)),
-      )
-    }
-
-    tick()
-    const timer = window.setInterval(tick, 1000)
-    return () => window.clearInterval(timer)
-  }, [isStreaming, isPaused, currentSessionStartedAt])
-
   const navItems = [
-    { id: 'live' as const, label: '实时辅助' },
-    { id: 'replay' as const, label: '回放复盘' },
-    { id: 'settings' as const, label: '模型设置' },
+    { id: 'live' as const, label: '会议' },
+    { id: 'replay' as const, label: '历史会话' },
   ]
 
-  const titleMap = {
-    live: '实时辅助',
-    replay: '回放复盘',
-    settings: '模型设置',
-  }
-
-  const canStart =
-    supportsLiveAssist && hasFullConfig() && !isStreaming
-
-  const elapsedLabel = isStreaming
-    ? `${String(Math.floor(elapsedSec / 60)).padStart(2, '0')}:${String(elapsedSec % 60).padStart(2, '0')}`
-    : '00:00'
+  const showLiveControls = activeView === 'live' && isStreaming
 
   return (
-    <div
-      className="app-shell"
-      data-sidebar={sidebarCollapsed ? 'collapsed' : 'expanded'}
-    >
-      {navOpen ? (
-        <button
-          aria-label="关闭导航"
-          className="sidebar-backdrop"
-          onClick={() => setNavOpen(false)}
-          type="button"
-        />
-      ) : null}
-
-      <aside className="sidebar" data-open={navOpen}>
-        <div className="flex items-start justify-between gap-2 border-b border-[color:var(--sidebar-border)] px-5 py-5">
-          <div className="min-w-0">
-            <p className="kicker theme-muted text-[10px]">Meeting Assistant</p>
-            <h1 className="theme-title mt-2 text-lg font-semibold">会议智能助手</h1>
-          </div>
-          <button
-            aria-label="收起侧栏"
-            className="sidebar-collapse btn-ghost shrink-0 px-2"
-            onClick={() => setSidebarCollapsed(true)}
-            title="收起侧栏"
-            type="button"
-          >
-            «
-          </button>
+    <div className="app-shell">
+      <header className="app-bar">
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="theme-title hidden shrink-0 text-sm font-semibold sm:inline">
+            会议智能助手
+          </span>
+          <nav aria-label="主导航" className="tabs-list shrink-0 p-0.5">
+            {navItems.map((item) => (
+              <button
+                aria-current={activeView === item.id ? 'page' : undefined}
+                className="tabs-trigger px-3 py-1.5"
+                data-active={activeView === item.id}
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                type="button"
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+          {activeView === 'settings' ? (
+            <span className="theme-muted hidden text-sm md:inline">模型设置</span>
+          ) : null}
         </div>
 
-        <nav className="flex flex-1 flex-col gap-1 p-3">
-          {navItems.map((item) => (
-            <button
-              className={clsx(
-                'rounded-[var(--radius-control)] px-3 py-2.5 text-left text-sm font-medium transition',
-                activeView === item.id
-                  ? 'bg-[color:var(--accent-soft)] text-[color:var(--accent-text)]'
-                  : 'theme-muted hover:bg-[color:var(--surface-inline)] hover:text-[color:var(--text-primary)]',
-              )}
-              key={item.id}
-              onClick={() => setActiveView(item.id)}
-              type="button"
-            >
-              {item.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="border-t border-[color:var(--sidebar-border)] p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <span
-              className={clsx(
-                'inline-block h-2 w-2 rounded-full',
-                hasFullConfig() ? 'bg-[color:var(--success)]' : 'bg-[color:var(--warning)]',
-              )}
-            />
-            <span className="theme-muted text-xs">
-              {hasFullConfig() ? '模型已就绪' : '待配置模型'}
-            </span>
-          </div>
-          <p className="theme-title truncate text-sm font-medium">
-            {user?.name || user?.email || '用户'}
-          </p>
-          <p className="theme-muted truncate text-xs">{user?.email}</p>
-          <button
-            className="btn-ghost mt-3 w-full justify-start px-0"
-            onClick={() => void logout()}
-            type="button"
-          >
-            退出登录
-          </button>
+        <div className="flex min-w-0 flex-1 justify-center">
+          <RecordingIndicator />
         </div>
-      </aside>
 
-      <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <header className="app-bar">
-          <div className="flex min-w-0 items-center gap-3">
-            <button
-              className="sidebar-toggle btn-ghost px-2"
-              onClick={() => setNavOpen(true)}
-              type="button"
-            >
-              菜单
-            </button>
-            <button
-              aria-label="展开侧栏"
-              className="sidebar-expand btn-ghost px-2"
-              onClick={() => setSidebarCollapsed(false)}
-              title="展开侧栏"
-              type="button"
-            >
-              »
-            </button>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="theme-title truncate text-base font-semibold">
-                  {titleMap[activeView]}
-                </h2>
-                {activeView === 'live' && isStreaming ? (
-                  <span
-                    className="status-badge"
-                    data-tone={isPaused ? 'warning' : 'active'}
-                  >
-                    {isPaused ? '已暂停' : '监听中'}
-                  </span>
-                ) : null}
-              </div>
-              {activeView === 'live' ? (
-                <p className="theme-muted text-xs tabular-nums">
-                  计时 {elapsedLabel}
-                </p>
-              ) : null}
-            </div>
-          </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {showLiveControls ? (
+            <>
+              <button
+                className="btn-ghost"
+                onClick={() => setContextOpen(true)}
+                type="button"
+              >
+                会议背景
+              </button>
+              <button
+                className="btn-ghost"
+                disabled={liveSegments.length === 0}
+                onClick={pinCurrentSegment}
+                title="标记最新一段发言（快捷键 M）"
+                type="button"
+              >
+                标记
+              </button>
+              <button
+                className={isPaused ? 'btn-primary' : 'btn-secondary'}
+                onClick={() => void togglePause()}
+                type="button"
+              >
+                {isPaused ? '继续' : '暂停'}
+              </button>
+              <button
+                className="btn-danger"
+                onClick={() => void stopStream()}
+                type="button"
+              >
+                结束会议
+              </button>
+              <span aria-hidden="true" className="theme-divider mx-1 h-5 border-l" />
+            </>
+          ) : null}
+          <SystemStatusButton />
+          <UserMenu />
+        </div>
+      </header>
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            {activeView === 'live' ? (
-              <>
-                <button
-                  className="btn-secondary"
-                  onClick={() => setPrepOpen(true)}
-                  type="button"
-                >
-                  会话准备
-                </button>
-                {isStreaming ? (
-                  <>
-                    <button
-                      className={isPaused ? 'btn-primary' : 'btn-secondary'}
-                      onClick={() => void togglePause()}
-                      type="button"
-                    >
-                      {isPaused ? '继续' : '暂停'}
-                    </button>
-                    <button
-                      className="btn-secondary"
-                      onClick={stopStream}
-                      type="button"
-                    >
-                      停止
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="btn-primary"
-                    disabled={!canStart}
-                    onClick={() => void startStream()}
-                    title={
-                      !supportsLiveAssist
-                        ? '实时转写服务未配置'
-                        : !hasFullConfig()
-                          ? '请先完成模型设置'
-                          : undefined
-                    }
-                    type="button"
-                  >
-                    开始
-                  </button>
-                )}
-                {liveSegments.length > 0 ? (
-                  <>
-                    <button
-                      className="btn-ghost"
-                      onClick={pinCurrentSegment}
-                      type="button"
-                    >
-                      标记
-                    </button>
-                    <button
-                      className="btn-ghost"
-                      onClick={saveCurrentSession}
-                      type="button"
-                    >
-                      保存
-                    </button>
-                  </>
-                ) : null}
-              </>
-            ) : null}
-            <SystemStatusPopover />
-          </div>
-        </header>
+      <main className="min-h-0 flex-1 overflow-auto p-4 md:p-5">{children}</main>
 
-        <main
-          className={clsx(
-            'min-h-0 flex-1 p-4 md:p-5',
-            activeView === 'settings' ? 'overflow-auto' : 'overflow-auto xl:overflow-hidden',
-          )}
-        >
-          {children}
-        </main>
-      </div>
-
-      <SessionPrepDrawer open={prepOpen} onClose={() => setPrepOpen(false)} />
+      <ContextDrawer onClose={closeContext} open={contextOpen} />
     </div>
   )
 }

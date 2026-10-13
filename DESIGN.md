@@ -69,7 +69,6 @@ spacing:
   control-x: "0.875rem"
   panel: "1rem"
   workbench: "1.25rem"
-  sidebar: "220px"
   appbar: "56px"
 components:
   button-primary:
@@ -131,7 +130,7 @@ components:
 
 **Creative North Star: "The Briefing Desk"**
 
-The product looks like a personal briefing desk, not a shared war room. Light slate paper, a white work surface, and one indigo signal color that marks the next action. Login can feel like a softer SaaS product (split hero, generous type). Once inside, the UI is a workbench: 220px sidebar, 56px app bar, and a two-column live floor so the transcript stays beside the hints.
+The product looks like a personal briefing desk, not a shared war room. Light slate paper, a white work surface, and one indigo signal color that marks the next action. Login can feel like a softer SaaS product (split hero, generous type). Once inside, the UI is a workbench: one 56px top bar (no sidebar) and a live floor where speaking hints lead and the transcript sits beside them as reference. The user is in a room, glancing down for one or two seconds at a time; every live-screen decision is judged by what that glance returns.
 
 The typeface is Inter plus system Chinese fallbacks — one family for UI and headings. Density is medium: 14px body, 8–10px radii, 16px panel padding. Personality is practical and Chinese-first. The user asked new work to feel **tactile and confident** (clear primary vs ghost, decisive hover color) and for **analysis cards to lift** using the existing medium shadow, while chrome stays flat.
 
@@ -158,9 +157,9 @@ A cool slate paper field with a single indigo accent. Semantic greens, ambers, a
 - **Auth Hero Indigo** (`{colors.auth-hero-start}` → `{colors.auth-hero-end}`): login left pane only (`linear-gradient(160deg, …)`). Do not reuse this gradient on the workbench.
 
 ### Neutral
-- **Paper** (`{colors.paper}`): sidebar, app bar, panels, inputs.
+- **Paper** (`{colors.paper}`): app bar, panels, inputs.
 - **Slate Canvas** (`{colors.slate-canvas}` / `{colors.slate-canvas-deep}`): page background and inset wells.
-- **Hairline** (`{colors.hairline}`): sidebar, app bar, panel, divider.
+- **Hairline** (`{colors.hairline}`): app bar, panel, divider.
 - **Ink** (`{colors.ink}` / `{colors.ink-secondary}` / `{colors.ink-muted}` / `{colors.ink-quiet}`): title → body → meta → kicker.
 
 ### Named Rules
@@ -172,43 +171,50 @@ A cool slate paper field with a single indigo accent. Semantic greens, ambers, a
 
 **Display Font:** Inter (PingFang SC, Microsoft YaHei, Noto Sans SC, Segoe UI)
 **Body Font:** same stack
-**Label/Mono Font:** none; labels are Inter at 12px / 11px with tracked uppercase kickers
+**Label/Mono Font:** none; labels are Inter at 12px / 11px
 
-**Character:** Neutral product sans. Chinese and English share one rhythm. Kickers (`Meeting Assistant`, `Session Prep`) are the only ornamental type gesture.
+**Character:** Neutral product sans. Chinese and English share one rhythm. The login hero's `Meeting Assistant` kicker is the only tracked-uppercase gesture; panels inside the app do not carry English kickers.
 
 ### Hierarchy
 - **Display** (600, 2.25rem / `text-4xl`): login title 「会议智能助手」 only.
-- **Headline** (600, 1.5rem / `text-2xl`): panel titles such as 「当前阶段」.
-- **Title** (600, 1.125rem / `text-lg`): shell product name, drawer titles, section heads.
-- **Body** (400, 0.875rem / `text-sm`, line-height ~1.625): transcript, hints, settings, buttons.
-- **Label** (600, 0.75rem–11px, `letter-spacing: 0.08em`–`0.18em`, uppercase): `.kicker` and phase meta.
+- **Page title** (600, 1.25rem / `text-xl`): 「准备开始会议」, 「模型设置」, history session title (`text-lg`).
+- **Glance line** (500, 1.125rem / `text-lg`, `leading-8`): the 「现在开口」 sentence on the live floor. The one place body copy is enlarged, because it is read in a one-second glance.
+- **Hint body** (400, 15px, `leading-7`): the 15 / 30 / 60 秒 lines on the live floor.
+- **Panel title** (600, 0.875rem / `text-sm`): panel headers such as 发言建议, 转写.
+- **Body** (400, 0.875rem / `text-sm`, line-height ~1.625): transcript, settings, buttons.
+- **Meta** (400–600, 0.75rem / `text-xs`): timestamps, counts, speaker names in the transcript.
 
 ### Named Rules
 **The One Voice Type Rule.** Do not add a second display serif or a mono “terminal” face. Kickers may track; body copy never shouts in all caps.
 
 ## Layout
 
-App chrome is a two-column product grid: sidebar `{spacing.sidebar}` + fluid main. App bar is `{spacing.appbar}` with `1.25rem` horizontal padding. Main content pads `1rem` (`1.25rem` from `md`).
+App chrome is a single column: one `{spacing.appbar}` top bar, then the main area (padding `1rem`, `1.25rem` from `md`). There is no sidebar; horizontal space belongs to the work. Pages that fill the viewport use `lg:h-full` and scroll internally; prep and settings scroll with the page.
 
-The sidebar is collapsible at ≥960px: a `«` ghost button in the sidebar header hides it entirely (`.app-shell[data-sidebar="collapsed"]`), and a `»` button appears at the far left of the app bar to bring it back. The state persists in `localStorage`. Below 960px the sidebar stays a drawer behind the 菜单 button.
+### Live page: three states, one route
+The 会议 view is derived from store state, never from a separate flag:
+- **会前准备** (`!isStreaming && liveSegments.length === 0`): one centered card (`max-w-3xl`) with readiness (语音转写 / 文本分析 dots + 前往模型设置), the scenario radio chips, topic and role fields, then the data-path sentence and a large 开始会议. There are no per-field 应用 buttons; 开始会议 applies the drafts.
+- **会中** (`isStreaming`, including paused): two columns at `lg` (≥1024px). The **copilot column leads** (default 60%): one-line phase strip, then 发言建议 (`flex 3`), then the 共识分歧 / AI 问答 tab stack (`flex 2`). The transcript column is reference (40%). One vertical divider adjusts the split (drag, arrow keys, double-click reset), stored as `copilotRatio` in `live-layout`. Fixed ratios inside the copilot column are deliberate: the hints panel must not change height as content updates, so the user's eye finds it in the same place every glance. Below `lg` the copilot column stacks above the transcript.
+- **会后** (`!isStreaming && liveSegments.length > 0`): a 会议已结束 banner (duration, segment count, 已自动保存) carries the post-meeting actions: 生成总结与纪要 (primary, generates both), 思维导图 (opens the full-screen overlay), 在历史会话中查看, 开始新会议. The copilot column becomes tabs 总结与纪要 / 共识分歧 / AI 问答; the transcript stays.
 
-Live Assist has two column counts, driven by the **measured width of the layout grid** (`ResizeObserver`, not a viewport media query) so collapsing the sidebar can gain a column. Below `1340px` of content width it is two columns; at or above it is three: 转写 / 阶段 + 发言建议 / 共识分歧 ↔ AI 问答 + 产出. 共识分歧 and AI 问答 always share one tab stack; the 产出 row stays under that stack. In three-column mode the middle column is only phase + hints. At `xl`, 10px drag rails replace the fixed gaps: vertical rails adjust column widths, and in two-column mode the horizontal rail adjusts 发言建议 against the tab stack. A rail must track the pointer one-to-one: column widths are ratios of the full grid width, but the hints height is stored in **pixels** inside its own flexible zone (`.live-resizable-zone` = hints / rail / `minmax(0, 1fr)`), because a ratio of the whole column would lag the cursor by the height of the phase and 产出 rows, and `minmax()` px floors would make the rail stick and jump. Arrow keys move a focused rail (Shift for a larger step), and double-click restores that rail. `重置布局` restores every track. Values persist in `localStorage`; the stored height is kept even when a short window has to clamp it, so it returns when there is room again. Below `xl`, rails disappear and panels return to the normal stacked page flow.
+Speaking hints refresh automatically during a meeting (after a phase analysis, only when there is new final speech, at most every 20 s). The header shows 「N 秒前更新」, an 自动更新 toggle (users pay for their own model calls, so it can be turned off), and 刷新. Shortcuts while live: `M` marks the latest segment, `R` refreshes hints; both are ignored while typing.
 
-思维导图 and 会议总结 are **产出**, not panels: they live as buttons on one `产出` row at the bottom of the analysis column and open the existing full-screen overlay (which carries the view switcher and 重新生成). Never render them as a thumbnail inside a 420px column — a mind map at that size is unreadable.
+Only errors and the unstable-speaker warning surface as a runtime strip on the live floor. Routine status messages (「发言建议已刷新」) are not shown; the hints header already states freshness.
 
-Live Assist column proportions are user-adjustable rather than fixed. Transcript stays left, stacked `gap-3` under at most one notice: the setup callout is a single row (message + `前往模型设置`), and the runtime strip is suppressed while that callout already states what is missing. The live transcript uses the compact header (one row: `text-base` title, export, count badges — no `Transcript` kicker, no `text-2xl` headline). The right column is a compact phase strip (`shrink-0`), then speaking hints and tabbed analysis sharing the user-selected height with internal scroll; below `xl` the blocks stack at fixed `min-h` so the 15 / 30 / 60 cards stay visible without a nested scroll. Do not stack full briefing cards for phase and hints on the live floor. Live app-bar actions are state-switched: idle shows Session Prep + Start; listening shows Pause/Resume + Stop; Pin/Save appear only when there is transcript.
+### History
+Master-detail at `lg`: a 260px session list (search + rows: title, scenario, date, duration) and the detail. The detail header carries title, meta, an 导出 menu (Markdown / JSON) and 删除. Tabs: 总结与纪要 (default when the session has a summary or minutes, otherwise 时间线回放), 时间线回放 (scrubber + transcript + phase strip and hints at that moment, one vertical divider stored as `transcriptRatio` in `replay-layout`), 共识分歧 and 思维导图 (end-of-meeting result). Below `lg` the list sits above the detail with a capped height.
 
-Compact speaking hints are a one-line header (title + function-type badge + stale badge + timestamp + `生成建议`), a single accent-labelled `现在开口` line, then the three timing cards at `leading-5`. The full-density version (kicker + headline + description + badge row) is for wide standalone use only.
+### Shared rules
+Panels rendered inside a tab stack are **embedded**: the tab label is the panel title, so they drop their own headline and pad `1rem`.
 
-Panels rendered inside a tab stack are **embedded**: the tab label is the panel title, so they drop their own kicker and `text-2xl` headline, pad `1rem` instead of `1.25rem`, and keep only their status badges and action button on the first row. This applies in both modes.
+Rhythm: `gap-3` between stacked live/history blocks, `gap-2` in the top-bar action row, `0.25rem` inside the tab list. Login is a 960px split: hero hidden below that breakpoint.
 
-Replay uses the same two-column workbench: a one-line phase strip plus one tabbed analysis stack (共识分歧 / 会议总结 / 思维导图 / 发言建议) that owns the rest of the right column height with internal scroll. At `xl`, the divider between transcript and analysis adjusts their width, the divider below the phase strip adjusts the height shared with the active analysis panel, and the divider below the toolbar adjusts the height shared with the whole workbench. All dividers support pointer drag, arrow-key adjustment, double-click reset, and persist their proportions locally; the toolbar also exposes `重置布局`. Session picker, scrubber, and both export buttons sit on one toolbar row above the grid. The transcript search field lives inline in the transcript header beside the count badges. Below `xl` the two columns stack and the page scrolls normally. Login is a 960px split: hero hidden below that breakpoint.
-
-Rhythm: `gap-4` between workbench stacks (`gap-3` inside the live right column), `gap-2` in the app-bar action row, `0.25rem` inside the tab list.
+### CSS layering
+Custom element resets live in `@layer base` and component classes (`.btn-*`, `.panel-card`, `.status-badge`, `.tabs-*`, `.theme-*`) in `@layer components` in `shared/ui/index.css`. Tailwind utilities must be able to override them (`btn-secondary text-xs` really is 12px). Never add unlayered class rules; they silently beat every utility.
 
 ## Elevation & Depth
 
-Chrome (sidebar, app bar) is flat: fill + 1px hairline, no drop shadow. Implemented panels use `--shadow-sm` (`0 1px 2px rgba(15, 23, 42, 0.06)`). Overlay drawers and popovers already use `--shadow-md` (`0 4px 12px rgba(15, 23, 42, 0.08)`).
+Chrome (the top bar) is flat: fill + 1px hairline, no drop shadow. Implemented panels use `--shadow-sm` (`0 1px 2px rgba(15, 23, 42, 0.06)`). Overlay drawers and popovers already use `--shadow-md` (`0 4px 12px rgba(15, 23, 42, 0.08)`).
 
 **Confirmed direction for new work:** analysis and briefing cards should read as lifted sheets via `--shadow-md` at rest. Do not add blur, glow, or glass. Dark theme only deepens the same two shadows (`0.35` / `0.4` black).
 
@@ -218,7 +224,7 @@ Chrome (sidebar, app bar) is flat: fill + 1px hairline, no drop shadow. Implemen
 - **Focus ring** (`0 0 0 3px rgba(79, 70, 229, 0.35)`): inputs on focus. Global `:focus-visible` is a 2px outline in the same indigo.
 
 ### Named Rules
-**The Lifted Sheet Rule.** The work product (transcript, phase, hints, consensus) may lift. The desk itself (sidebar, app bar, page canvas) stays flat.
+**The Lifted Sheet Rule.** The work product (transcript, phase, hints, consensus) may lift. The desk itself (top bar, page canvas) stays flat.
 
 ## Shapes
 
@@ -255,9 +261,9 @@ Short, 14px medium labels. Shared padding `0.5rem 0.875rem`, 6px radius, 160ms c
 Hairline stroke (`{colors.input-stroke}`), paper fill, 6px radius. Focus: indigo border + 3px indigo ring, no extra outline. Placeholder is muted ink.
 
 ### Navigation
-220px white sidebar. Product kicker + title in the header. Nav items are 14px medium, 6px radius; active is indigo wash + indigo ink (never a solid indigo bar). Footer shows a 8px status dot (success or warning) plus user identity and ghost logout.
+One 56px white top bar. Left: product name, then a segmented control 会议 | 历史会话 (tab-well styling). Center: while a meeting runs, a recording indicator (pulsing red dot, or amber when paused, plus elapsed time and the scenario badge); it stays visible on other views and clicking it returns to the meeting. Right: live controls only while recording (会议背景, 标记, 暂停/继续, 结束会议 as a danger wash), then a status dot that opens the system-status popover, then the avatar menu (模型设置, 退出登录). Settings is reached from the avatar menu, not the main nav.
 
-App bar is a 56px white strip: page title left, live transport actions right.
+Popovers and menus close on outside click and Escape. Row-level menus inside scroll containers render `position: fixed` so they are never clipped.
 
 ### Tabs
 Inset well (slate canvas, 8px, 1px hairline) with 4px inner gap. Active trigger is a paper chip with `--shadow-sm`. Inactive is muted ink, no border.
@@ -268,16 +274,17 @@ At ≥960px, left pane is the only large indigo gradient in the product. Right p
 ## Do's and Don'ts
 
 ### Do:
-- **Do** keep transcript on the left and analysis on the right at `xl`.
-- **Do** keep the phase read-out as a one-line strip in both modes; give remaining right-column height to the tabbed analysis stack.
+- **Do** lead the live floor with speaking hints; the transcript is reference, not the headline.
+- **Do** keep the phase read-out as a one-line strip in both modes.
+- **Do** keep panel positions stable while content updates; a glance must land in the same place.
+- **Do** save automatically at meaningful moments (meeting end, after generating summary, minutes or mind map); never make the user remember to click 保存.
 - **Do** let the tab label be the panel title: no kicker + headline repeated inside a tab.
-- **Do** put "generate then read in full" products (mind map, summary) behind the 产出 row and its overlay, not in a cramped inline preview.
-- **Do** measure the container, not the viewport, when a layout can gain space from the collapsing sidebar.
+- **Do** open mind maps in the full-screen overlay, not a cramped inline preview.
 - **Do** say a runtime condition once — a setup callout and a status strip must not repeat the same sentence.
 - **Do** use Indigo Signal for at most one primary action in a cluster.
-- **Do** lift briefing cards with `--shadow-md`; keep sidebar and app bar flat.
+- **Do** lift briefing cards with `--shadow-md`; keep the top bar flat.
 - **Do** mark live/system state with semantic washes and 8px dots, not decorative charts.
-- **Do** write UI in Chinese with short English kickers.
+- **Do** write UI in Chinese; name the vendor data path where live capture starts.
 
 ### Don't:
 - **Don't** build a neon command-center, dark glass panels, or rainbow status bars.
@@ -285,3 +292,5 @@ At ≥960px, left pane is the only large indigo gradient in the product. Right p
 - **Don't** put the login hero gradient on workbench chrome.
 - **Don't** add a display serif or a terminal mono as the product voice.
 - **Don't** turn every control into a pill; 6–10px is the form language.
+- **Don't** add more drag dividers or a 重置布局 button to fix a layout; fix the default instead. One divider per page, double-click resets it.
+- **Don't** nest cards inside tinted cards; separate list items with hairlines and use colored dots for section meaning.

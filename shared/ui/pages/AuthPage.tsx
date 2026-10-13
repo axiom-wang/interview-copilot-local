@@ -47,10 +47,10 @@ export function AuthPage() {
         </p>
         <ul className="mt-10 space-y-4 text-sm text-indigo-100">
           <li className="border-l border-indigo-200/40 pl-3">
-            实时辅助：边听边看阶段与发言建议
+            会中：边听边看讨论阶段和下一句怎么说
           </li>
           <li className="border-l border-indigo-200/40 pl-3">
-            回放复盘：按时间线回顾共识与分歧
+            会后：自动保存，一键生成总结与纪要，按时间线回看
           </li>
           <li className="border-l border-indigo-200/40 pl-3">
             自带模型：使用你自己的语音与文本模型配置

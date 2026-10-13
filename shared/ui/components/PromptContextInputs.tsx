@@ -1,228 +1,111 @@
+import clsx from 'clsx'
 import { resolveScenarioProfile, SCENARIO_PROFILES } from '../../meeting/scenarios'
 import { useAppStore } from '../store/useAppStore'
 
-interface PromptContextInputsProps {
-  questionContextDraft: string
-  roleContextDraft: string
-  appliedQuestionContext: string
-  appliedRoleContext: string
-  collapsed: boolean
-  onQuestionContextDraftChange: (value: string) => void
-  onRoleContextDraftChange: (value: string) => void
-  onApplyQuestionContext: () => void
-  onApplyRoleContext: () => void
-  onClearQuestionContext: () => void
-  onClearRoleContext: () => void
-  onToggleCollapsed: () => void
-}
+const SCENARIO_OPTIONS = Object.values(SCENARIO_PROFILES).flatMap((scenario) =>
+  scenario.parentScenarioId
+    ? []
+    : [
+        scenario,
+        ...Object.values(SCENARIO_PROFILES).filter(
+          (preset) => preset.parentScenarioId === scenario.id,
+        ),
+      ],
+)
 
-const contextCardClassName =
-  'theme-inline-card-strong rounded-[var(--radius-card)] p-4'
-
-const getComparableContextValue = (value: string) =>
-  value.replace(/\r\n/g, '\n').trim()
-
-const summarizeContext = (value: string) => {
-  const normalized = getComparableContextValue(value)
-
-  if (!normalized) {
-    return '未设置'
-  }
-
-  return normalized.length > 40 ? `${normalized.slice(0, 40)}…` : normalized
-}
-
-export function PromptContextInputs({
-  questionContextDraft,
-  roleContextDraft,
-  appliedQuestionContext,
-  appliedRoleContext,
-  collapsed,
-  onQuestionContextDraftChange,
-  onRoleContextDraftChange,
-  onApplyQuestionContext,
-  onApplyRoleContext,
-  onClearQuestionContext,
-  onClearRoleContext,
-  onToggleCollapsed,
-}: PromptContextInputsProps) {
+export function ScenarioPicker({ disabled = false }: { disabled?: boolean }) {
   const scenarioId = useAppStore((state) => state.scenarioId)
   const setScenarioId = useAppStore((state) => state.setScenarioId)
   const profile = resolveScenarioProfile(scenarioId)
-  const showRoleContext = profile.roleContextEnabled !== false
-  const scenarios = Object.values(SCENARIO_PROFILES)
-  const isQuestionApplyDisabled =
-    !getComparableContextValue(questionContextDraft) ||
-    getComparableContextValue(questionContextDraft) ===
-      getComparableContextValue(appliedQuestionContext)
-  const isRoleApplyDisabled =
-    !getComparableContextValue(roleContextDraft) ||
-    getComparableContextValue(roleContextDraft) ===
-      getComparableContextValue(appliedRoleContext)
-  const hasAppliedContext =
-    Boolean(getComparableContextValue(appliedQuestionContext)) ||
-    (showRoleContext && Boolean(getComparableContextValue(appliedRoleContext)))
 
   return (
-    <section className="theme-divider mt-5 border-t pt-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="kicker theme-muted text-[11px]">分析上下文</p>
-          <h3 className="theme-title mt-2 text-lg font-semibold">
-            {profile.contextTitle ?? '背景与角色信息'}
-          </h3>
-          <p className="theme-muted mt-1 text-sm">
-            应用后会参与阶段分析、发言建议、AI 问答与总结生成。
-          </p>
-        </div>
+    <fieldset disabled={disabled}>
+      <legend className="theme-title text-sm font-semibold">会议场景</legend>
+      <div className="mt-2.5 flex flex-wrap gap-2" role="radiogroup">
+        {SCENARIO_OPTIONS.map((scenario) => {
+          const selected = scenario.id === scenarioId
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="status-badge" data-tone={hasAppliedContext ? 'active' : undefined}>
-            {profile.topicContextLabel}：{summarizeContext(appliedQuestionContext)}
-          </span>
-          {showRoleContext ? (
-            <span className="status-badge" data-tone={hasAppliedContext ? 'primary' : undefined}>
-              {profile.roleContextLabel}：{summarizeContext(appliedRoleContext)}
-            </span>
-          ) : null}
-          <button
-            className="btn-secondary"
-            onClick={onToggleCollapsed}
-            type="button"
-          >
-            {collapsed ? '展开编辑' : '收起上下文'}
-          </button>
-        </div>
-      </div>
-
-      {!collapsed ? (
-        <div className="mt-4 grid gap-3 xl:grid-cols-2">
-          <div className={`${contextCardClassName} xl:col-span-2`}>
-            <label className="theme-title text-sm font-semibold" htmlFor="meeting-scenario">
-              会议场景
-            </label>
-            <select
-              className="theme-input mt-3 w-full px-4 py-3 text-sm"
-              id="meeting-scenario"
-              onChange={(event) => {
-                setScenarioId(event.currentTarget.value as typeof scenarioId)
-              }}
-              value={scenarioId}
+          return (
+            <button
+              aria-checked={selected}
+              className={clsx(
+                'rounded-[var(--radius-control)] border px-3 py-1.5 text-sm transition',
+                selected
+                  ? 'border-[color:var(--accent)] bg-[color:var(--accent-soft)] font-medium text-[color:var(--accent-text)]'
+                  : 'border-[color:var(--panel-border)] text-[color:var(--text-secondary)] hover:bg-[color:var(--surface-inline-hover)]',
+              )}
+              key={scenario.id}
+              onClick={() => setScenarioId(scenario.id)}
+              role="radio"
+              type="button"
             >
-              {scenarios.filter((scenario) => !scenario.parentScenarioId).map((scenario) => {
-                const presets = scenarios.filter((preset) => preset.parentScenarioId === scenario.id)
-                return presets.length > 0 ? (
-                  <optgroup key={scenario.id} label={scenario.label}>
-                    {[scenario, ...presets].map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                ) : (
-                  <option key={scenario.id} value={scenario.id}>
-                    {scenario.label}
-                  </option>
-                )
-              })}
-            </select>
-            {profile.preparationNote ? (
-              <p className="theme-muted mt-3 text-sm leading-6">{profile.preparationNote}</p>
-            ) : null}
-          </div>
-          <div className={`${contextCardClassName}${showRoleContext ? '' : ' xl:col-span-2'}`}>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h4 className="theme-title text-sm font-semibold">
-                  {profile.topicContextLabel}
-                </h4>
-                <p className="theme-muted mt-1 text-xs">
-                  {profile.topicHelp ?? '填写主题、背景、目标与约束。'}
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-                <button
-                  className="btn-primary text-xs"
-                  disabled={isQuestionApplyDisabled}
-                  onClick={onApplyQuestionContext}
-                  type="button"
-                >
-                  应用
-                </button>
-                <button
-                  className="btn-ghost text-xs"
-                  onClick={onClearQuestionContext}
-                  type="button"
-                >
-                  清空
-                </button>
-              </div>
-            </div>
-            <textarea
-              aria-label={profile.topicContextLabel}
-              className={`theme-input ${showRoleContext ? 'h-32' : 'h-64'} w-full resize-y rounded-xl px-4 py-3 text-sm leading-6`}
-              onChange={(event) =>
-                onQuestionContextDraftChange(event.currentTarget.value)
-              }
-              placeholder={profile.topicPlaceholder}
-              value={questionContextDraft}
-            />
-            <div className="theme-muted mt-3 flex items-center justify-between gap-3 text-xs">
-              <span>
-                {getComparableContextValue(appliedQuestionContext)
-                  ? '已应用到后续分析'
-                  : '尚未应用'}
-              </span>
-              <span>{questionContextDraft.trim().length} 字</span>
-            </div>
-          </div>
+              {scenario.label}
+            </button>
+          )
+        })}
+      </div>
+      <p className="theme-muted mt-2 text-xs leading-5">
+        {profile.preparationNote ?? profile.description}
+      </p>
+    </fieldset>
+  )
+}
 
-          {showRoleContext ? <div className={contextCardClassName}>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h4 className="theme-title text-sm font-semibold">
-                  {profile.roleContextLabel}
-                </h4>
-                <p className="theme-muted mt-1 text-xs">
-                  说明当前身份、职责边界与表达风格。
-                </p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
-                <button
-                  className="btn-primary text-xs"
-                  disabled={isRoleApplyDisabled}
-                  onClick={onApplyRoleContext}
-                  type="button"
-                >
-                  应用
-                </button>
-                <button
-                  className="btn-ghost text-xs"
-                  onClick={onClearRoleContext}
-                  type="button"
-                >
-                  清空
-                </button>
-              </div>
-            </div>
-            <textarea
-              aria-label={profile.roleContextLabel}
-              className="theme-input h-32 w-full resize-none rounded-xl px-4 py-3 text-sm leading-6"
-              onChange={(event) => onRoleContextDraftChange(event.currentTarget.value)}
-              placeholder={profile.rolePlaceholder}
-              value={roleContextDraft}
-            />
-            <div className="theme-muted mt-3 flex items-center justify-between gap-3 text-xs">
-              <span>
-                {getComparableContextValue(appliedRoleContext)
-                  ? '已应用到后续分析'
-                  : '尚未应用'}
-              </span>
-              <span>{roleContextDraft.trim().length} 字</span>
-            </div>
-          </div> : null}
-        </div>
+export function ContextFields({ compact = false }: { compact?: boolean }) {
+  const questionContextDraft = useAppStore((state) => state.questionContextDraft)
+  const roleContextDraft = useAppStore((state) => state.roleContextDraft)
+  const setQuestionContextDraft = useAppStore((state) => state.setQuestionContextDraft)
+  const setRoleContextDraft = useAppStore((state) => state.setRoleContextDraft)
+  const scenarioId = useAppStore((state) => state.scenarioId)
+  const profile = resolveScenarioProfile(scenarioId)
+  const showRoleContext = profile.roleContextEnabled !== false
+
+  return (
+    <div className={clsx('grid gap-4', !compact && showRoleContext && 'md:grid-cols-[3fr_2fr]')}>
+      <label className="block">
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="theme-title text-sm font-semibold">
+            {profile.topicContextLabel}
+          </span>
+          <span className="theme-quiet text-xs tabular-nums">
+            {questionContextDraft.trim().length} 字
+          </span>
+        </span>
+        <span className="theme-muted mt-1 block text-xs leading-5">
+          {profile.topicHelp ?? '主题、背景、目标与约束，填得越具体建议越贴合。'}
+        </span>
+        <textarea
+          className={clsx(
+            'theme-input mt-2 w-full resize-y px-3 py-2.5 text-sm leading-6',
+            showRoleContext ? 'h-36' : 'h-52',
+          )}
+          onChange={(event) => setQuestionContextDraft(event.currentTarget.value)}
+          placeholder={profile.topicPlaceholder}
+          value={questionContextDraft}
+        />
+      </label>
+
+      {showRoleContext ? (
+        <label className="block">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="theme-title text-sm font-semibold">
+              {profile.roleContextLabel}
+            </span>
+            <span className="theme-quiet text-xs tabular-nums">
+              {roleContextDraft.trim().length} 字
+            </span>
+          </span>
+          <span className="theme-muted mt-1 block text-xs leading-5">
+            你的身份、职责边界和希望的表达风格。
+          </span>
+          <textarea
+            className="theme-input mt-2 h-36 w-full resize-y px-3 py-2.5 text-sm leading-6"
+            onChange={(event) => setRoleContextDraft(event.currentTarget.value)}
+            placeholder={profile.rolePlaceholder}
+            value={roleContextDraft}
+          />
+        </label>
       ) : null}
-    </section>
+    </div>
   )
 }

@@ -20,6 +20,8 @@ interface SummaryPreviewPanelProps {
   embedded?: boolean
   /** `launcher` renders only the action buttons plus the full-screen overlay. */
   presentation?: 'panel' | 'launcher'
+  /** Appended to the empty state when this panel has no generate action. */
+  emptyHint?: string
 }
 
 type SummaryView = 'speech' | 'minutes'
@@ -150,6 +152,7 @@ export function SummaryPreviewPanel({
   scenarioId,
   embedded = false,
   presentation = 'panel',
+  emptyHint = '会议结束后可在会后页面一键生成，生成结果会自动保存到这里。',
 }: SummaryPreviewPanelProps) {
   const activeScenarioId = useAppStore((state) => state.scenarioId)
   const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
@@ -278,7 +281,7 @@ export function SummaryPreviewPanel({
     return (
       <>
         <button
-          className="btn-secondary text-xs"
+          className="btn-secondary"
           disabled={
             isActiveGenerating || (!activeResult && (disableGenerate || !activeGenerate))
           }
@@ -372,10 +375,9 @@ export function SummaryPreviewPanel({
             {content}
           </div>
         ) : (
-          <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm">
-            {activeView === 'speech'
-              ? '尚未生成口播总结。'
-              : '尚未生成标准会议纪要。'}
+          <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-6">
+            {activeView === 'speech' ? '尚未生成口播总结。' : '尚未生成标准会议纪要。'}
+            {activeGenerate ? '' : ` ${emptyHint}`}
           </div>
         )}
       </div>
