@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     branch: main
-    buildCommand: npm install && npm run build:realtime
+    buildCommand: corepack pnpm --filter @meeting-assistant/web... install --frozen-lockfile && npm run build:realtime
     startCommand: npm run start:realtime
     healthCheckPath: /health
     autoDeployTrigger: commit
@@ -13,9 +13,3 @@ services:
         value: 24.13.0
       - key: ALLOWED_ORIGIN
         value: https://interview-copilot-local.netlify.app
-      - key: BYTEDANCE_WS_URL
-        value: wss://openspeech.bytedance.com/api/v4/ast/v2/translate
-      - key: BYTEDANCE_RESOURCE_ID
-        value: volc.service_type.10053
-      - key: BYTEDANCE_API_KEY
-        sync: false

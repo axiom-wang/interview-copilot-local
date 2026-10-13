@@ -1,0 +1,32 @@
+{
+  "name": "@meeting-assistant/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.functions.json && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "build:realtime": "tsc -p tsconfig.realtime.json",
+    "start:realtime": "tsx realtime/server.ts"
+  },
+  "dependencies": {
+    "@meeting-assistant/ui": "0.1.0",
+    "@meeting-assistant/meeting": "0.1.0",
+    "@meeting-assistant/analysis": "0.1.0",
+    "@netlify/identity": "^2.0.0",
+    "ws": "^8.20.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.4",
+    "typescript": "~6.0.2",
+    "@types/node": "^24.12.2",
+    "@netlify/functions": "^5.2.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0"
+  }
+}

@@ -1,6 +1,6 @@
 # 会议智能助手
 
-面向多人会议的 Web SaaS 应用（Netlify），可选 Electron 桌面壳。会话开始前可选择场景模板，把实时转写、讨论阶段识别、共识与分歧提取、发言提示、思维导图、口播总结、标准会议纪要和会后回放集中在同一个工作台中。
+面向多人会议的助手，同一仓库提供本地桌面版（Electron）和线上网页版（Netlify）。两版独立启动、构建和配置，共享会议界面与分析核心。会话开始前可选择场景模板，把实时转写、讨论阶段识别、共识与分歧提取、发言提示、思维导图、口播总结、标准会议纪要和会后回放集中在同一个工作台中。
 
 > 当前项目仍在开发中，接口和数据结构可能继续调整。
 
@@ -18,10 +18,12 @@
 
 场景是每场会议的属性，在会话准备抽屉中选择，并随会话保存在本地。
 
+群面场景下还可选择 **京东 TET 商业案例** 预设：在「会话准备 → 会议场景」选择后，粘贴自己提供的题目并点击「应用」。该预设无需填写或分配候选人角色，按题目相关性关注选品、定价、营销、成本利润、库存履约与风险；阶段分析、发言建议、问答及总结均使用这一口径。题目事实、讨论观点和待验证假设需区分，未提供题目时不自动编造案例。默认汇报长度为 2—3 分钟，题目明确指定时长时以题目为准。
+
 ## 核心能力
 
-- **登录与模型设置**：Netlify Identity 登录门；按用户在浏览器本地保存 BYO 密钥，并提供连接测试
-- **Live Assist**：实时接收转写，持续识别讨论阶段、共识、分歧和待补充信息
+- **登录与模型设置**：线上使用 Netlify Identity，桌面版保留本地登录门；按用户在浏览器本地保存 BYO 密钥，并提供连接测试
+- **Live Assist**：实时接收中文会议原话（中间结果持续更新、分句定稿并标记说话人），持续识别讨论阶段、共识、分歧和待补充信息
 - **发言提示**：根据当前讨论生成 15 秒、30 秒和 60 秒表达建议
 - **AI 问答**：结合最近转写、会议背景和角色背景回答现场问题
 - **思维导图**：将讨论结构转换为 React Flow 节点与连线
@@ -29,109 +31,122 @@
 - **Replay**：保存会话后按时间线回放转写与分析快照
 - **本地数据**：会话保存在当前浏览器或桌面应用的本地存储中，可导出为 JSON、Markdown 或纯文本
 
-## 技术架构
+## 两版职责与共享代码
 
-| 模块 | 实现 |
-| --- | --- |
-| 部署 | Netlify（静态站点 + Functions 分析代理） |
-| 桌面运行时 | 可选 Electron |
-| 界面 | React 19、TypeScript、Vite、Tailwind CSS |
-| 状态管理 | Zustand |
-| 思维导图 | React Flow |
-| 实时转写 | ByteDance 同声传译 2.0 WebSocket 适配器 |
-| AI 分析 | OpenAI Responses API，所有任务使用结构化 JSON 输出 |
-| Provider | AST 与 LLM 均通过类型化适配器接入，并提供 Mock LLM 回退 |
-| 数据存储 | 当前使用浏览器本地存储，数据结构保持文件或 SQLite 迁移友好 |
+| 能力 | 本地桌面版 | 线上网页版 |
+| --- | --- | --- |
+| 入口 | `apps/desktop` | `apps/web` |
+| 文本分析 | Codex 或 OpenAI Responses API | OpenAI Responses API，通过 Netlify Functions |
+| 语音转写 | Electron IPC 直接连接火山引擎 | 浏览器通过独立实时服务连接火山引擎 |
+| 登录 | 现有本地登录门 | Netlify Identity（开发环境可用 mock） |
+| 产物 | `apps/desktop/dist` + `apps/desktop/dist-electron` | `apps/web/dist` |
 
-Web 模式下，分析请求走 Netlify Functions；Electron 主进程通过受限 IPC 调用转写和分析能力。密钥由用户自行配置，默认不写入服务端。
+`shared/ui` 提供 React 工作台、登录/设置/回放页面和 Zustand 状态。应用入口先注入运行环境，再挂载共享界面；界面不直接引用另一版代码或桌面桥接。
+
+`shared/meeting` 提供场景、提示词、JSON Schema、模型设置、类型、分析编排、会话保存与导出。`shared/analysis` 提供两版服务端共用的 API 分析及火山引擎协议，实现中不导入 Electron。
+
+会话格式、模型配置的存储键、场景和上下文键保持不变。桌面版沿用 `interview-copilot-local` 用户数据目录，默认开发地址继续为 `http://localhost:5173`；网页版默认继续为 `http://127.0.0.1:5173`。原有配置和已保存会话无需手工搬迁。改变访问端口会切换浏览器存储空间，开发时请留意这一点。
 
 ## 环境要求
 
-- Node.js 22.12 或更高版本
-- npm 10 或更高版本
+- Node.js 22.13 或更高版本
+- pnpm 12.8.1（项目固定版本）；已有 `npm run` 启动方式继续可用
 - 可用的麦克风（实时转写）
-- 用户自备的 OpenAI API 凭证
-- 用户自备的 ByteDance 同声传译 2.0 凭证
+- 文本分析：OpenAI API 凭证，或桌面版已安装并登录的 Codex CLI
+- 用户自备的火山引擎流式语音识别 2.0 凭证
 
-## 快速开始
+## 本地桌面版启动
 
-1. 安装依赖：
+在仓库根目录运行：
 
-   ```bash
-   npm install
-   ```
+```bash
+pnpm install --frozen-lockfile
+npm run dev:desktop
+```
 
-2. 创建本地配置：
+原命令 `npm run dev` 继续打开桌面版。进入「模型设置」选择 API 或 Codex，测试并保存配置；语音转写凭证仍在设置页填写。会议期间保持程序运行、电脑唤醒和联网。
 
-   ```bash
-   cp .env.example .env
-   ```
+可从 `apps/desktop/.env.example` 创建 `apps/desktop/.env`，设置桌面版服务端的开发备用配置。Codex 沿用自己的 CLI 登录，不需要项目 API Key。
 
-3. 在 `.env` 中按需填写服务凭证（本地开发可用 mock 登录）：
+## 线上网页版开发与部署
 
-   ```dotenv
-   OPENAI_API_KEY=
-   OPENAI_MODEL=gpt-5.4-mini
-   OPENAI_BASE_URL=https://api.openai.com/v1
+只安装网页及共享模块所需依赖：
 
-   VITE_FORCE_MOCK_AUTH=true
+```bash
+pnpm --filter @meeting-assistant/web... install --frozen-lockfile
+npm run dev:web
+```
 
-   BYTEDANCE_API_KEY=
-   BYTEDANCE_WS_URL=wss://openspeech.bytedance.com/api/v4/ast/v2/translate
-   BYTEDANCE_RESOURCE_ID=volc.service_type.10053
-   ```
+网页版开发不会启动 Electron，也不依赖 Codex CLI。开发模式保留 mock 登录；生产构建使用 Netlify Identity，除非显式设置 `VITE_FORCE_MOCK_AUTH=true`。
 
-4. 启动界面：
+生产环境保持 `IDENTITY_REQUIRED=true`。`/api/analysis` 与 `/api/ast/probe` 都要登录。分析请求必须带上用户自己的 API Key，服务端不会改用 `OPENAI_API_KEY`。Base URL 只接受 https，默认只允许 `api.openai.com`；其他兼容主机写入 `ALLOWED_MODEL_HOSTS`。
 
-   ```bash
-   npm run dev:web
-   ```
+从 `apps/web/.env.example` 创建 `apps/web/.env`，配置 `VITE_REALTIME_WS_URL`。网页语音转写需要部署实时服务；未配置时仍可使用 Replay 示例。
 
-本地开发默认可使用任意邮箱密码登录。首次使用实时能力前，请在「模型设置」中填写并测试语音转写与文本分析配置。桌面壳使用 `npm run dev`。
+根目录 `netlify.toml` 已配置：
+
+- 构建命令：`npm run build:web`
+- 发布目录：`apps/web/dist`
+- Functions 目录：`apps/web/netlify/functions`
+- 依赖安装筛选：`PNPM_FLAGS=--filter=@meeting-assistant/web...`
+
+Netlify 的 base directory 保持仓库根目录。无需构建桌面版。实时服务仍由 `render.yaml` 配置，它也只安装网页和共享模块依赖。仓库中的构建配置已更新，本次拆分不会自动发布线上站点。
+
+两版独立读取各自目录下的 `.env`，暂时兼容根目录 `.env` 作为旧配置的备用来源，各版配置优先。密钥不要放进 `VITE_` 变量，这类值会进入浏览器代码。
+
+默认地址为兼容原有存储保留在 5173；如需同时开发两版，可将网页版临时改到其他端口：
+
+```bash
+npm run dev --workspace @meeting-assistant/web -- --port 5174
+```
+
+## 桌面版使用 Codex 分析
+
+线上与浏览器版继续使用 API 通道。Electron 桌面版可在「模型设置 → 文本分析 → 分析通道」选择 **本地 Codex**：
+
+1. 安装 Codex CLI，并在终端运行 `codex login` 登录。使用 ChatGPT 登录时使用相应账号权益与额度；如果 CLI 使用 API Key 登录，则按该登录方式计费。
+2. 运行 `npm run dev` 打开桌面版，选择本地 Codex。模型留空沿用 Codex 的默认配置；程序路径留空自动查找，也可填写可执行文件的绝对路径。
+3. 点击「测试连接」，测试会完成一次真实的结构化分析请求，再点击「保存配置」。语音转写仍需单独配置火山引擎凭证。
+
+API 与 Codex 的配置分别保留，切回 API 后可继续使用原有密钥。旧配置默认迁移到 API 通道。浏览器版不能启动本机程序，因此无法选择 Codex。
+
+Codex 在 Electron 主进程中通过 `app-server` 的 stdio 协议运行；它使用自己的登录凭证，不接收项目的文本分析 API Key。阶段与共识合并为一次请求，自动分析约每 8 秒处理最新定稿文本，执行中的分析完成后再处理后续更新。各任务串行运行，会议重启、停止、通道切换和应用退出时会清理进程；所有任务复用场景提示词、JSON Schema 和已有解析器。异常沿用可见的 Mock 回退，界面显示错误和实际通道。
+
+本地 Codex 程序不等于离线模型：会议文本仍发送至 Codex 配置的模型服务，需要联网，延迟取决于模型与网络。此通道不启用 shell、MCP、连接器、插件或网页搜索来分析会议文本。App Server 协议可能随 CLI 版本变化，升级后可先重新测试连接。
 
 ## 常用命令
 
 ```bash
-# 启动浏览器开发环境
-npm run dev:web
-
-# 启动 Electron 开发环境
-npm run dev
-
-# 类型检查并构建 Web 应用
-npm run build:web
-
-# 类型检查并构建 Electron 应用
-npm run build:electron
-
-# 运行静态检查
-npm run lint
+npm run dev:desktop     # 桌面版，原 npm run dev 仍可用
+npm run dev:web         # 网页版
+npm run build:desktop   # 桌面构建，原 build:electron 仍可用
+npm run build:web       # 网页与 Functions 类型检查、网页构建
+npm run build:realtime  # 独立实时服务类型检查
+npm run start:realtime  # 启动实时转写服务
+npm run typecheck      # 两版与服务端统一类型检查
+npm test               # 功能回归及依赖边界测试
+npm run lint           # 代码检查
 ```
-
-浏览器模式不包含 Electron IPC。未配置实时服务时，它仍可用于界面调试、场景切换和内置 Replay 示例。
 
 ## 项目结构
 
 ```text
-electron/
-  ast/                 ByteDance AST 会话、配置与 IPC
-  llm/                 OpenAI 分析服务、结构化响应解析与 IPC
-  main.ts              Electron 主进程
-  preload.ts           安全的渲染进程桥接
-netlify/functions/     Web 分析代理与连接探测
-src/
-  auth/                登录适配器（Netlify Identity / mock）
-  components/          工作台界面组件
-  modes/               Live Assist 与 Replay 页面
-  pages/               登录页与模型设置页
-  prompts/             各类分析任务的提示词
-  providers/           AST / LLM Provider 适配器
-  scenarios/           会议场景 profile
-  schemas/             分析任务的 JSON Schema
-  services/            分析编排、会话存储与导出
-  settings/            按用户保存的模型配置
-  store/               Zustand 应用状态
-  types/               共享领域类型
+apps/
+  desktop/
+    electron/          主进程、IPC、Codex 进程
+    renderer/          桌面入口与 AST/LLM 桥接适配器
+    vite.config.ts     独立桌面构建
+  web/
+    auth/              Netlify 登录适配器
+    providers/         HTTP 分析与远程转写适配器
+    netlify/functions/ 分析代理与连接测试
+    realtime/          独立实时转写服务
+    vite/              网页本地开发代理
+    vite.config.ts     独立网页构建
+shared/
+  ui/                  共享工作台、页面、状态与运行环境接口
+  meeting/             场景、提示词、结果结构、设置、回放与导出
+  analysis/            API 分析服务及语音识别协议
 ```
 
 ## 数据与隐私
@@ -140,13 +155,13 @@ src/
 - 保存的会话、回放记录、场景选择和上下文默认留在当前浏览器或桌面应用的本地存储中。
 - 模型密钥按用户保存在浏览器本地，不会作为默认云配置下发。
 - `.env` 仅用于本地或部署环境变量，切勿提交真实密钥。
-- 启用实时能力后，麦克风音频会发送至配置的 ByteDance 服务，分析所需的转写文本会发送至配置的 OpenAI 或兼容服务；请在使用前确认数据合规要求。
+- 启用实时能力后，麦克风音频会发送至配置的火山引擎语音服务，分析所需的转写文本会发送至配置的 OpenAI 或兼容服务，选择 Codex 时发送至 Codex 配置的模型服务；请在使用前确认数据合规要求。
 
 ## 开发约定
 
 - 保持模块小而类型清晰。
 - 新 Provider 先实现接口，再接入状态层。
-- 场景相关文案放进 `src/scenarios/`，不要在 prompt 或 UI 里再写死群面口径。
+- 场景相关文案放进 `shared/meeting/scenarios/`，不要在 prompt 或 UI 里再写死群面口径。
 - 所有 AI 分析任务必须返回可校验的结构化 JSON。
 - 优先完善 Mock Provider 和 Replay 流程，再扩展真实服务能力。
 - 不在本项目中加入计费、云同步或多人实时协作。

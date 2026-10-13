@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/functions.tsbuildinfo",
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "netlify/functions/**/*.ts"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/web.tsbuildinfo"
+  },
+  "include": [
+    "main.ts",
+    "runtime.ts",
+    "providers/**/*.ts",
+    "auth/**/*.ts",
+    "vite.config.ts",
+    "vite/**/*.ts",
+    "../../shared/ui/**/*",
+    "../../shared/meeting/**/*"
+  ]
+}

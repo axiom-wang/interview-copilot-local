@@ -10,7 +10,7 @@ Meeting scenarios (default: general meeting):
 - brainstorm
 - team-sync
 
-Scenario-specific copy lives in `src/scenarios/`. Do not hardcode group-interview wording in prompts or UI.
+Scenario-specific copy lives in `shared/meeting/scenarios/`. Do not hardcode group-interview wording in prompts or UI.
 
 Modes:
 - Live Assist Mode
@@ -39,11 +39,17 @@ Do not build:
 - per-meeting scenario templates
 
 ## Architecture rules
+- One repository with independent `apps/desktop` (Electron) and `apps/web` (Netlify) entries
+- Shared UI/state in `shared/ui`, meeting domain in `shared/meeting`, server/provider protocols in `shared/analysis`
+- Neither application may import the other; shared modules must not import applications
+- Inject runtime adapters at each application entry; shared UI must not access Electron IPC directly
+- Desktop supports Codex and API analysis; web supports API analysis only
+- Keep existing storage keys, session formats, and desktop user-data directory compatible
 - Electron + React + TypeScript (desktop optional)
 - Vite frontend, Netlify Functions for analysis proxy
 - provider adapters for AST and LLM
 - OpenAI Responses API for analysis (user-supplied keys)
-- ByteDance simultaneous interpretation 2.0 WebSocket adapter for transcript (user-supplied credentials)
+- Volcengine streaming speech recognition 2.0 WebSocket adapter for transcript (user-supplied credentials)
 - structured JSON outputs for all analysis tasks
 - React Flow for mind map rendering
 - Zustand for app state

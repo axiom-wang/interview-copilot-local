@@ -1,0 +1,13 @@
+{
+  "name": "@meeting-assistant/analysis",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@meeting-assistant/meeting": "0.1.0",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

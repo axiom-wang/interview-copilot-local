@@ -4,7 +4,7 @@
 
 ## Platform
 
-web
+web + desktop
 
 ## Users
 
@@ -26,9 +26,9 @@ A personal, bring-your-own-model copilot sitting with one participant during a l
 
 ## Operating Context
 
-Typical flow: log in → configure and test speech (ByteDance AST 2.0) and analysis (OpenAI-compatible Responses API) → choose a meeting scenario and optional topic/role context → start listening → watch Live Assist (transcript, phase, consensus, 15s/30s/60s hints, AI Q&A, mind map) → save locally → Replay the timeline.
+Typical flow: log in → configure and test speech (Volcengine Streaming ASR 2.0) and analysis (OpenAI-compatible Responses API, or a signed-in local Codex CLI in Electron) → choose a meeting scenario and optional topic/role context → start listening → watch Live Assist (transcript, phase, consensus, 15s/30s/60s hints, AI Q&A, mind map) → save locally → Replay the timeline.
 
-Runs as a Netlify-hosted web app; Electron is an optional desktop shell around the same web UI. Browser-only mode is for UI work and Replay demos; full live transcription and local credential use expect Electron when IPC-backed providers are required. Microphone is required for live capture.
+Runs as separate Netlify web and Electron desktop applications in one repository, sharing UI and meeting domain modules. Each entry supplies its own runtime adapters, auth and provider implementations. Browser-only mode is for UI work and Replay demos; full live transcription and local credential use expect Electron when IPC-backed providers are required. Microphone is required for live capture.
 
 ## Capabilities and Constraints
 
@@ -41,9 +41,9 @@ Confirmed capabilities:
 
 Confirmed constraints:
 
-- User supplies AST and LLM keys; settings live in browser-local storage (not a hosted model product)
+- User supplies AST keys and either LLM API keys or an existing Codex login in Electron; settings live in browser-local storage
 - Sessions stay on the device; no cloud session sync, no multi-user realtime collaboration, no billing
-- Audio goes to the configured ByteDance service; transcript text used for analysis goes to the configured OpenAI-compatible service. This is a data path, not a marketing claim
+- Audio goes to the configured Volcengine speech service; transcript text used for analysis goes to the configured OpenAI-compatible service or the model provider configured in Codex. Local Codex still requires network inference. This is a data path, not a marketing claim
 - Optional Electron wrapper does not make the product a native-OS design language; UI is designed as a web SaaS
 
 Undecided: none recorded in this init.
@@ -56,9 +56,9 @@ Voice in product copy is practical and operational (login, settings, live assist
 
 ## Evidence on Hand
 
-- Runnable UI: login, settings, Live Assist, Replay (`src/pages/`, `src/modes/`)
-- Scenario definitions: `src/scenarios/profiles.ts`
-- Sample analysis payload: `src/sample/mockAnalysis.json`
+- Runnable UI: login, settings, Live Assist, Replay (`shared/ui/pages/`, `shared/ui/modes/`)
+- Scenario definitions: `shared/meeting/scenarios/profiles.ts`
+- Sample analysis payload: `shared/meeting/sample/mockAnalysis.json`
 - Architecture and out-of-scope list: `AGENTS.md`
 
 Do not fabricate testimonials, customer logos, benchmarks, pricing, or compliance certifications. README still describes an older no-account Electron-only product; treat the live app and `AGENTS.md` as product truth where they conflict.

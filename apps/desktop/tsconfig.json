@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "../../node_modules/.tmp/desktop.tsbuildinfo"
+  },
+  "include": [
+    "renderer/**/*",
+    "electron/**/*",
+    "vite.config.ts",
+    "../../shared/ui/**/*",
+    "../../shared/meeting/**/*",
+    "../../shared/analysis/**/*"
+  ]
+}

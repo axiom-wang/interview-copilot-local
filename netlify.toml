@@ -1,9 +1,12 @@
 [build]
   command = "npm run build:web"
-  publish = "dist"
+  publish = "apps/web/dist"
+
+[build.environment]
+  PNPM_FLAGS = "--filter=@meeting-assistant/web..."
 
 [functions]
-  directory = "netlify/functions"
+  directory = "apps/web/netlify/functions"
   node_bundler = "esbuild"
 
 [[redirects]]
