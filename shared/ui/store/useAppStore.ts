@@ -175,6 +175,7 @@ const ignoredLiveSegmentIds = new Set<string>()
 
 const ANALYSIS_DEBOUNCE_MS = 1500
 const QUESTION_CONTEXT_STORAGE_KEY = 'interview-copilot-local/question-context'
+const QUESTION_CONTEXT_DRAFT_KEY = 'interview-copilot-local/question-context-draft'
 const ROLE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/role-context'
 const SCENARIO_ID_STORAGE_KEY = 'interview-copilot-local/scenario-id'
 const MAX_QA_HISTORY_ITEMS = 6
@@ -838,6 +839,41 @@ const persistContextValue = (storageKey: string, value: string) => {
   window.localStorage.removeItem(storageKey)
 }
 
+const persistQuestionDraft = (value: string) => {
+  persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, value)
+  persistContextValue(QUESTION_CONTEXT_DRAFT_KEY, value ? '1' : '')
+}
+
+const clearStoredQuestionDraft = () => {
+  persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, '')
+  persistContextValue(QUESTION_CONTEXT_DRAFT_KEY, '')
+}
+
+/** Restore a question only while it still belongs to the meeting being prepared. */
+const readQuestionDraft = (sessions: SessionRecord[]) => {
+  if (readStoredContext(QUESTION_CONTEXT_DRAFT_KEY) === '1') {
+    return readStoredContext(QUESTION_CONTEXT_STORAGE_KEY)
+  }
+
+  const stored = readStoredContext(QUESTION_CONTEXT_STORAGE_KEY)
+  if (!stored) {
+    return ''
+  }
+
+  const archived = sessions.some(
+    (session) =>
+      session.id !== 'session-demo' &&
+      (session.questionContext ?? '').trim() === stored.trim(),
+  )
+  if (archived) {
+    clearStoredQuestionDraft()
+    return ''
+  }
+
+  persistQuestionDraft(stored)
+  return stored
+}
+
 const buildPromptContext = (
   state: Pick<
     AppState,
@@ -1123,7 +1159,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const selectedSession = supportsLiveAssist
       ? sessions[0] ?? null
       : sessions.at(-1) ?? sessions[0] ?? null
-    const questionContext = readStoredContext(QUESTION_CONTEXT_STORAGE_KEY)
+    const questionContext = readQuestionDraft(sessions)
     const roleContext = readStoredContext(ROLE_CONTEXT_STORAGE_KEY)
     const scenarioId = resolveScenarioProfile(
       readStoredContext(SCENARIO_ID_STORAGE_KEY),
@@ -1485,6 +1521,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       statusMessage: '转写已停止。',
     })
     get().saveCurrentSession()
+    clearStoredQuestionDraft()
   },
   startNewMeeting: () => {
     const state = get()
@@ -1497,6 +1534,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.savedSessions.some((session) => session.id === state.currentSessionId)) {
       state.saveCurrentSession()
     }
+    clearStoredQuestionDraft()
     clearAnalysisTimer()
     clearHintsRefreshTimer()
     ignoredLiveSegmentIds.clear()
@@ -1534,6 +1572,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       meetingMinutes: null,
       minutesStale: false,
       analysisSnapshots: [],
+      questionContextDraft: '',
+      questionContext: '',
       aiQaHistory: [],
       aiQaError: null,
       isAnsweringQuestion: false,
@@ -1921,7 +1961,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       return
     }
 
-    persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, nextValue)
+    if (!state.currentSessionEndedAt) {
+      persistQuestionDraft(nextValue)
+    }
     set({
       questionContext: nextValue,
       errorMessage: null,
@@ -1947,7 +1989,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     })
   },
   clearQuestionContext: () => {
-    persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, '')
+    clearStoredQuestionDraft()
     set({
       questionContextDraft: '',
       questionContext: '',
