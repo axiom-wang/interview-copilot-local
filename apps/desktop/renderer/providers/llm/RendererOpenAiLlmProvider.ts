@@ -1,3 +1,5 @@
+import { MeetingContextCapacityError, normalizeMeetingMemory } from '../../../../../shared/meeting/context/meetingMemory'
+import type { MeetingMemory } from '../../../../../shared/meeting/types/meetingMemory'
 import type { DesktopAnalysisConfig } from '../../../../../shared/meeting/types/desktopAnalysis'
 import type {
   ConsensusAnalysis,
@@ -12,6 +14,13 @@ import type { MindMapSnapshot } from '../../../../../shared/meeting/types/mindma
 import type { AnalysisPromptContext, SummaryAssemblyContext } from '../../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../../shared/meeting/types/transcript'
 import type { LlmProvider } from '../../../../../shared/meeting/providers/llm/LlmProvider'
+
+const raiseAnalysisError = (result: { error: string; code?: string; meetingMemory?: MeetingMemory }): never => {
+  if (result.code === 'meeting-context-capacity') {
+    throw new MeetingContextCapacityError(normalizeMeetingMemory(result.meetingMemory) ?? { version: 1, chunks: [] })
+  }
+  throw new Error(result.error)
+}
 
 const normalizeSummaryAssemblyContext = (
   value: SummaryAssemblyContext | undefined,
@@ -31,6 +40,9 @@ const normalizeSummaryAssemblyContext = (
 }
 
 const normalizePromptContext = (context: AnalysisPromptContext | undefined) => ({
+  previousParticipantView: context?.previousParticipantView,
+  meetingMemory: context?.meetingMemory,
+  pinnedSegmentIds: context?.pinnedSegmentIds,
   scenarioId: context?.scenarioId,
   questionContext: context?.questionContext?.trim() || undefined,
   roleContext: context?.roleContext?.trim() || undefined,
@@ -51,6 +63,9 @@ const buildRequestKey = (
 
   return [
     ...segments.map((segment) => `${segment.id}:${segment.timestamp}:${segment.isFinal}:${segment.speaker}:${segment.text}`),
+    `view:${JSON.stringify(normalizedContext.previousParticipantView)}`,
+    `memory:${JSON.stringify(normalizedContext.meetingMemory)}`,
+    `pinned:${JSON.stringify(normalizedContext.pinnedSegmentIds)}`,
     `scenario:${normalizedContext.scenarioId ?? ''}`,
     `q:${normalizedContext.questionContext ?? ''}`,
     `r:${normalizedContext.roleContext ?? ''}`,
@@ -62,6 +77,7 @@ const buildRequestKey = (
 export class RendererOpenAiLlmProvider implements LlmProvider {
   readonly id: string = 'openai-responses'
   readonly label: string = 'OpenAI Responses'
+  readonly automaticAnalysis = { intervalMs: 8000, finalOnly: true, singleFlight: true }
 
   private readonly analysisConfig?: DesktopAnalysisConfig
 
@@ -112,9 +128,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): PhaseConsensusAnalysisBundle => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.bundle
       })
@@ -155,9 +169,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): SpeakingHints => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.hints
       })
@@ -198,9 +210,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): MindMapSnapshot => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.snapshot
       })
@@ -241,9 +251,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): MeetingSummary => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.summary
       })
@@ -286,9 +294,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): InterviewQaAnswer => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.answer
       })
@@ -329,9 +335,7 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         analysisConfig: this.analysisConfig,
       })
       .then((result): MeetingMinutes => {
-        if (!result.ok) {
-          throw new Error(result.error)
-        }
+        if (!result.ok) return raiseAnalysisError(result)
 
         return result.minutes
       })

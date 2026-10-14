@@ -1,3 +1,4 @@
+import { groundConsensusEvidence } from '../../../../shared/meeting/context/groundConsensus'
 import type { CodexConfig } from '../../../../shared/meeting/types/desktopAnalysis'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
@@ -9,7 +10,7 @@ import { parseConsensusAnalysis, parsePhaseAnalysis } from '../../../../shared/a
 import { getRecentSegmentsByWindow } from '../../../../shared/analysis/llm/segmentWindows'
 import { CodexClient } from './codexClient'
 import {
-  answerInterviewQuestionOnly, generateMeetingMinutesOnly,
+  prepareAnalysisContext, answerInterviewQuestionOnly, generateMeetingMinutesOnly,
   generateMeetingSummaryOnly, generateSpeakingHintsOnly,
   generateTranscriptMindMap, type StructuredResponse,
 } from '../../../../shared/analysis/llm/openaiAnalysisService'
@@ -53,6 +54,7 @@ export const codexAnalysis = (config: CodexConfig) => {
 
   return {
     realtime: async (segments: TranscriptSegment[], context?: AnalysisPromptContext) => {
+      context = await prepareAnalysisContext(segments, context, undefined, createResponse)
       const recent = getRecentSegmentsByWindow(segments, 90_000)
       const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
       const prompt = `请完成以下两项会议分析，将结果分别放入 phaseAnalysis 和 consensusAnalysis，最终只输出一个 JSON 对象。\n\n阶段分析任务：\n${buildDetectPhasePrompt(recent, context)}\n\n共识分析任务：\n${buildExtractConsensusPrompt(recent, context)}`
@@ -63,7 +65,8 @@ export const codexAnalysis = (config: CodexConfig) => {
       }) as Record<string, unknown>
       return {
         phaseAnalysis: parsePhaseAnalysis(result.phaseAnalysis, updatedAt),
-        consensusAnalysis: parseConsensusAnalysis(result.consensusAnalysis, updatedAt),
+        consensusAnalysis: { ...groundConsensusEvidence(parseConsensusAnalysis(result.consensusAnalysis, updatedAt), segments), meetingMemory: context.meetingMemory,
+      contextCoverage: { segmentCount: segments.length, throughTimestamp: updatedAt } },
       }
     },
     hints: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>

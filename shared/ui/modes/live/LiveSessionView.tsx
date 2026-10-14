@@ -67,6 +67,8 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const speakerProfiles = useAppStore((state) => state.speakerProfiles)
   const pinnedSegmentIds = useAppStore((state) => state.pinnedSegmentIds)
   const phaseAnalysis = useAppStore((state) => state.phaseAnalysis)
+  const meetingMemory = useAppStore((state) => state.meetingMemory)
+  const scenarioId = useAppStore((state) => state.scenarioId)
   const consensusAnalysis = useAppStore((state) => state.consensusAnalysis)
   const speakingHints = useAppStore((state) => state.speakingHints)
   const isRefreshingHints = useAppStore((state) => state.isRefreshingHints)
@@ -184,6 +186,8 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const consensusPanel = (
     <ConsensusPanel
       analysis={consensusAnalysis}
+      meetingMemory={meetingMemory}
+      scenarioId={scenarioId}
       className="h-full"
       detailSegments={liveSegments}
       embedded

@@ -84,6 +84,9 @@ const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
 
   const sections: string[] = []
 
+  if (context?.meetingHistory) sections.push(context.meetingHistory)
+  if (context?.previousParticipantView) sections.push(`AI 上一轮的参会观点（尚未实际发言或被团队接受，不是会议事实）：${JSON.stringify(context.previousParticipantView)}`)
+
   if (questionContext) {
     sections.push(`${profile.topicContextLabel}：\n${questionContext}`)
   }
@@ -100,7 +103,7 @@ const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
   }
 
   if (sessionSummary) {
-    sections.push(`完整讨论主线摘要：\n${sessionSummary}`)
+    sections.push(`此前分析结果（辅助信息，以全程原话和最新明确变更为准）：\n${sessionSummary}`)
   }
 
   if (sections.length === 0) {
@@ -133,7 +136,8 @@ export const buildSpeakingHintsPrompt = (
 
 你的目标不是写一段漂亮空话，而是判断：在当前这个时点，${profile.participantPersona}最适合承担哪一种“功能性动作”，才能最有效推动团队讨论。
 
-functionType 必须严格从以下 6 类中选 1 类：
+functionType 必须严格从以下 7 类中选 1 类：
+- 倾听观察：没有新增价值、他人正在补充信息或观点已表达过时，whyNow 说明正在等待什么；hint15s、hint30s、hint60s 均为空字符串，不强行生成发言
 - 推进结构：当讨论散、重复、没有统一顺序时，用于定义框架、明确讨论路径
 - 补齐信息：当讨论缺用户场景、约束条件、风险、数据假设、落地细节时，用于补关键缺口
 - 化解分歧：当存在明显冲突、争论或口径不统一时，用于搭桥、整合、降冲突
@@ -148,7 +152,7 @@ functionType 必须严格从以下 6 类中选 1 类：
 4. 如果最近 90 秒内容较窄、较碎或信息不足，不要被局部带偏，要回到会议目标和整场讨论主线。
 5. 建议必须符合真实会议口语风格，像${profile.participantPersona}会说的话，不要像 AI 作文。
 6. 建议必须和会议目标、当前阶段、完整讨论脉络保持一致，不能脱离上下文。
-7. 如果证据不足，也要给出最稳健的建议，不要输出空泛模板。
+7. 先判断是否值得发言。无新增价值时选择倾听观察；有证据支持追问时再提出具体问题，不为了输出脚本而制造观点。
 
 你在判断时应特别关注：
 - 当前讨论是否已经回应会议的核心目标
@@ -158,7 +162,7 @@ functionType 必须严格从以下 6 类中选 1 类：
 
 输出严格为 JSON：
 {
-  "functionType": "推进结构 | 补齐信息 | 化解分歧 | 收敛结论 | 分工落地 | 汇报总结",
+  "functionType": "倾听观察 | 推进结构 | 补齐信息 | 化解分歧 | 收敛结论 | 分工落地 | 汇报总结",
   "whyNow": "一句话说明为什么当前最适合做这个动作，需同时体现会议目标与当前讨论状态",
   "hint15s": "15秒内能说完的口语版建议",
   "hint30s": "30秒左右的口语版建议",

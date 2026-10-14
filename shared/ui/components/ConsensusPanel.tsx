@@ -1,3 +1,6 @@
+import { MeetingContextDetails } from './MeetingContextDetails'
+import type { MeetingMemory } from '../../meeting/types/meetingMemory'
+import type { MeetingScenarioId } from '../../meeting/scenarios'
 import clsx from 'clsx'
 import { useState } from 'react'
 import type { ConsensusAnalysis } from '../../meeting/types/analysis'
@@ -5,6 +8,8 @@ import type { SpeakerProfile } from '../../meeting/types/speaker'
 import type { TranscriptSegment } from '../../meeting/types/transcript'
 
 interface ConsensusPanelProps {
+  meetingMemory?: MeetingMemory
+  scenarioId?: MeetingScenarioId
   analysis: ConsensusAnalysis | null
   detailSegments?: TranscriptSegment[]
   speakerProfiles?: Record<string, SpeakerProfile>
@@ -231,7 +236,7 @@ const ConsensusSection = ({
                   >
                     <span className="min-w-0 leading-6">{item}</span>
                     <span className="theme-quiet shrink-0 pt-0.5 whitespace-nowrap text-xs">
-                      {isExpanded ? '收起' : '原话'}
+                      {isExpanded ? '收起' : '相关原话'}
                     </span>
                   </button>
                 ) : (
@@ -268,6 +273,8 @@ const ConsensusSection = ({
 
 export function ConsensusPanel({
   analysis,
+  meetingMemory,
+  scenarioId,
   detailSegments,
   speakerProfiles = {},
   isLoading = false,
@@ -307,6 +314,8 @@ export function ConsensusPanel({
 
       {analysis ? (
         <div className={clsx(bodyClassName, 'space-y-5')}>
+          <MeetingContextDetails analysis={analysis} memory={meetingMemory} scenarioId={scenarioId}
+            segments={detailSegments} speakerProfiles={speakerProfiles} />
           <ConsensusSection
             detailSegments={detailSegments}
             expandedItemKey={expandedItemKey}
@@ -345,7 +354,7 @@ export function ConsensusPanel({
             'panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7',
           )}
         >
-          讨论推进后，这里会汇总已经达成的共识、还没解决的分歧和缺少的信息。点开任一条可以看到对应原话。
+          讨论推进后，这里会汇总已经达成的共识、还没解决的分歧和缺少的信息。点开任一条可以查找相关原话。
         </div>
       )}
     </section>

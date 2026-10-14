@@ -1,3 +1,5 @@
+import { readPartialMeetingMemory } from '../../meeting/context/meetingMemory'
+import type { MeetingMemory } from '../../meeting/types/meetingMemory'
 import { getMeetingRuntime, type ConfiguredAstProvider } from '../runtime'
 import { DEFAULT_MODEL_SETTINGS } from '../../meeting/settings/types'
 import { create } from 'zustand'
@@ -81,6 +83,7 @@ interface AppState {
   speakerOrder: string[]
   pinnedSegmentIds: string[]
   phaseAnalysis: PhaseAnalysis | null
+  meetingMemory?: MeetingMemory
   consensusAnalysis: ConsensusAnalysis | null
   speakingHints: SpeakingHints | null
   speakingHintsStale: boolean
@@ -167,14 +170,13 @@ let analysisTimeoutId: number | null = null
 let hintsRefreshTimeoutId: number | null = null
 let lastHintsRequestedAt: number | null = null
 let queueAutoHintsRefresh = () => {}
+let rememberPartialMeetingMemory = (_error: unknown) => {}
 const ignoredLiveSegmentIds = new Set<string>()
 
 const ANALYSIS_DEBOUNCE_MS = 1500
 const QUESTION_CONTEXT_STORAGE_KEY = 'interview-copilot-local/question-context'
 const ROLE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/role-context'
 const SCENARIO_ID_STORAGE_KEY = 'interview-copilot-local/scenario-id'
-const QA_SEGMENT_WINDOW_MS = 5 * 60 * 1000
-const MAX_QA_SEGMENTS = 24
 const MAX_QA_HISTORY_ITEMS = 6
 const DUPLICATE_WINDOW_MS = 8_000
 const SPEAKER_TURN_GAP_MS = 10_000
@@ -420,7 +422,7 @@ const buildReplaySnapshot = (
   id: `snapshot-${timestamp}`,
   timestamp,
   phaseAnalysis: bundle.phaseAnalysis,
-  consensusAnalysis: bundle.consensusAnalysis,
+  consensusAnalysis: { ...bundle.consensusAnalysis, meetingMemory: undefined },
   speakingHints: bundle.speakingHints,
   mindMapSnapshot,
 })
@@ -841,6 +843,8 @@ const buildPromptContext = (
   state: Pick<
     AppState,
     | 'scenarioId'
+    | 'meetingMemory'
+    | 'pinnedSegmentIds'
     | 'questionContext'
     | 'roleContext'
     | 'phaseAnalysis'
@@ -863,6 +867,9 @@ const buildPromptContext = (
 
   return {
     scenarioId: state.scenarioId,
+    meetingMemory: state.meetingMemory,
+    previousParticipantView: state.consensusAnalysis?.participantView,
+    pinnedSegmentIds: state.pinnedSegmentIds,
     questionContext,
     roleContext,
     phaseContext,
@@ -882,6 +889,8 @@ const buildQuestionAnswerPromptContext = (
   state: Pick<
     AppState,
     | 'scenarioId'
+    | 'meetingMemory'
+    | 'pinnedSegmentIds'
     | 'questionContext'
     | 'roleContext'
     | 'phaseAnalysis'
@@ -902,6 +911,9 @@ const buildQuestionAnswerPromptContext = (
 
   return {
     scenarioId: state.scenarioId,
+    meetingMemory: state.meetingMemory,
+    previousParticipantView: state.consensusAnalysis?.participantView,
+    pinnedSegmentIds: state.pinnedSegmentIds,
     questionContext,
     roleContext,
     phaseContext,
@@ -985,37 +997,6 @@ const getSegmentsForSummary = (segments: TranscriptSegment[]) => {
   const finalSegments = stableSegments.filter((segment) => segment.isFinal)
 
   return finalSegments.length > 0 ? finalSegments : stableSegments
-}
-
-const getSegmentsForQuestionAnswer = (
-  segments: TranscriptSegment[],
-  pinnedSegmentIds: string[],
-) => {
-  const stableSegments = getSegmentsForAnalysis(segments)
-  const finalSegments = stableSegments.filter((segment) => segment.isFinal)
-  const latestTimestamp =
-    finalSegments.at(-1)?.timestamp ?? stableSegments.at(-1)?.timestamp ?? null
-  const recentFinalSegments =
-    latestTimestamp === null
-      ? []
-      : finalSegments.filter(
-          (segment) => latestTimestamp - segment.timestamp <= QA_SEGMENT_WINDOW_MS,
-        )
-  const pinnedSet = new Set(pinnedSegmentIds)
-  const pinnedSegments = stableSegments.filter((segment) => pinnedSet.has(segment.id))
-  const mergedById = new Map<string, TranscriptSegment>()
-
-  for (const segment of [...recentFinalSegments, ...pinnedSegments]) {
-    const existing = mergedById.get(segment.id)
-
-    if (!existing || segment.timestamp >= existing.timestamp) {
-      mergedById.set(segment.id, segment)
-    }
-  }
-
-  return [...mergedById.values()]
-    .sort((left, right) => left.timestamp - right.timestamp)
-    .slice(-MAX_QA_SEGMENTS)
 }
 
 const getSpeakerDisplayName = (
@@ -1104,6 +1085,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   speakerOrder: [],
   pinnedSegmentIds: [],
   phaseAnalysis: null,
+  meetingMemory: undefined,
   consensusAnalysis: null,
   speakingHints: null,
   speakingHintsStale: false,
@@ -1279,6 +1261,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       speakerOrder: [],
       pinnedSegmentIds: [],
       phaseAnalysis: null,
+      meetingMemory: undefined,
       consensusAnalysis: null,
       speakingHints: null,
       speakingHintsStale: false,
@@ -1440,6 +1423,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           errorMessage: null,
           statusMessage: '已继续收音，转写连接已重建并恢复。',
         })
+        if (get().liveSegments.length && !get().consensusAnalysis) {
+          void get().refreshAnalysis()
+        }
         queueAutoHintsRefresh()
       } catch (error) {
         set({
@@ -1517,7 +1503,17 @@ export const useAppStore = create<AppState>((set, get) => ({
     ignoredLiveSegmentIds.clear()
     lastHintsRequestedAt = null
     aiQuestionRunToken += 1
+    analysisRunToken += 1
+    speakingHintsRunToken += 1
+    mindMapRunToken += 1
+    summaryRunToken += 1
+    minutesRunToken += 1
     set({
+      isAnalyzing: false,
+      isRefreshingHints: false,
+      isGeneratingMindMap: false,
+      isGeneratingSummary: false,
+      isGeneratingMinutes: false,
       currentSessionId: null,
       currentSessionStartedAt: null,
       currentSessionEndedAt: null,
@@ -1526,6 +1522,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       speakerOrder: [],
       pinnedSegmentIds: [],
       phaseAnalysis: null,
+      meetingMemory: undefined,
       consensusAnalysis: null,
       speakingHints: null,
       speakingHintsStale: false,
@@ -1703,6 +1700,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     ignoredLiveSegmentIds.add(normalizedSegmentId)
+    speakingHintsRunToken += 1
+    mindMapRunToken += 1
+    summaryRunToken += 1
+    minutesRunToken += 1
+    aiQuestionRunToken += 1
     analysisRunToken += 1
     clearAnalysisTimer()
 
@@ -1719,17 +1721,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return {
         liveSegments: nextSegments,
+        meetingMemory: undefined,
+        isRefreshingHints: false,
+        isGeneratingMindMap: false,
+        isGeneratingSummary: false,
+        isGeneratingMinutes: false,
+        isAnsweringQuestion: false,
         pinnedSegmentIds: state.pinnedSegmentIds.filter(
           (id) => id !== normalizedSegmentId,
         ),
-        phaseAnalysis: hasRemainingSegments ? state.phaseAnalysis : null,
-        consensusAnalysis: hasRemainingSegments ? state.consensusAnalysis : null,
+        phaseAnalysis: null,
+        consensusAnalysis: null,
         speakingHints: hasRemainingSegments ? state.speakingHints : null,
         speakingHintsStale: hasRemainingSegments
           ? Boolean(state.speakingHints)
           : false,
         lastHintsUpdatedAt: hasRemainingSegments ? state.lastHintsUpdatedAt : null,
-        mindMap: hasRemainingSegments ? state.mindMap : null,
+        mindMap: null,
         mindMapStale: hasRemainingSegments ? Boolean(state.mindMap) : false,
         meetingSummary: hasRemainingSegments ? state.meetingSummary : null,
         summaryStale: hasRemainingSegments
@@ -1746,9 +1754,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         isAnalyzing: false,
         lastUpdatedAt: nextSegments.at(-1)?.timestamp ?? null,
         errorMessage: null,
-        statusMessage: hasRemainingSegments
-          ? '已删除该转写片段，阶段与共识分析将按最新转写重新刷新。'
-          : '已删除该转写片段，当前实时转写已清空。',
+        statusMessage: !hasRemainingSegments
+          ? '已删除该转写片段，当前实时转写已清空。'
+          : state.isPaused
+            ? '已删除该转写片段，阶段与共识已清除。继续会议后会按最新转写重新分析。'
+            : '已删除该转写片段，阶段与共识分析将按最新转写重新刷新。',
       }
     })
 
@@ -1821,6 +1831,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       meetingSummary: state.meetingSummary,
       meetingMinutes: state.meetingMinutes,
       scenarioId: state.scenarioId,
+      meetingMemory: state.meetingMemory,
+      questionContext: state.questionContext,
+      roleContext: state.roleContext,
     }
 
     const savedSessions = saveSession(session)
@@ -1955,10 +1968,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   askAiQuestion: async () => {
     const state = get()
     const question = normalizeContextInput(state.aiQuestionDraft).trim()
-    const segments = getSegmentsForQuestionAnswer(
-      state.liveSegments,
-      state.pinnedSegmentIds,
-    )
+    const segments = getSegmentsForAnalysis(state.liveSegments)
     const promptContext = buildQuestionAnswerPromptContext(state)
 
     if (!question || !segments.length) {
@@ -2004,6 +2014,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set({
         isAnsweringQuestion: false,
         aiQaError: toErrorMessage(error),
@@ -2056,6 +2067,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       set((currentState) => ({
         phaseAnalysis: result.bundle.phaseAnalysis,
+        meetingMemory: result.bundle.consensusAnalysis.meetingMemory ?? currentState.meetingMemory,
         consensusAnalysis: result.bundle.consensusAnalysis,
         analysisSnapshots: upsertSnapshot(
           currentState.analysisSnapshots,
@@ -2077,12 +2089,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         lastUpdatedAt: timestamp,
       }))
 
+      get().saveCurrentSession({ createIfMissing: false })
       queueAutoHintsRefresh()
     } catch (error) {
       if (activeToken !== analysisRunToken) {
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set({
         isAnalyzing: false,
         errorMessage: toErrorMessage(error),
@@ -2159,12 +2173,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         isRefreshingHints: false,
         statusMessage: '发言建议已刷新。',
       }))
+      get().saveCurrentSession({ createIfMissing: false })
       queueAutoHintsRefresh()
     } catch (error) {
       if (activeToken !== speakingHintsRunToken) {
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set({
         isRefreshingHints: false,
         errorMessage: toErrorMessage(error),
@@ -2249,6 +2265,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return {
             phaseAnalysis,
             consensusAnalysis,
+            meetingMemory: consensusAnalysis.meetingMemory ?? state.meetingMemory,
             speakingHints,
             mindMap: result.snapshot,
             mindMapStale: false,
@@ -2278,6 +2295,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set({
         isGeneratingMindMap: false,
         errorMessage: toErrorMessage(error),
@@ -2332,6 +2350,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set((currentState) => ({
         isGeneratingSummary: false,
         meetingSummary:
@@ -2386,6 +2405,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
+      rememberPartialMeetingMemory(error)
       set((currentState) => ({
         isGeneratingMinutes: false,
         meetingMinutes:
@@ -2397,6 +2417,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 }))
+
+rememberPartialMeetingMemory = (error: unknown) => {
+  const memory = readPartialMeetingMemory(error)
+  if (!memory?.chunks.length) return
+  useAppStore.setState({ meetingMemory: memory })
+  useAppStore.getState().saveCurrentSession({ createIfMissing: false })
+}
 
 queueAutoHintsRefresh = () => {
   clearHintsRefreshTimer()

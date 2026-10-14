@@ -135,11 +135,11 @@ function LiveHints({
           </div>
         ) : hints ? (
           <div className={clsx('transition-opacity duration-200', isRefreshing && 'opacity-60')}>
-            <p className="text-xs font-semibold text-[color:var(--accent-text)]">现在开口</p>
+            <p className="text-xs font-semibold text-[color:var(--accent-text)]">{hints.functionType === '倾听观察' ? '先听一听' : '可以这样接话'}</p>
             <p className="theme-title mt-1.5 text-lg leading-8 font-medium text-balance">
               {hints.whyNow || FALLBACK_WHY_NOW}
             </p>
-            <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
+            {hints.functionType !== '倾听观察' ? <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
               {HINT_ROWS.map((row) => (
                 <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 py-3" key={row.key}>
                   <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
@@ -148,7 +148,7 @@ function LiveHints({
                   <dd className="theme-title text-[15px] leading-7">{hints[row.key]}</dd>
                 </div>
               ))}
-            </dl>
+            </dl> : null}
           </div>
         ) : (
           <div className="flex h-full min-h-32 flex-col items-start justify-center gap-1">
@@ -156,7 +156,7 @@ function LiveHints({
               {autoRefresh ? '听到第一段完整发言后自动生成' : '自动更新已关闭'}
             </p>
             <p className="theme-muted text-sm leading-6">
-              会给出一句「现在开口」的切入点，以及 15 / 30 / 60 秒三种长度的说法。也可以按 R 立即生成。
+              有值得补充的内容时，给出 15 / 30 / 60 秒三种说法；没有新贡献时，会建议继续倾听。也可以按 R 立即生成。
             </p>
           </div>
         )}
@@ -226,11 +226,11 @@ export function HintsPanel(props: HintsPanelProps) {
           <div className="panel-skeleton h-40 rounded-[var(--radius-card)]" />
         ) : hints ? (
           <div>
-            <p className="text-xs font-semibold text-[color:var(--accent-text)]">现在开口</p>
+            <p className="text-xs font-semibold text-[color:var(--accent-text)]">{hints.functionType === '倾听观察' ? '先听一听' : '可以这样接话'}</p>
             <p className="theme-title mt-1.5 text-base leading-7 font-medium">
               {hints.whyNow || FALLBACK_WHY_NOW}
             </p>
-            <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
+            {hints.functionType !== '倾听观察' ? <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
               {HINT_ROWS.map((row) => (
                 <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 py-3" key={row.key}>
                   <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
@@ -239,7 +239,7 @@ export function HintsPanel(props: HintsPanelProps) {
                   <dd className="theme-body text-sm leading-7">{hints[row.key]}</dd>
                 </div>
               ))}
-            </dl>
+            </dl> : null}
           </div>
         ) : (
           <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7">

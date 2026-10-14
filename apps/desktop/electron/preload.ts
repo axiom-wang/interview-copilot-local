@@ -9,6 +9,7 @@ import type {
 } from '../../../shared/meeting/types/analysis'
 import type { AstProviderStatusPayload } from '../../../shared/meeting/providers/ast/AstProvider'
 import type { MindMapSnapshot } from '../../../shared/meeting/types/mindmap'
+import type { AnalysisErrorResult } from '../../../shared/analysis/llm/analysisFailure'
 import type { TranscriptSegment } from '../../../shared/meeting/types/transcript'
 import {
   VOLC_ASR_SEGMENT_CHANNEL,
@@ -40,60 +41,42 @@ type AnalyzeTranscriptRealtimeResult =
       ok: true
       bundle: PhaseConsensusAnalysisBundle
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type GenerateSpeakingHintsResult =
   | {
       ok: true
       hints: SpeakingHints
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type GenerateMindMapResult =
   | {
       ok: true
       snapshot: MindMapSnapshot
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type GenerateMeetingSummaryResult =
   | {
       ok: true
       summary: MeetingSummary
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type GenerateMeetingMinutesResult =
   | {
       ok: true
       minutes: MeetingMinutes
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type AnswerInterviewQuestionResult =
   | {
       ok: true
       answer: InterviewQaAnswer
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type SmokeTestVolcAsrResult =
   | {

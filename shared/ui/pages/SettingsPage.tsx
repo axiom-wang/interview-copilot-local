@@ -234,6 +234,11 @@ export function SettingsPage() {
                   <p className="theme-muted text-sm leading-6">
                     会议文本仍会发送至 Codex 配置的模型服务，需要联网。自动阶段分析约每 8 秒处理最新定稿文本。
                   </p>
+                  {supportsCodex ? (
+                    <p className="theme-muted text-sm leading-6">
+                      本项目统一使用 Fast 速度与 Medium 推理强度，单独使用 Codex 时保留原来的设置。Fast 会更快消耗账号额度。
+                    </p>
+                  ) : null}
                   <label className="block space-y-1.5 text-sm">
                     <span className="theme-muted">Codex 模型（可选）</span>
                     <input

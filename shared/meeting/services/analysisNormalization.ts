@@ -4,6 +4,7 @@ const FUNCTION_TYPE_BY_KEYWORD: Array<{
   keywords: string[]
   value: SpeakingFunctionType
 }> = [
+  { keywords: ['倾听'], value: '倾听观察' },
   { keywords: ['结构', '框架', '顺序'], value: '推进结构' },
   { keywords: ['信息', '补充', '补齐', '缺口', '约束', '风险'], value: '补齐信息' },
   { keywords: ['分歧', '冲突', '争论', '口径'], value: '化解分歧' },
@@ -22,6 +23,7 @@ export const normalizeFunctionType = (
   }
 
   const exactValues: SpeakingFunctionType[] = [
+    '倾听观察',
     '推进结构',
     '补齐信息',
     '化解分歧',

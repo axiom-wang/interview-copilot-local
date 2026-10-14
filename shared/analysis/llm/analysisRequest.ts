@@ -1,3 +1,6 @@
+import { toAnalysisFailure } from './analysisFailure'
+import { normalizeParticipantView } from '../../meeting/context/participantView'
+import { normalizeMeetingMemory } from '../../meeting/context/meetingMemory'
 import type { AnalysisPromptContext } from '../../meeting/types/promptContext'
 import type { TranscriptSegment } from '../../meeting/types/transcript'
 import {
@@ -57,6 +60,9 @@ const validateTranscriptRequest = (request: TranscriptRequest) => {
   }
 
   if (
+    (request.previousParticipantView !== undefined && !normalizeParticipantView(request.previousParticipantView)) ||
+    (request.meetingMemory !== undefined && !normalizeMeetingMemory(request.meetingMemory)) ||
+    (request.pinnedSegmentIds !== undefined && (!Array.isArray(request.pinnedSegmentIds) || !request.pinnedSegmentIds.every((id) => typeof id === 'string'))) ||
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.phaseContext) ||
@@ -76,6 +82,9 @@ const validateInterviewQuestionRequest = (request: InterviewQuestionRequest) => 
 }
 
 const toPromptContext = (request: TranscriptRequest): AnalysisPromptContext => ({
+  previousParticipantView: normalizeParticipantView(request.previousParticipantView),
+  meetingMemory: normalizeMeetingMemory(request.meetingMemory),
+  pinnedSegmentIds: request.pinnedSegmentIds,
   scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
@@ -183,9 +192,6 @@ export const handleAnalysisRequest = async (input: {
     )
     return result(200, { ok: true, summary })
   } catch (error) {
-    return result(400, {
-      ok: false,
-      error: error instanceof Error ? error.message : 'Unknown analysis error.',
-    })
+    return result(400, toAnalysisFailure(error, 'Unknown analysis error.'))
   }
 }

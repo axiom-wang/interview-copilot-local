@@ -9,6 +9,8 @@ const normalizeText = (value: string | undefined) => {
 }
 
 const buildContextData = (context?: AnalysisPromptContext) => ({
+  meetingHistory: context?.meetingHistory,
+  previousAiViewNotMeetingFact: context?.previousParticipantView,
   questionContext: normalizeText(context?.questionContext),
   roleContext: resolveScenarioProfile(context?.scenarioId).roleContextEnabled === false
     ? null

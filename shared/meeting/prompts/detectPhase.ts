@@ -20,7 +20,7 @@ export const buildDetectPhasePrompt = (
     .join('\n')
 
   return composePromptWithGlobalSystemPrompt(`
-请根据以下最近 90 秒转写，判断当前讨论阶段。
+请结合全程会议记录，以最近 90 秒的讨论重点判断当前议题所处阶段；允许切换议题或回到早期阶段。
 
 阶段定义如下：
 ${phaseDefinitions}

@@ -1,3 +1,5 @@
+import { normalizeParticipantView } from '../../meeting/context/participantView'
+import { normalizeScenarioFocus } from '../../meeting/context/scenarioFocus'
 import {
   coerceString,
   coerceStringArray,
@@ -78,6 +80,8 @@ export const parseConsensusAnalysis = (
   }
 
   return {
+    participantView: normalizeParticipantView(value.participantView),
+    scenarioFocus: normalizeScenarioFocus(value.scenarioFocus),
     consensus: coerceStringArray(value.consensus, { maxItems: 4 }),
     tensions: coerceStringArray(value.tensions, { maxItems: 4 }),
     missing: coerceStringArray(value.missing, { maxItems: 4 }),
@@ -91,6 +95,11 @@ export const parseSpeakingHints = (
 ): SpeakingHints => {
   if (!isObject(value)) {
     throw new Error('hints response format is invalid')
+  }
+
+  if (normalizeFunctionType(coerceString(value.functionType)) === '倾听观察') {
+    return { functionType: '倾听观察', whyNow: coerceString(value.whyNow, '先听完当前发言，再判断是否有值得补充的内容。'),
+      hint15s: '', hint30s: '', hint60s: '', updatedAt }
   }
 
   const hint15s = coerceString(

@@ -27,6 +27,9 @@ export interface ReplaySnapshot {
 }
 
 export interface SessionRecord {
+  meetingMemory?: import('./meetingMemory').MeetingMemory
+  questionContext?: string
+  roleContext?: string
   id: string
   title: string
   startedAt: number

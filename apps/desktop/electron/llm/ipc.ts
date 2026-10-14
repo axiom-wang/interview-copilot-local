@@ -1,3 +1,4 @@
+import { normalizeParticipantView } from '../../../../shared/meeting/context/participantView'
 import type { DesktopAnalysisConfig, DesktopTranscriptRequest } from '../../../../shared/meeting/types/desktopAnalysis'
 import { codexAnalysis, disposeCodexAnalysis, probeCodexConnection } from './codexAnalysisService'
 import { probeOpenAiConnection } from '../../../../shared/analysis/llm/openaiAnalysisService'
@@ -10,6 +11,8 @@ import type {
   SpeakingHints,
 } from '../../../../shared/meeting/types/analysis'
 import type { MindMapSnapshot } from '../../../../shared/meeting/types/mindmap'
+import { toAnalysisFailure, type AnalysisErrorResult } from '../../../../shared/analysis/llm/analysisFailure'
+import { normalizeMeetingMemory } from '../../../../shared/meeting/context/meetingMemory'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
 import {
@@ -42,60 +45,42 @@ type RealtimeAnalysisResult =
       ok: true
       bundle: PhaseConsensusAnalysisBundle
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type SpeakingHintsResult =
   | {
       ok: true
       hints: SpeakingHints
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type MindMapResult =
   | {
       ok: true
       snapshot: MindMapSnapshot
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type MeetingSummaryResult =
   | {
       ok: true
       summary: MeetingSummary
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type MeetingMinutesResult =
   | {
       ok: true
       minutes: MeetingMinutes
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 type InterviewQuestionResult =
   | {
       ok: true
       answer: InterviewQaAnswer
     }
-  | {
-      ok: false
-      error: string
-    }
+  | AnalysisErrorResult
 
 const isTranscriptSegment = (
   value: unknown,
@@ -124,6 +109,9 @@ const validateRequest = (request: TranscriptRequest) => {
   }
 
   if (
+    (request.previousParticipantView !== undefined && !normalizeParticipantView(request.previousParticipantView)) ||
+    (request.meetingMemory !== undefined && !normalizeMeetingMemory(request.meetingMemory)) ||
+    (request.pinnedSegmentIds !== undefined && (!Array.isArray(request.pinnedSegmentIds) || !request.pinnedSegmentIds.every((id) => typeof id === 'string'))) ||
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.phaseContext) ||
@@ -147,6 +135,9 @@ const validateInterviewQuestionRequest = (
 const toPromptContext = (
   request: TranscriptRequest,
 ): AnalysisPromptContext => ({
+  previousParticipantView: normalizeParticipantView(request.previousParticipantView),
+  meetingMemory: normalizeMeetingMemory(request.meetingMemory),
+  pinnedSegmentIds: request.pinnedSegmentIds,
   scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
@@ -225,10 +216,7 @@ export const registerLlmIpcHandlers = () => {
           bundle,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : '未知分析错误',
-        }
+        return toAnalysisFailure(error, '未知分析错误')
       }
     },
   )
@@ -249,10 +237,7 @@ export const registerLlmIpcHandlers = () => {
           hints,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : '未知发言建议生成错误',
-        }
+        return toAnalysisFailure(error, '未知发言建议生成错误')
       }
     },
   )
@@ -273,10 +258,7 @@ export const registerLlmIpcHandlers = () => {
           snapshot,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : '未知导图生成错误',
-        }
+        return toAnalysisFailure(error, '未知导图生成错误')
       }
     },
   )
@@ -297,10 +279,7 @@ export const registerLlmIpcHandlers = () => {
           summary,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : '未知总结发言生成错误',
-        }
+        return toAnalysisFailure(error, '未知总结发言生成错误')
       }
     },
   )
@@ -321,10 +300,7 @@ export const registerLlmIpcHandlers = () => {
           minutes,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : '未知会议纪要生成错误',
-        }
+        return toAnalysisFailure(error, '未知会议纪要生成错误')
       }
     },
   )
@@ -349,13 +325,7 @@ export const registerLlmIpcHandlers = () => {
           answer,
         }
       } catch (error) {
-        return {
-          ok: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Unknown interview question error',
-        }
+        return toAnalysisFailure(error, 'Unknown interview question error')
       }
     },
   )

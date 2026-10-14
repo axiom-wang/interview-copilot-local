@@ -54,6 +54,27 @@ test('probe verifies an inference turn; explicit model is passed to analysis', a
   assert.equal(result.probeModel, 'chosen-model')
 })
 
+test('uses Fast and Medium in its own process, connection probe, and every analysis turn', async (t) => {
+  const client = new CodexClient(setup(t))
+  t.after(() => client.dispose())
+  await client.probe()
+  for (const prompt of ['realtime analysis', 'meeting minutes']) {
+    const result = await client.structured(prompt, schema) as {
+      startupConfig: Record<string, unknown>
+      config: Record<string, unknown>
+      turnSettings: { serviceTier: string; effort: string }
+      probeSettings: { serviceTier: string; effort: string }
+    }
+    for (const config of [result.startupConfig, result.config]) {
+      assert.equal(config.service_tier, 'fast')
+      assert.equal(config.model_reasoning_effort, 'medium')
+      assert.equal(config['features.fast_mode'], true)
+    }
+    assert.deepEqual(result.turnSettings, { serviceTier: 'fast', effort: 'medium' })
+    assert.deepEqual(result.probeSettings, result.turnSettings)
+  }
+})
+
 test('timeouts and unexpected exits reject work and allow a fresh process on retry', async (t) => {
   const client = new CodexClient(setup(t), { rpc: 1000, turn: 100 })
   t.after(() => client.dispose())

@@ -1,3 +1,4 @@
+import type { MeetingMemory } from './meetingMemory'
 import type { LegacyMindMapNode, MindMapSnapshot } from './mindmap'
 
 export type PhaseType =
@@ -17,6 +18,7 @@ export interface PhaseAnalysis {
 }
 
 export type SpeakingFunctionType =
+  | '倾听观察'
   | '推进结构'
   | '补齐信息'
   | '化解分歧'
@@ -24,7 +26,25 @@ export type SpeakingFunctionType =
   | '分工落地'
   | '汇报总结'
 
+export interface ScenarioFocusItem {
+  label: string
+  detail: string
+  evidenceIds: string[]
+}
+
+export interface ParticipantView {
+  understanding: string
+  intent: 'contribute' | 'clarify' | 'challenge' | 'listen'
+  contribution: string
+  reason: string
+  evidenceIds: string[]
+}
+
 export interface ConsensusAnalysis {
+  participantView?: ParticipantView
+  scenarioFocus?: ScenarioFocusItem[]
+  contextCoverage?: { segmentCount: number; throughTimestamp: number }
+  meetingMemory?: MeetingMemory
   consensus: string[]
   tensions: string[]
   missing: string[]

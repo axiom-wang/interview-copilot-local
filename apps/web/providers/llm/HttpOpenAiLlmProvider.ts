@@ -10,6 +10,8 @@ import type {
 import type { MindMapSnapshot } from '../../../../shared/meeting/types/mindmap'
 import type { AnalysisPromptContext, SummaryAssemblyContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
+import { MeetingContextCapacityError, normalizeMeetingMemory } from '../../../../shared/meeting/context/meetingMemory'
+import type { MeetingMemory } from '../../../../shared/meeting/types/meetingMemory'
 import type { LlmProvider } from '../../../../shared/meeting/providers/llm/LlmProvider'
 
 interface TranscriptRequest extends AnalysisPromptContext {
@@ -25,6 +27,8 @@ type ApiResult<T extends Record<string, unknown>> =
   | {
       ok: false
       error: string
+      code?: 'meeting-context-capacity'
+      meetingMemory?: MeetingMemory
     }
 
 const normalizeSummaryAssemblyContext = (
@@ -45,6 +49,9 @@ const normalizeSummaryAssemblyContext = (
 }
 
 const normalizePromptContext = (context: AnalysisPromptContext | undefined) => ({
+  previousParticipantView: context?.previousParticipantView,
+  meetingMemory: context?.meetingMemory,
+  pinnedSegmentIds: context?.pinnedSegmentIds,
   scenarioId: context?.scenarioId,
   questionContext: context?.questionContext?.trim() || undefined,
   roleContext: context?.roleContext?.trim() || undefined,
@@ -65,6 +72,9 @@ const buildRequestKey = (
 
   return [
     ...segments.map((segment) => `${segment.id}:${segment.timestamp}:${segment.isFinal}:${segment.speaker}:${segment.text}`),
+    `view:${JSON.stringify(normalizedContext.previousParticipantView)}`,
+    `memory:${JSON.stringify(normalizedContext.meetingMemory)}`,
+    `pinned:${JSON.stringify(normalizedContext.pinnedSegmentIds)}`,
     `scenario:${normalizedContext.scenarioId ?? ''}`,
     `q:${normalizedContext.questionContext ?? ''}`,
     `r:${normalizedContext.roleContext ?? ''}`,
@@ -90,6 +100,9 @@ const postJson = async <T extends Record<string, unknown>>(
   const payload = (await response.json().catch(() => null)) as ApiResult<T> | null
 
   if (!response.ok || !payload?.ok) {
+    if (payload && !payload.ok && payload.code === 'meeting-context-capacity') {
+      throw new MeetingContextCapacityError(normalizeMeetingMemory(payload.meetingMemory) ?? { version: 1, chunks: [] })
+    }
     throw new Error(
       payload && !payload.ok
         ? payload.error
@@ -103,6 +116,7 @@ const postJson = async <T extends Record<string, unknown>>(
 export class HttpOpenAiLlmProvider implements LlmProvider {
   readonly id = 'openai-responses-http'
   readonly label = 'OpenAI Responses API'
+  readonly automaticAnalysis = { intervalMs: 8000, finalOnly: true, singleFlight: true }
 
   private modelHeaders: Record<string, string> = {}
 

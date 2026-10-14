@@ -275,6 +275,8 @@ function SessionDetail({ session }: { session: SessionRecord }) {
             content: (
               <ConsensusPanel
                 analysis={finalSnapshot?.consensusAnalysis ?? null}
+                meetingMemory={session.meetingMemory}
+                scenarioId={session.scenarioId}
                 className="h-full"
                 detailSegments={session.transcriptSegments}
                 embedded

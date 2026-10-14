@@ -1,3 +1,4 @@
+import { isMeetingContextCapacityError } from '../context/meetingMemory'
 import type { LlmProvider } from '../providers/llm/LlmProvider'
 import type {
   InterviewQaAnswer,
@@ -80,6 +81,7 @@ export const analyzeTranscriptWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const bundle = await runPhaseConsensusAnalysis(
       fallbackProvider,
       segments,
@@ -111,6 +113,7 @@ export const generateSpeakingHintsWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const hints = await fallbackProvider.generateSpeakingHints(segments, context)
 
     return {
@@ -138,6 +141,7 @@ export const generateMindMapWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const snapshot = await fallbackProvider.generateMindMap(segments, context)
 
     return {
@@ -165,6 +169,7 @@ export const generateMeetingSummaryWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const summary = await fallbackProvider.generateMeetingSummary(segments, context)
 
     return {
@@ -195,6 +200,7 @@ export const generateMeetingMinutesWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const minutes = await fallbackProvider.generateMeetingMinutes(
       segments,
       context,
@@ -230,6 +236,7 @@ export const answerInterviewQuestionWithFallback = async (
       providerLabel: primaryProvider.label,
     }
   } catch (error) {
+    if (isMeetingContextCapacityError(error)) throw error
     const answer = await fallbackProvider.answerInterviewQuestion(
       question,
       segments,

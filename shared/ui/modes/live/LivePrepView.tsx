@@ -46,7 +46,7 @@ export function LivePrepView() {
       <div>
         <h1 className="theme-title text-xl font-semibold">准备开始会议</h1>
         <p className="theme-muted mt-1 text-sm leading-6">
-          选好场景、写清议题，会中的阶段判断和发言建议会更贴合这场讨论。
+          选好场景、写清议题，AI 会跟随整场讨论，在有价值时补充观点或提出追问。
         </p>
       </div>
 

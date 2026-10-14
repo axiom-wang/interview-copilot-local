@@ -1,10 +1,18 @@
 import { createInterface } from 'node:readline'
 
 const send = (message) => process.stdout.write(`${JSON.stringify(message)}\n`)
+const startupConfig = {}
+for (let i = 2; i < process.argv.length; i++) {
+  if (process.argv[i] !== '-c') continue
+  const override = process.argv[++i]
+  const separator = override.indexOf('=')
+  startupConfig[override.slice(0, separator)] = JSON.parse(override.slice(separator + 1))
+}
 let nextThread = 0
 let active = 0
 let config = {}
 let probeModel
+let probeSettings
 let permissionThread = null
 const threadModels = new Map()
 
@@ -57,13 +65,18 @@ for await (const line of createInterface({ input: process.stdin })) {
       : outputSchema.properties.phaseAnalysis ? {
         phaseAnalysis: { phase: 'alignment-building', confidence: 0.8, nextAction: '确认验收标准', reason: '已经收敛到一个方案' },
         consensusAnalysis: { consensus: ['先验证核心流程'], tensions: ['交付时间尚未确定'], missing: ['负责人'] },
-      } : { echo: prompt, concurrent, config, model: threadModels.get(threadId), openaiKeyPresent: Boolean(process.env.OPENAI_API_KEY) }
-    if (outputSchema.properties.ok) probeModel = threadModels.get(threadId)
+      } : { echo: prompt, concurrent, config, startupConfig,
+        turnSettings: { serviceTier: params.serviceTier, effort: params.effort },
+        model: threadModels.get(threadId), openaiKeyPresent: Boolean(process.env.OPENAI_API_KEY) }
+    if (outputSchema.properties.ok) {
+      probeModel = threadModels.get(threadId)
+      probeSettings = { serviceTier: params.serviceTier, effort: params.effort }
+    }
     const complete = () => {
       if (prompt === 'HANG_TURN') return
       active -= 1
       send({ method: 'item/completed', params: { threadId, turnId, item: { id: 'comment', type: 'agentMessage', phase: 'commentary', text: 'ignore this message' } } })
-      send({ method: 'item/completed', params: { threadId, turnId, item: { id: 'answer', type: 'agentMessage', phase: 'final_answer', text: prompt === 'INVALID_JSON' ? 'invalid json' : JSON.stringify({ ...result, ...(probeModel && !outputSchema.properties.ok ? { probeModel } : {}) }) } } })
+      send({ method: 'item/completed', params: { threadId, turnId, item: { id: 'answer', type: 'agentMessage', phase: 'final_answer', text: prompt === 'INVALID_JSON' ? 'invalid json' : JSON.stringify({ ...result, ...(probeModel && !outputSchema.properties.ok ? { probeModel, probeSettings } : {}) }) } } })
       send({ method: 'turn/completed', params: { threadId, turn: { id: turnId, status: prompt === 'FAIL' ? 'failed' : 'completed', error: prompt === 'FAIL' ? { message: 'model unavailable' } : null } } })
     }
     if (prompt === 'EARLY_EVENTS') { complete(); send({ id, result: { turn: { id: turnId } } }) }

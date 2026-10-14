@@ -10,10 +10,7 @@ export const speakingHintsSchema = {
     whyNow: {
       type: 'string',
     },
-    hint15s: {
-      type: 'string',
-      minLength: 1,
-    },
+    hint15s: { type: 'string' },
     hint30s: {
       type: 'string',
     },

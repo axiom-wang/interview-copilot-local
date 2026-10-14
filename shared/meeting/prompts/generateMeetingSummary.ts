@@ -94,7 +94,7 @@ nextSteps：
 
 ${formatOptionalPromptContext(context)}
 
-全部有效转写：
+最近原话（全程记录见上方上下文，结果必须覆盖整场会议）：
 ${formatSegmentsForPrompt(segments)}
 `.trim(), profile)
 }

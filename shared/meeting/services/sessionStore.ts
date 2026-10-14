@@ -1,3 +1,6 @@
+import { normalizeParticipantView } from '../context/participantView'
+import { normalizeScenarioFocus } from '../context/scenarioFocus'
+import { normalizeMeetingMemory } from '../context/meetingMemory'
 import mockAnalysis from '../sample/mockAnalysis.json'
 import mockTranscript from '../sample/mockTranscript.json'
 import { normalizeFunctionType } from './analysisNormalization'
@@ -124,6 +127,12 @@ const normalizeConsensusAnalysis = (
   const record = isRecord(value) ? value : {}
 
   return {
+    participantView: normalizeParticipantView(record.participantView),
+    scenarioFocus: normalizeScenarioFocus(record.scenarioFocus),
+    contextCoverage: isRecord(record.contextCoverage) &&
+      typeof record.contextCoverage.segmentCount === 'number' &&
+      typeof record.contextCoverage.throughTimestamp === 'number'
+      ? { segmentCount: record.contextCoverage.segmentCount, throughTimestamp: record.contextCoverage.throughTimestamp } : undefined,
     consensus: uniqueStrings(record.consensus, 4),
     tensions: uniqueStrings(record.tensions, 4),
     missing: uniqueStrings(record.missing, 4),
@@ -136,6 +145,11 @@ const normalizeSpeakingHints = (
   updatedAt: number,
 ): SpeakingHints => {
   const record = isRecord(value) ? value : {}
+  if (normalizeFunctionType(asString(record.functionType)) === '倾听观察') {
+    return { functionType: '倾听观察', whyNow: asString(record.whyNow, '先听完当前发言。'),
+      hint15s: '', hint30s: '', hint60s: '', updatedAt }
+  }
+
   const hint15s = asString(
     record.hint15s,
     '我先帮大家把当前讨论收一下，再推进下一步。',
@@ -483,6 +497,9 @@ const normalizeSessionRecord = (
 
   return {
     id: asString(value.id, `session-${index + 1}`),
+    meetingMemory: normalizeMeetingMemory(value.meetingMemory),
+    questionContext: asString(value.questionContext, ''),
+    roleContext: asString(value.roleContext, ''),
     title: asString(value.title, `Session ${index + 1}`),
     startedAt,
     endedAt,

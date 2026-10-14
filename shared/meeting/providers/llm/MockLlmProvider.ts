@@ -64,6 +64,11 @@ export class MockLlmProvider implements LlmProvider {
     const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
     return {
+      participantView: {
+        understanding: '当前是模拟分析，尚未形成基于真实会议的参会观点。',
+        intent: 'listen', contribution: '', reason: '等待可用的分析通道。', evidenceIds: [],
+      },
+      scenarioFocus: [],
       consensus: scenario.consensus.consensus.slice(0, 4),
       tensions: scenario.consensus.tensions.slice(0, 4),
       missing: scenario.consensus.missing.slice(0, 4),

@@ -1,3 +1,7 @@
+import { groundConsensusEvidence } from '../../meeting/context/groundConsensus'
+import { acceptMemoryEvents, findHistoricalEvidence, formatEvidence, prepareMeetingHistory } from '../../meeting/context/meetingMemory'
+import { buildMeetingMemoryPrompt } from '../../meeting/prompts/meetingMemory'
+import { meetingMemorySchema } from '../../meeting/schemas/meetingMemory.schema'
 import { buildAnswerInterviewQuestionPrompt } from '../../meeting/prompts/answerInterviewQuestion'
 import { buildDetectPhasePrompt } from '../../meeting/prompts/detectPhase'
 import { buildExtractConsensusPrompt } from '../../meeting/prompts/extractConsensus'
@@ -207,12 +211,37 @@ const createStructuredResponse = async <T>(
   return parser(JSON.parse(outputText))
 }
 
+export const prepareAnalysisContext = async (
+  segments: TranscriptSegment[],
+  context: AnalysisPromptContext | undefined,
+  configOverride: OpenAiRuntimeConfigOverride | undefined,
+  createResponse: StructuredResponse,
+  question?: string,
+) => {
+  const prepared = await prepareMeetingHistory(segments, context?.meetingMemory, (source) =>
+    createResponse(buildMeetingMemoryPrompt(source), 'meeting_memory', meetingMemorySchema,
+      (value) => acceptMemoryEvents(value, source.map((segment) => segment.id)), configOverride))
+  const evidence = question
+    ? findHistoricalEvidence(prepared.segments, question, context?.pinnedSegmentIds)
+    : []
+  return {
+    ...context,
+    meetingMemory: prepared.memory,
+    meetingHistory: prepared.history + (evidence.length
+      ? `\n与用户问题有关的历史原话（含相邻发言及固定片段）：\n${formatEvidence(evidence)}` : ''),
+    // Full history above supersedes the old unbounded duplicate transcript.
+    summaryAssemblyContext: context?.summaryAssemblyContext
+      ? { ...context.summaryAssemblyContext, transcript: undefined } : undefined,
+  }
+}
+
 export const analyzeTranscriptRealtimeBundle = async (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<PhaseConsensusAnalysisBundle> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
   const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
@@ -235,7 +264,8 @@ export const analyzeTranscriptRealtimeBundle = async (
 
   return {
     phaseAnalysis,
-    consensusAnalysis,
+    consensusAnalysis: { ...groundConsensusEvidence(consensusAnalysis, segments), meetingMemory: context.meetingMemory,
+      contextCoverage: { segmentCount: segments.length, throughTimestamp: updatedAt } },
   }
 }
 
@@ -245,6 +275,7 @@ export const generateSpeakingHintsOnly = async (
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<SpeakingHints> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
   const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
@@ -263,6 +294,7 @@ export const generateTranscriptMindMap = async (
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<MindMapSnapshot> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
   const mindMapSegments = getRecentSegmentsByWindow(segments, 3 * 60 * 1000)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
@@ -281,23 +313,12 @@ export const generateMeetingSummaryOnly = async (
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<MeetingSummary> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
   const summarySegments = segments.filter((segment) => segment.text.trim().length > 0)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
-  const summaryAssemblyContext = {
-    ...(context?.summaryAssemblyContext ?? {}),
-    transcript:
-      context?.summaryAssemblyContext?.transcript &&
-      context.summaryAssemblyContext.transcript.length > 0
-        ? context.summaryAssemblyContext.transcript
-        : summarySegments,
-  }
-  const promptContext: AnalysisPromptContext = {
-    ...context,
-    summaryAssemblyContext,
-  }
 
   return createResponse(
-    buildGenerateMeetingSummaryPrompt(summarySegments, promptContext),
+    buildGenerateMeetingSummaryPrompt(getRecentSegmentsByWindow(summarySegments, 90_000), context),
     'generate_meeting_summary',
     generateMeetingSummarySchema,
     (value) => parseMeetingSummary(value, updatedAt),
@@ -311,25 +332,14 @@ export const generateMeetingMinutesOnly = async (
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<MeetingMinutes> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
   const minutesSegments = segments.filter(
     (segment) => segment.text.trim().length > 0,
   )
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
-  const summaryAssemblyContext = {
-    ...(context?.summaryAssemblyContext ?? {}),
-    transcript:
-      context?.summaryAssemblyContext?.transcript &&
-      context.summaryAssemblyContext.transcript.length > 0
-        ? context.summaryAssemblyContext.transcript
-        : minutesSegments,
-  }
-  const promptContext: AnalysisPromptContext = {
-    ...context,
-    summaryAssemblyContext,
-  }
 
   return createResponse(
-    buildGenerateMeetingMinutesPrompt(minutesSegments, promptContext),
+    buildGenerateMeetingMinutesPrompt(getRecentSegmentsByWindow(minutesSegments, 90_000), context),
     'generate_meeting_minutes',
     generateMeetingMinutesSchema,
     (value) => parseMeetingMinutes(value, updatedAt),
@@ -344,11 +354,12 @@ export const answerInterviewQuestionOnly = async (
   configOverride?: OpenAiRuntimeConfigOverride,
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<InterviewQaAnswer> => {
+  context = await prepareAnalysisContext(segments, context, configOverride, createResponse, question)
   const questionSegments = segments.filter((segment) => segment.text.trim().length > 0)
   const updatedAt = questionSegments.at(-1)?.timestamp ?? Date.now()
 
   return createResponse(
-    buildAnswerInterviewQuestionPrompt(question, questionSegments, context),
+    buildAnswerInterviewQuestionPrompt(question, getRecentSegmentsByWindow(questionSegments, 90_000), context),
     'answer_interview_question',
     answerInterviewQuestionSchema,
     (value) => parseInterviewQaAnswer(value, updatedAt),

@@ -18,7 +18,7 @@ export const buildGenerateMindMapPrompt = (
     .join('\n')
 
   return composePromptWithGlobalSystemPrompt(`
-请根据以下最近 3 分钟转写，生成一个适合 React Flow 渲染的“讨论思维导图”。
+请根据全程会议记录，结合最近 3 分钟的变化，生成一个适合 React Flow 渲染的“讨论思维导图”。保留早期仍有效的目标、约束和决定；已撤销内容不能显示为当前结论。
 
 导图目标：
 - 不是逐字记录，而是把当前讨论压缩成一个清晰结构
@@ -82,7 +82,7 @@ ${dimensions}
 - 只输出 JSON
 - 节点标签尽量抽象到“可汇报结构”，不要抄整句发言
 - 忽略闲聊和重复表态
-- 如果最近 3 分钟讨论信息不足，就输出最简结构，不要硬凑复杂导图
+- 只有全程记录也不足时才输出最简结构；不要因最近 3 分钟内容少而丢失之前主线
 
 ${formatOptionalPromptContext(context)}
 
