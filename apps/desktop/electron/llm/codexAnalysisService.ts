@@ -50,6 +50,8 @@ export const codexAnalysis = (config: CodexConfig) => {
   const client = getClient(config)
   const createResponse: StructuredResponse = async (prompt, _name, schema, parser) =>
     parser(await client.structured(prompt, schema))
+  const createLiveResponse: StructuredResponse = async (prompt, name, schema, parser) =>
+    parser(await client.structured(prompt, schema, name === 'meeting_memory' ? 'medium' : 'low'))
 
   return {
     realtime: async (segments: TranscriptSegment[], context?: AnalysisPromptContext) => {
@@ -61,7 +63,7 @@ export const codexAnalysis = (config: CodexConfig) => {
         type: 'object',
         properties: { phaseAnalysis: detectPhaseSchema, consensusAnalysis: extractConsensusSchema },
         required: ['phaseAnalysis', 'consensusAnalysis'], additionalProperties: false,
-      }) as Record<string, unknown>
+      }, 'low') as Record<string, unknown>
       return {
         phaseAnalysis: parsePhaseAnalysis(result.phaseAnalysis, updatedAt),
         consensusAnalysis: { ...groundConsensusEvidence(parseConsensusAnalysis(result.consensusAnalysis, updatedAt), segments), meetingMemory: context.meetingMemory,
@@ -69,7 +71,7 @@ export const codexAnalysis = (config: CodexConfig) => {
       }
     },
     hints: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>
-      generateSpeakingHintsOnly(segments, context, undefined, createResponse),
+      generateSpeakingHintsOnly(segments, context, undefined, createLiveResponse),
     mindMap: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>
       generateTranscriptMindMap(segments, context, undefined, createResponse),
     summary: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>

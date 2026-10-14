@@ -1,10 +1,11 @@
 import { MeetingContextCapacityError } from '../../meeting/context/meetingMemory'
 import type { MeetingMemory } from '../../meeting/types/meetingMemory'
+import type { AnalysisRoutingMetadata } from '../../meeting/types/desktopAnalysis'
 
-export type AnalysisErrorResult = {
+export type AnalysisErrorResult = AnalysisRoutingMetadata & {
   ok: false
   error: string
-  code?: 'meeting-context-capacity'
+  code?: 'meeting-context-capacity' | 'analysis-channel-failure' | 'analysis-cancelled'
   meetingMemory?: MeetingMemory
 }
 

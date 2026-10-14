@@ -65,7 +65,7 @@ const runPhaseConsensusAnalysis = async (
 
 export const analyzeTranscriptWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
 ): Promise<PhaseConsensusAnalysisRunResult> => {
@@ -79,9 +79,10 @@ export const analyzeTranscriptWithFallback = async (
     return {
       bundle,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const bundle = await runPhaseConsensusAnalysis(
       fallbackProvider,
       segments,
@@ -101,7 +102,7 @@ export const analyzeTranscriptWithFallback = async (
 
 export const generateSpeakingHintsWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
 ): Promise<SpeakingHintsRunResult> => {
@@ -111,9 +112,10 @@ export const generateSpeakingHintsWithFallback = async (
     return {
       hints,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const hints = await fallbackProvider.generateSpeakingHints(segments, context)
 
     return {
@@ -129,7 +131,7 @@ export const generateSpeakingHintsWithFallback = async (
 
 export const generateMindMapWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
 ): Promise<MindMapRunResult> => {
@@ -139,9 +141,10 @@ export const generateMindMapWithFallback = async (
     return {
       snapshot,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const snapshot = await fallbackProvider.generateMindMap(segments, context)
 
     return {
@@ -157,7 +160,7 @@ export const generateMindMapWithFallback = async (
 
 export const generateMeetingSummaryWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
 ): Promise<MeetingSummaryRunResult> => {
@@ -167,9 +170,10 @@ export const generateMeetingSummaryWithFallback = async (
     return {
       summary,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const summary = await fallbackProvider.generateMeetingSummary(segments, context)
 
     return {
@@ -185,7 +189,7 @@ export const generateMeetingSummaryWithFallback = async (
 
 export const generateMeetingMinutesWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
 ): Promise<MeetingMinutesRunResult> => {
@@ -198,9 +202,10 @@ export const generateMeetingMinutesWithFallback = async (
     return {
       minutes,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const minutes = await fallbackProvider.generateMeetingMinutes(
       segments,
       context,
@@ -219,7 +224,7 @@ export const generateMeetingMinutesWithFallback = async (
 
 export const answerInterviewQuestionWithFallback = async (
   primaryProvider: LlmProvider,
-  fallbackProvider: LlmProvider,
+  fallbackProvider: LlmProvider | null,
   question: string,
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
@@ -234,9 +239,10 @@ export const answerInterviewQuestionWithFallback = async (
     return {
       answer,
       providerLabel: primaryProvider.label,
+      warning: primaryProvider.warning,
     }
   } catch (error) {
-    if (isMeetingContextCapacityError(error)) throw error
+    if (!fallbackProvider || isMeetingContextCapacityError(error)) throw error
     const answer = await fallbackProvider.answerInterviewQuestion(
       question,
       segments,

@@ -42,6 +42,7 @@ function TestResult({ state }: { state: TestState }) {
 export function SettingsPage() {
   const draft = useSettingsStore((state) => state.draft)
   const supportsCodex = getMeetingRuntime().supportsCodex
+  const isDesktop = getMeetingRuntime().environment === 'electron'
   const usesCodex = draft.llm.provider === 'codex'
   const dirty = useSettingsStore((state) => state.dirty)
   const updateAstDraft = useSettingsStore((state) => state.updateAstDraft)
@@ -56,7 +57,10 @@ export function SettingsPage() {
   const [showAstSecrets, setShowAstSecrets] = useState(false)
   const [showLlmSecrets, setShowLlmSecrets] = useState(false)
   const [astTest, setAstTest] = useState<TestState>({ status: 'idle' })
-  const [llmTest, setLlmTest] = useState<TestState>({ status: 'idle' })
+  const [apiTest, setApiTest] = useState<TestState>({ status: 'idle' })
+  const [codexTest, setCodexTest] = useState<TestState>({ status: 'idle' })
+  const llmTest = usesCodex ? codexTest : apiTest
+  const llmTesting = apiTest.status === 'testing' || codexTest.status === 'testing'
 
   const updateAst = (patch: Parameters<typeof updateAstDraft>[0]) => {
     updateAstDraft(patch)
@@ -65,7 +69,8 @@ export function SettingsPage() {
 
   const updateLlm = (patch: Partial<LlmModelSettings>) => {
     updateLlmDraft(patch)
-    setLlmTest({ status: 'idle' })
+    setApiTest({ status: 'idle' })
+    setCodexTest({ status: 'idle' })
   }
 
   const handleSave = () => {
@@ -89,21 +94,24 @@ export function SettingsPage() {
     }
   }
 
-  const testLlmConnection = async () => {
+  const testLlmConnection = async (provider: 'api' | 'codex') => {
+    const setLlmTest = provider === 'codex' ? setCodexTest : setApiTest
     setLlmTest({ status: 'testing' })
 
     try {
-      const result = await getMeetingRuntime().probeLlmConnection(draft.llm)
+      const result = await getMeetingRuntime().probeLlmConnection({ ...draft.llm, provider })
       setLlmTest({
         status: 'ok',
-        message: usesCodex
+        message: provider === 'codex'
           ? `Codex 分析请求成功（${result.model}，${result.authMethod === 'chatgpt' ? 'ChatGPT 账号' : result.authMethod === 'apiKey' ? 'Codex API Key 登录' : 'Codex 当前登录方式'}）。`
           : `文本分析连接成功（${result.model}）。`,
       })
     } catch (error) {
       setLlmTest({
         status: 'error',
-        message: error instanceof Error ? error.message : '文本分析连接测试失败。',
+        message: error instanceof Error
+          ? (draft.llm.apiKey.trim() ? error.message.split(draft.llm.apiKey.trim()).join('[已隐藏密钥]') : error.message)
+          : '文本分析连接测试失败。',
       })
     }
   }
@@ -200,7 +208,7 @@ export function SettingsPage() {
                 </div>
                 <p className="theme-muted mt-1 text-xs">{usesCodex ? '本机 Codex · 云端模型分析' : 'OpenAI Responses API'}</p>
               </div>
-              {!usesCodex ? (
+              {(isDesktop || !usesCodex) ? (
                 <button
                   className="btn-ghost shrink-0 text-xs"
                   onClick={() => setShowLlmSecrets((value) => !value)}
@@ -213,10 +221,10 @@ export function SettingsPage() {
 
             <div className="space-y-3">
               <label className="block space-y-1.5 text-sm">
-                <span className="theme-muted">分析通道</span>
+                <span className="theme-muted">{isDesktop ? '首选渠道' : '分析通道'}</span>
                 <select
                   className="theme-input w-full px-3 py-2"
-                  disabled={llmTest.status === 'testing'}
+                  disabled={llmTesting}
                   value={draft.llm.provider}
                   onChange={(event) => updateLlm({ provider: event.currentTarget.value === 'codex' ? 'codex' : 'api' })}
                 >
@@ -224,11 +232,27 @@ export function SettingsPage() {
                   <option value="codex" disabled={!supportsCodex}>本地 Codex（仅桌面版）</option>
                 </select>
               </label>
-              {usesCodex ? (
+              {isDesktop ? (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={draft.llm.autoFallbackEnabled} disabled={llmTesting}
+                    onChange={(event) => updateLlm({ autoFallbackEnabled: event.currentTarget.checked })} />
+                  <span>故障时自动切换</span>
+                </label>
+              ) : null}
+              {isDesktop && draft.llm.autoFallbackEnabled ? (
+                <p className="theme-muted text-xs leading-5">
+                  首选渠道重试失败后切换至另一渠道，成功后本场会议持续使用备用。备用 API 需要填写密钥和模型。
+                </p>
+              ) : null}
+              {(isDesktop || usesCodex) ? (
                 <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <h3 className="theme-title text-sm font-semibold">Codex 配置{usesCodex ? '（首选）' : '（备用）'}</h3>
+                    <TestStatusBadge state={codexTest} />
+                  </div>
                   <p className="theme-muted text-sm leading-6">
                     {supportsCodex
-                      ? '先安装 Codex CLI 并运行 codex login 登录，再测试连接。无需在这里填写文本分析 API Key；使用当前 Codex 登录方式与额度。'
+                      ? '先安装 Codex CLI 并运行 codex login 登录，再测试连接。Codex 使用当前登录方式与额度；API 使用下方独立配置。'
                       : '当前浏览器无法启动本地 Codex。请打开桌面版，或切换到 API 通道。'}
                   </p>
                   <p className="theme-muted text-sm leading-6">
@@ -236,14 +260,14 @@ export function SettingsPage() {
                   </p>
                   {supportsCodex ? (
                     <p className="theme-muted text-sm leading-6">
-                      本项目统一使用 Fast 速度与 Medium 推理强度，单独使用 Codex 时保留原来的设置。Fast 会更快消耗账号额度。
+                      本项目使用 Fast 速度：实时阶段、共识和发言建议使用 Low 推理，其余任务使用 Medium。单独使用 Codex 时保留原来的设置。Fast 会更快消耗账号额度。
                     </p>
                   ) : null}
                   <label className="block space-y-1.5 text-sm">
                     <span className="theme-muted">Codex 模型（可选）</span>
                     <input
                       className="theme-input w-full px-3 py-2"
-                      disabled={llmTest.status === 'testing'}
+                      disabled={llmTesting}
                       value={draft.llm.codex.model}
                       placeholder="留空使用 Codex 默认模型"
                       onChange={(event) => updateLlm({ codex: { ...draft.llm.codex, model: event.currentTarget.value } })}
@@ -253,20 +277,32 @@ export function SettingsPage() {
                     <span className="theme-muted">Codex 程序路径（可选）</span>
                     <input
                       className="theme-input w-full px-3 py-2"
-                      disabled={llmTest.status === 'testing'}
+                      disabled={llmTesting}
                       value={draft.llm.codex.executablePath}
                       placeholder="留空自动查找，或填写绝对路径"
                       onChange={(event) => updateLlm({ codex: { ...draft.llm.codex, executablePath: event.currentTarget.value } })}
                     />
                   </label>
+                  <button className="btn-secondary" disabled={llmTesting || !supportsCodex}
+                    onClick={() => void testLlmConnection('codex')} type="button">
+                    {codexTest.status === 'testing' ? '测试中…' : '测试 Codex 连接'}
+                  </button>
+                  <TestResult state={codexTest} />
                 </>
-              ) : (
+              ) : null}
+              {(isDesktop || !usesCodex) ? (
                 <>
+                  {isDesktop ? (
+                    <div className="flex items-center gap-2 border-t border-[color:var(--border)] pt-4">
+                      <h3 className="theme-title text-sm font-semibold">API 配置{usesCodex ? '（备用）' : '（首选）'}</h3>
+                      <TestStatusBadge state={apiTest} />
+                    </div>
+                  ) : null}
                   <label className="block space-y-1.5 text-sm">
                     <span className="theme-muted">API Key</span>
                     <input
                       className="theme-input w-full px-3 py-2"
-                      disabled={llmTest.status === 'testing'}
+                      disabled={llmTesting}
                       onChange={(event) =>
                         updateLlm({ apiKey: event.currentTarget.value })
                       }
@@ -283,7 +319,7 @@ export function SettingsPage() {
                     <span className="theme-muted">模型</span>
                     <input
                       className="theme-input w-full px-3 py-2"
-                      disabled={llmTest.status === 'testing'}
+                      disabled={llmTesting}
                       onChange={(event) =>
                         updateLlm({ model: event.currentTarget.value })
                       }
@@ -296,7 +332,7 @@ export function SettingsPage() {
                     <span className="theme-muted">Base URL</span>
                     <input
                       className="theme-input w-full px-3 py-2"
-                      disabled={llmTest.status === 'testing'}
+                      disabled={llmTesting}
                       onChange={(event) =>
                         updateLlm({ baseURL: event.currentTarget.value })
                       }
@@ -305,21 +341,13 @@ export function SettingsPage() {
                       value={draft.llm.baseURL}
                     />
                   </label>
+                  <button className="btn-secondary" disabled={llmTesting}
+                    onClick={() => void testLlmConnection('api')} type="button">
+                    {apiTest.status === 'testing' ? '测试中…' : isDesktop ? '测试 API 连接' : '测试连接'}
+                  </button>
+                  <TestResult state={apiTest} />
                 </>
-
-              )}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
-                className="btn-secondary"
-                disabled={llmTest.status === 'testing' || (usesCodex && !supportsCodex)}
-                onClick={() => void testLlmConnection()}
-                type="button"
-              >
-                {llmTest.status === 'testing' ? '测试中…' : '测试连接'}
-              </button>
-              <TestResult state={llmTest} />
+              ) : null}
             </div>
           </div>
         </div>
@@ -327,7 +355,7 @@ export function SettingsPage() {
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <button
             className="btn-primary"
-            disabled={!dirty || llmTest.status === 'testing'}
+            disabled={!dirty || llmTesting}
             onClick={handleSave}
             type="button"
           >
@@ -335,8 +363,12 @@ export function SettingsPage() {
           </button>
           <button
             className="btn-secondary"
-            disabled={!dirty || llmTest.status === 'testing'}
-            onClick={() => { resetDraft(); setLlmTest({ status: 'idle' }) }}
+            disabled={!dirty || llmTesting}
+            onClick={() => {
+              resetDraft()
+              setApiTest({ status: 'idle' })
+              setCodexTest({ status: 'idle' })
+            }}
             type="button"
           >
             撤销更改

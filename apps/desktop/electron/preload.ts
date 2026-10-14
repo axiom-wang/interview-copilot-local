@@ -1,4 +1,4 @@
-import type { DesktopAnalysisConfig, DesktopProbeResult, DesktopTranscriptRequest } from '../../../shared/meeting/types/desktopAnalysis'
+import type { AnalysisRoutingMetadata, AnalysisSessionReset, DesktopAnalysisConfig, DesktopProbeResult, DesktopTranscriptRequest } from '../../../shared/meeting/types/desktopAnalysis'
 import { contextBridge, ipcRenderer } from 'electron'
 import type {
   InterviewQaAnswer,
@@ -39,6 +39,7 @@ interface InterviewQuestionRequest extends TranscriptRequest {
 type AnalyzeTranscriptRealtimeResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       bundle: PhaseConsensusAnalysisBundle
     }
   | AnalysisErrorResult
@@ -46,6 +47,7 @@ type AnalyzeTranscriptRealtimeResult =
 type GenerateSpeakingHintsResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       hints: SpeakingHints
     }
   | AnalysisErrorResult
@@ -53,6 +55,7 @@ type GenerateSpeakingHintsResult =
 type GenerateMindMapResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       snapshot: MindMapSnapshot
     }
   | AnalysisErrorResult
@@ -60,6 +63,7 @@ type GenerateMindMapResult =
 type GenerateMeetingSummaryResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       summary: MeetingSummary
     }
   | AnalysisErrorResult
@@ -67,6 +71,7 @@ type GenerateMeetingSummaryResult =
 type GenerateMeetingMinutesResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       minutes: MeetingMinutes
     }
   | AnalysisErrorResult
@@ -74,6 +79,7 @@ type GenerateMeetingMinutesResult =
 type AnswerInterviewQuestionResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       answer: InterviewQaAnswer
     }
   | AnalysisErrorResult
@@ -102,7 +108,7 @@ type StartVolcAsrSessionResult =
 
 contextBridge.exposeInMainWorld('interviewCopilot', {
   platform: process.platform,
-  resetAnalysisSession: () => ipcRenderer.invoke(RESET_ANALYSIS_CHANNEL) as Promise<void>,
+  resetAnalysisSession: (options?: AnalysisSessionReset) => ipcRenderer.invoke(RESET_ANALYSIS_CHANNEL, options) as Promise<void>,
   probeAnalysisConnection: (config: DesktopAnalysisConfig) =>
     ipcRenderer.invoke(PROBE_ANALYSIS_CHANNEL, config) as Promise<DesktopProbeResult>,
   analyzeTranscriptRealtime: (request: TranscriptRequest) =>

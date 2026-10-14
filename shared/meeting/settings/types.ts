@@ -8,6 +8,7 @@ export interface AstModelSettings {
 
 export interface LlmModelSettings {
   provider: 'api' | 'codex'
+  autoFallbackEnabled: boolean
   codex: CodexConfig
   apiKey: string
   model: string
@@ -27,6 +28,7 @@ export const DEFAULT_AST_SETTINGS: AstModelSettings = {
 
 export const DEFAULT_LLM_SETTINGS: LlmModelSettings = {
   provider: 'api',
+  autoFallbackEnabled: true,
   codex: { executablePath: '', model: '' },
   apiKey: '',
   model: 'gpt-5.4-mini',
@@ -68,3 +70,8 @@ export const toDesktopAnalysisConfig = (settings: LlmModelSettings): DesktopAnal
   settings.provider === 'codex'
     ? { provider: 'codex', ...settings.codex }
     : { provider: 'api', apiKey: settings.apiKey, model: settings.model, baseURL: settings.baseURL }
+
+export const toDesktopFallbackConfig = (settings: LlmModelSettings): DesktopAnalysisConfig | undefined =>
+  settings.autoFallbackEnabled
+    ? toDesktopAnalysisConfig({ ...settings, provider: settings.provider === 'api' ? 'codex' : 'api' })
+    : undefined

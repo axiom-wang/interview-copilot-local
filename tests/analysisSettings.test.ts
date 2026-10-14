@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { loadModelSettings, saveModelSettings } from '../shared/meeting/settings/settingsStore'
-import { DEFAULT_LLM_SETTINGS, isLlmConfigured, toDesktopAnalysisConfig } from '../shared/meeting/settings/types'
+import { DEFAULT_LLM_SETTINGS, isLlmConfigured, toDesktopAnalysisConfig, toDesktopFallbackConfig } from '../shared/meeting/settings/types'
 import { RendererCodexLlmProvider } from '../apps/desktop/renderer/providers/llm/RendererCodexLlmProvider'
 import { RendererOpenAiLlmProvider } from '../apps/desktop/renderer/providers/llm/RendererOpenAiLlmProvider'
 import { HttpOpenAiLlmProvider } from '../apps/web/providers/llm/HttpOpenAiLlmProvider'
@@ -22,13 +22,16 @@ test('legacy settings remain on API; switching providers preserves both configur
   }))
   const settings = loadModelSettings('test-user')
   assert.equal(settings.llm.provider, 'api')
+  assert.equal(settings.llm.autoFallbackEnabled, true)
   assert.equal(settings.llm.apiKey, 'old-key')
   assert.equal(settings.llm.baseURL, 'https://example.com/v1')
   settings.llm.provider = 'codex'
   settings.llm.codex = { executablePath: '/usr/local/bin/codex', model: 'my-codex-model' }
+  settings.llm.autoFallbackEnabled = false
   saveModelSettings('test-user', settings)
   const reloaded = loadModelSettings('test-user')
   assert.equal(reloaded.llm.provider, 'codex')
+  assert.equal(reloaded.llm.autoFallbackEnabled, false)
   assert.equal(reloaded.llm.apiKey, 'old-key')
   assert.equal(toDesktopAnalysisConfig(reloaded.llm).provider, 'codex')
   assert.ok(!('apiKey' in toDesktopAnalysisConfig(reloaded.llm)))
@@ -93,4 +96,61 @@ test('web analysis repeats when text, finality, or speaker changes', async (t) =
   await provider.detectPhase([{ ...segments[0], text: '修正内容', isFinal: true, speaker: 'B' }])
   assert.equal(bodies.length, 4)
   assert.equal(bodies[3]?.segments[0]?.speaker, 'B')
+})
+
+
+test('fallback configuration uses the other channel without changing the preferred setting', () => {
+  const settings = { ...DEFAULT_LLM_SETTINGS, apiKey: 'user-key' }
+  assert.equal(toDesktopFallbackConfig(settings)?.provider, 'codex')
+  assert.deepEqual(toDesktopFallbackConfig({ ...settings, provider: 'codex' }), {
+    provider: 'api', apiKey: 'user-key', model: settings.model, baseURL: settings.baseURL,
+  })
+  assert.equal(toDesktopFallbackConfig({ ...settings, autoFallbackEnabled: false }), undefined)
+  assert.equal(settings.provider, 'api')
+})
+
+test('renderer shares fallback work and ignores metadata from a prior analysis session', async (t) => {
+  type Result = { ok: true; bundle: { phaseAnalysis: { phase: string }; consensusAnalysis: { consensus: string[] } }; routing: { actualProvider: 'api' | 'codex'; fallbackReason?: string } }
+  const requests: Array<Record<string, unknown>> = []
+  const pending: Array<(result: Result) => void> = []
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { interviewCopilot: {
+    analyzeTranscriptRealtime: (input: Record<string, unknown>) => {
+      requests.push(input)
+      return new Promise<Result>((resolve) => pending.push(resolve))
+    },
+  } } })
+  t.after(() => { if (previous) Object.defineProperty(globalThis, 'window', previous); else Reflect.deleteProperty(globalThis, 'window') })
+  let sessionId = 'first'
+  const backup = { provider: 'api' as const, apiKey: 'key', model: 'model', baseURL: 'https://example.com/v1' }
+  const provider = new RendererCodexLlmProvider({ executablePath: '', model: '' }, backup, () => sessionId)
+  const segments = [{ id: 'a', speaker: 'A', text: '预算', timestamp: 1000, isFinal: true }]
+  const oldPhase = provider.detectPhase(segments)
+  const oldConsensus = provider.extractConsensusAndTensions(segments)
+  const old = Promise.allSettled([oldPhase, oldConsensus])
+  assert.equal(requests.length, 1)
+  assert.deepEqual(requests[0].fallbackAnalysisConfig, backup)
+  assert.equal(requests[0].analysisSessionId, 'first')
+  provider.resetSession()
+  sessionId = 'second'
+  const current = provider.detectPhase(segments)
+  const bundle = { phaseAnalysis: { phase: 'decision-lock' }, consensusAnalysis: { consensus: [] } }
+  pending[1]({ ok: true, bundle, routing: { actualProvider: 'codex' } })
+  await current
+  pending[0]({ ok: true, bundle, routing: { actualProvider: 'api', fallbackReason: 'old fallback' } })
+  assert.deepEqual((await old).map((result) => result.status), ['rejected', 'rejected'])
+  assert.equal(provider.label, '本地 Codex')
+  assert.equal(provider.warning, undefined)
+  await provider.detectPhase(segments)
+  assert.equal(requests.length, 2)
+  provider.resetSession()
+  const switched = provider.detectPhase(segments)
+  pending[2]({ ok: true, bundle, routing: { actualProvider: 'api', fallbackReason: 'switched' } })
+  await switched
+  assert.equal(provider.label, 'OpenAI Responses')
+  assert.equal(provider.warning, 'switched')
+  provider.resetSession(true)
+  assert.equal(provider.label, 'OpenAI Responses')
+  provider.resetSession()
+  assert.equal(provider.label, '本地 Codex')
 })

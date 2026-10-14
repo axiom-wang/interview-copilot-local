@@ -54,24 +54,59 @@ test('probe verifies an inference turn; explicit model is passed to analysis', a
   assert.equal(result.probeModel, 'chosen-model')
 })
 
-test('uses Fast and Medium in its own process, connection probe, and every analysis turn', async (t) => {
+test('uses Fast with Medium by default and isolates Low overrides between analysis turns', async (t) => {
   const client = new CodexClient(setup(t))
   t.after(() => client.dispose())
   await client.probe()
-  for (const prompt of ['realtime analysis', 'meeting minutes']) {
-    const result = await client.structured(prompt, schema) as {
+  for (const effort of ['low', 'medium', 'low', undefined] as const) {
+    const expectedEffort = effort ?? 'medium'
+    const result = await client.structured('meeting analysis', schema, effort) as {
       startupConfig: Record<string, unknown>
       config: Record<string, unknown>
       turnSettings: { serviceTier: string; effort: string }
       probeSettings: { serviceTier: string; effort: string }
     }
+    assert.equal(result.startupConfig.model_reasoning_effort, 'medium')
     for (const config of [result.startupConfig, result.config]) {
       assert.equal(config.service_tier, 'fast')
-      assert.equal(config.model_reasoning_effort, 'medium')
       assert.equal(config['features.fast_mode'], true)
     }
-    assert.deepEqual(result.turnSettings, { serviceTier: 'fast', effort: 'medium' })
-    assert.deepEqual(result.probeSettings, result.turnSettings)
+    assert.equal(result.config.model_reasoning_effort, expectedEffort)
+    assert.deepEqual(result.turnSettings, { serviceTier: 'fast', effort: expectedEffort })
+    assert.deepEqual(result.probeSettings, { serviceTier: 'fast', effort: 'medium' })
+  }
+})
+
+test('routes live analysis and hints to Low while keeping other tasks on Medium', async (t) => {
+  const captured: Array<{ effort: string; memory: boolean }> = []
+  t.mock.method(CodexClient.prototype, 'structured', async (_prompt: string, outputSchema: Record<string, unknown>, effort = 'medium') => {
+    captured.push({ effort, memory: 'events' in (outputSchema.properties as Record<string, unknown>) })
+    throw new Error('captured analysis request')
+  })
+  const service = codexAnalysis(setup(t))
+  t.after(disposeCodexAnalysis)
+  const segments = [{ id: '1', speaker: 'A', timestamp: 1234, text: '先验证核心流程。', isFinal: true }]
+  for (const [expectedEffort, task] of [
+    ['low', () => service.realtime(segments)],
+    ['low', () => service.hints(segments)],
+    ['medium', () => service.summary(segments)],
+    ['medium', () => service.minutes(segments)],
+    ['medium', () => service.mindMap(segments)],
+    ['medium', () => service.answer('目前决定是什么？', segments)],
+  ] as const) {
+    await assert.rejects(task(), /captured analysis request/)
+    assert.deepEqual(captured.at(-1), { effort: expectedEffort, memory: false })
+  }
+  const longSegments = Array.from({ length: 30 }, (_, i) => ({
+    ...segments[0], id: String(i), timestamp: i * 1000, text: '讨论会议方案。'.repeat(200),
+  }))
+  for (const task of [() => service.realtime(longSegments), () => service.hints(longSegments)]) {
+    const offset = captured.length
+    await assert.rejects(task(), /captured analysis request/)
+    assert.deepEqual(captured.slice(offset), [
+      { effort: 'medium', memory: true },
+      { effort: 'low', memory: false },
+    ])
   }
 })
 

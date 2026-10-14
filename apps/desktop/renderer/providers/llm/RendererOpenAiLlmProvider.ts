@@ -1,6 +1,6 @@
 import { MeetingContextCapacityError, normalizeMeetingMemory } from '../../../../../shared/meeting/context/meetingMemory'
 import type { MeetingMemory } from '../../../../../shared/meeting/types/meetingMemory'
-import type { DesktopAnalysisConfig } from '../../../../../shared/meeting/types/desktopAnalysis'
+import type { AnalysisRoutingMetadata, DesktopAnalysisConfig } from '../../../../../shared/meeting/types/desktopAnalysis'
 import type {
   ConsensusAnalysis,
   InterviewQaAnswer,
@@ -76,13 +76,43 @@ const buildRequestKey = (
 
 export class RendererOpenAiLlmProvider implements LlmProvider {
   readonly id: string = 'openai-responses'
-  readonly label: string = 'OpenAI Responses'
+  get label(): string {
+    return (this.routing?.actualProvider ?? this.analysisConfig?.provider) === 'codex' ? '本地 Codex' : 'OpenAI Responses'
+  }
+
+  get warning(): string | undefined { return this.routing?.fallbackReason }
   readonly automaticAnalysis = { intervalMs: 8000, finalOnly: true, singleFlight: true }
 
-  private readonly analysisConfig?: DesktopAnalysisConfig
+  private routing?: AnalysisRoutingMetadata
+  private generation = 0
 
-  constructor(analysisConfig?: DesktopAnalysisConfig) {
+  private readonly analysisConfig?: DesktopAnalysisConfig
+  private readonly fallbackAnalysisConfig?: DesktopAnalysisConfig
+  private readonly getSessionId?: () => string
+
+  constructor(
+    analysisConfig?: DesktopAnalysisConfig,
+    fallbackAnalysisConfig?: DesktopAnalysisConfig,
+    getSessionId?: () => string,
+  ) {
     this.analysisConfig = analysisConfig
+    this.fallbackAnalysisConfig = fallbackAnalysisConfig
+    this.getSessionId = getSessionId
+  }
+
+  resetSession(preserveRouting = false) {
+    this.generation += 1
+    if (!preserveRouting) this.routing = undefined
+    this.lastRealtimeRequestKey = this.lastHintsRequestKey = this.lastMindMapRequestKey = null
+    this.lastSummaryRequestKey = this.lastMinutesRequestKey = this.lastQaRequestKey = null
+    this.lastRealtimePromise = this.lastHintsPromise = this.lastMindMapPromise = null
+    this.lastSummaryPromise = this.lastMinutesPromise = this.lastQaPromise = null
+  }
+
+  private acceptRouting(result: { routing?: AnalysisRoutingMetadata } & Partial<AnalysisRoutingMetadata>, generation: number) {
+    if (generation !== this.generation) throw new Error('分析会话已重置，已忽略旧结果。')
+    const routing = result.routing ?? (result.actualProvider ? result : undefined)
+    if (routing) this.routing = routing
   }
 
   private lastRealtimeRequestKey: string | null = null
@@ -108,7 +138,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = buildRequestKey(segments, normalizedContext)
+    const generation = this.generation
+    const requestKey = `${generation}|${buildRequestKey(segments, normalizedContext)}`
     const cachedBundlePromise = this.lastRealtimePromise
 
     if (this.lastRealtimeRequestKey === requestKey && cachedBundlePromise) {
@@ -126,8 +157,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): PhaseConsensusAnalysisBundle => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.bundle
@@ -149,7 +183,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = buildRequestKey(segments, normalizedContext)
+    const generation = this.generation
+    const requestKey = `${generation}|${buildRequestKey(segments, normalizedContext)}`
     const cachedHintsPromise = this.lastHintsPromise
 
     if (this.lastHintsRequestKey === requestKey && cachedHintsPromise) {
@@ -167,8 +202,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): SpeakingHints => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.hints
@@ -190,7 +228,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = buildRequestKey(segments, normalizedContext)
+    const generation = this.generation
+    const requestKey = `${generation}|${buildRequestKey(segments, normalizedContext)}`
     const cachedMindMapPromise = this.lastMindMapPromise
 
     if (this.lastMindMapRequestKey === requestKey && cachedMindMapPromise) {
@@ -208,8 +247,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): MindMapSnapshot => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.snapshot
@@ -231,7 +273,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = buildRequestKey(segments, normalizedContext)
+    const generation = this.generation
+    const requestKey = `${generation}|${buildRequestKey(segments, normalizedContext)}`
     const cachedSummaryPromise = this.lastSummaryPromise
 
     if (this.lastSummaryRequestKey === requestKey && cachedSummaryPromise) {
@@ -249,8 +292,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): MeetingSummary => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.summary
@@ -273,7 +319,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = `${question.trim()}|${buildRequestKey(segments, normalizedContext)}`
+    const generation = this.generation
+    const requestKey = `${generation}|${question.trim()}|${buildRequestKey(segments, normalizedContext)}`
     const cachedQaPromise = this.lastQaPromise
 
     if (this.lastQaRequestKey === requestKey && cachedQaPromise) {
@@ -292,8 +339,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): InterviewQaAnswer => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.answer
@@ -315,7 +365,8 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     context?: AnalysisPromptContext,
   ) {
     const normalizedContext = normalizePromptContext(context)
-    const requestKey = buildRequestKey(segments, normalizedContext)
+    const generation = this.generation
+    const requestKey = `${generation}|${buildRequestKey(segments, normalizedContext)}`
     const cachedMinutesPromise = this.lastMinutesPromise
 
     if (this.lastMinutesRequestKey === requestKey && cachedMinutesPromise) {
@@ -333,8 +384,11 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
         segments,
         ...normalizedContext,
         analysisConfig: this.analysisConfig,
+        fallbackAnalysisConfig: this.fallbackAnalysisConfig,
+        analysisSessionId: this.getSessionId?.(),
       })
       .then((result): MeetingMinutes => {
+        this.acceptRouting(result, generation)
         if (!result.ok) return raiseAnalysisError(result)
 
         return result.minutes

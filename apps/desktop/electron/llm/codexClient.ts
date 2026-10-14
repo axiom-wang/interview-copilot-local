@@ -6,6 +6,7 @@ import { createInterface } from 'node:readline'
 import type { CodexConfig } from '../../../../shared/meeting/types/desktopAnalysis'
 
 type ObjectValue = Record<string, unknown>
+export type CodexReasoningEffort = 'low' | 'medium'
 const object = (value: unknown): ObjectValue =>
   typeof value === 'object' && value !== null ? value as ObjectValue : {}
 
@@ -226,22 +227,22 @@ export class CodexClient {
     })
   }
 
-  structured(prompt: string, schema: ObjectValue): Promise<unknown> {
+  structured(prompt: string, schema: ObjectValue, effort: CodexReasoningEffort = 'medium'): Promise<unknown> {
     return this.enqueue(async () => {
       await this.start()
-      const text = await this.runTurn(prompt, schema, this.config.model.trim() || this.defaultModel)
+      const text = await this.runTurn(prompt, schema, this.config.model.trim() || this.defaultModel, effort)
       try { return JSON.parse(text) as unknown } catch {
         throw new Error('Codex 未返回有效的 JSON 分析结果。')
       }
     })
   }
 
-  private async runTurn(prompt: string, schema: ObjectValue, model?: string) {
+  private async runTurn(prompt: string, schema: ObjectValue, model?: string, effort: CodexReasoningEffort = 'medium') {
     const started = await this.rpc<{ thread: { id: string } }>('thread/start', {
       model, serviceTier: 'fast', cwd: this.workspace, ephemeral: true,
       sandbox: 'read-only', approvalPolicy: 'untrusted',
       baseInstructions: analysisInstructions, developerInstructions: analysisInstructions,
-      config: this.threadConfig,
+      config: { ...this.threadConfig, model_reasoning_effort: effort },
     })
     const threadId = started.thread.id
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -254,7 +255,7 @@ export class CodexClient {
     try {
       await this.rpc('turn/start', {
         threadId, input: [{ type: 'text', text: prompt }], outputSchema: schema,
-        serviceTier: 'fast', effort: 'medium',
+        serviceTier: 'fast', effort,
         sandboxPolicy: { type: 'readOnly' },
       })
       return await completed

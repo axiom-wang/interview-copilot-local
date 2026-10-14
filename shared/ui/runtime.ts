@@ -16,7 +16,7 @@ export interface MeetingRuntime {
   createAuthProvider: () => AuthProvider
   probeAstConnection: (settings: AstModelSettings) => Promise<void>
   probeLlmConnection: (settings: LlmModelSettings) => Promise<{ model: string; authMethod?: string }>
-  resetAnalysisSession: () => Promise<void>
+  resetAnalysisSession: (options?: { preserveRouting?: boolean }) => Promise<void>
 }
 
 let runtime: MeetingRuntime | null = null

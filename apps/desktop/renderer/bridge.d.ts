@@ -1,4 +1,4 @@
-import type { DesktopAnalysisConfig, DesktopProbeResult, DesktopTranscriptRequest } from '../../../shared/meeting/types/desktopAnalysis'
+import type { AnalysisRoutingMetadata, AnalysisSessionReset, DesktopAnalysisConfig, DesktopProbeResult, DesktopTranscriptRequest } from '../../../shared/meeting/types/desktopAnalysis'
 /// <reference types="vite/client" />
 
 import type {
@@ -22,6 +22,7 @@ interface InterviewQuestionRequest extends TranscriptRequest {
 type AnalyzeTranscriptRealtimeResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       bundle: PhaseConsensusAnalysisBundle
     }
   | AnalysisErrorResult
@@ -29,6 +30,7 @@ type AnalyzeTranscriptRealtimeResult =
 type GenerateSpeakingHintsResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       hints: SpeakingHints
     }
   | AnalysisErrorResult
@@ -36,6 +38,7 @@ type GenerateSpeakingHintsResult =
 type GenerateMindMapResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       snapshot: MindMapSnapshot
     }
   | AnalysisErrorResult
@@ -43,6 +46,7 @@ type GenerateMindMapResult =
 type GenerateMeetingSummaryResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       summary: MeetingSummary
     }
   | AnalysisErrorResult
@@ -50,6 +54,7 @@ type GenerateMeetingSummaryResult =
 type GenerateMeetingMinutesResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       minutes: MeetingMinutes
     }
   | AnalysisErrorResult
@@ -57,6 +62,7 @@ type GenerateMeetingMinutesResult =
 type AnswerInterviewQuestionResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       answer: InterviewQaAnswer
     }
   | AnalysisErrorResult
@@ -96,7 +102,7 @@ declare global {
   interface Window {
     interviewCopilot?: {
       platform: string
-      resetAnalysisSession?: () => Promise<void>
+      resetAnalysisSession?: (options?: AnalysisSessionReset) => Promise<void>
       probeAnalysisConnection?: (config: DesktopAnalysisConfig) => Promise<DesktopProbeResult>
       analyzeTranscriptRealtime?: (
         request: TranscriptRequest,

@@ -13,6 +13,7 @@ import type { TranscriptSegment } from '../../types/transcript'
 export interface LlmProvider {
   readonly id: string
   readonly label: string
+  readonly warning?: string
   readonly automaticAnalysis?: {
     intervalMs: number
     finalOnly: boolean

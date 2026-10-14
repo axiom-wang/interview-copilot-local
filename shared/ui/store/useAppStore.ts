@@ -158,6 +158,7 @@ const astProviders: Record<AstProviderId, ConfiguredAstProvider> = {
 
 let llmProvider: LlmProvider = getMeetingRuntime().createLlmProvider(DEFAULT_MODEL_SETTINGS.llm)
 const fallbackLlmProvider = new MockLlmProvider()
+const getFallbackLlmProvider = () => getMeetingRuntime().environment === 'electron' ? null : fallbackLlmProvider
 
 let analysisRunToken = 0
 let speakingHintsRunToken = 0
@@ -1498,9 +1499,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     mindMapRunToken += 1
     summaryRunToken += 1
     minutesRunToken += 1
+    aiQuestionRunToken += 1
     clearAnalysisTimer()
     clearHintsRefreshTimer()
-    void getMeetingRuntime().resetAnalysisSession()
+    void getMeetingRuntime().resetAnalysisSession({ preserveRouting: true })
     ignoredLiveSegmentIds.clear()
     set({
       isStreaming: false,
@@ -1510,6 +1512,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isGeneratingMindMap: false,
       isGeneratingSummary: false,
       isGeneratingMinutes: false,
+      isAnsweringQuestion: false,
       activeAstProviderId: get().selectedAstProviderId,
       listeningStatusLabel: '未监听',
       speakerStability: 'unknown',
@@ -1534,6 +1537,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (state.savedSessions.some((session) => session.id === state.currentSessionId)) {
       state.saveCurrentSession()
     }
+    void getMeetingRuntime().resetAnalysisSession()
     clearStoredQuestionDraft()
     clearAnalysisTimer()
     clearHintsRefreshTimer()
@@ -1546,6 +1550,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     summaryRunToken += 1
     minutesRunToken += 1
     set({
+      analysisProviderLabel: llmProvider.label,
       isAnalyzing: false,
       isRefreshingHints: false,
       isGeneratingMindMap: false,
@@ -2029,7 +2034,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await answerInterviewQuestionWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         question,
         segments,
         promptContext,
@@ -2095,7 +2100,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await analyzeTranscriptWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         segments,
         promptContext,
       )
@@ -2141,7 +2146,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({
         isAnalyzing: false,
         errorMessage: toErrorMessage(error),
-        analysisProviderLabel: fallbackLlmProvider.label,
+        analysisProviderLabel: llmProvider.label,
       })
     }
   },
@@ -2168,7 +2173,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await generateSpeakingHintsWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         segments,
         promptContext,
       )
@@ -2245,7 +2250,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       phaseAnalysis: PhaseAnalysis
       consensusAnalysis: ConsensusAnalysis
     } | null = null
-    let latestAnalysisProviderLabel: string | null = null
     let latestWarning: string | undefined
 
     set({
@@ -2260,7 +2264,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (!latestState.phaseAnalysis || !latestState.consensusAnalysis) {
         const analysisResult = await analyzeTranscriptWithFallback(
           llmProvider,
-          fallbackLlmProvider,
+          getFallbackLlmProvider(),
           segments,
           promptContext,
         )
@@ -2270,13 +2274,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
 
         latestBundle = analysisResult.bundle
-        latestAnalysisProviderLabel = analysisResult.providerLabel
         latestWarning = analysisResult.warning
       }
 
       const result = await generateMindMapWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         segments,
         promptContext,
       )
@@ -2323,7 +2326,7 @@ export const useAppStore = create<AppState>((set, get) => ({
             ),
           ),
           analysisProviderLabel:
-            latestAnalysisProviderLabel ?? result.providerLabel,
+            result.providerLabel,
           isGeneratingMindMap: false,
           lastUpdatedAt: timestamp,
           errorMessage: result.warning ?? latestWarning ?? state.errorMessage,
@@ -2365,7 +2368,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await generateMeetingSummaryWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         segments,
         promptContext,
       )
@@ -2394,9 +2397,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       rememberPartialMeetingMemory(error)
       set((currentState) => ({
         isGeneratingSummary: false,
-        meetingSummary:
-          currentState.meetingSummary ??
-          createFallbackMeetingSummary(Date.now(), currentState.scenarioId),
+        meetingSummary: currentState.meetingSummary ?? (getRuntimeEnvironment() === 'electron'
+          ? null : createFallbackMeetingSummary(Date.now(), currentState.scenarioId)),
         errorMessage: toErrorMessage(error),
         statusMessage: '总结发言生成失败，请稍后重试。',
       }))
@@ -2423,7 +2425,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const result = await generateMeetingMinutesWithFallback(
         llmProvider,
-        fallbackLlmProvider,
+        getFallbackLlmProvider(),
         segments,
         promptContext,
       )
@@ -2449,9 +2451,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       rememberPartialMeetingMemory(error)
       set((currentState) => ({
         isGeneratingMinutes: false,
-        meetingMinutes:
-          currentState.meetingMinutes ??
-          createFallbackMeetingMinutes(Date.now()),
+        meetingMinutes: currentState.meetingMinutes ?? (getRuntimeEnvironment() === 'electron'
+          ? null : createFallbackMeetingMinutes(Date.now())),
         errorMessage: toErrorMessage(error),
         statusMessage: '会议纪要生成失败，请稍后重试。',
       }))

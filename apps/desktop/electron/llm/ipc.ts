@@ -1,5 +1,5 @@
 import { normalizeParticipantView } from '../../../../shared/meeting/context/participantView'
-import type { DesktopAnalysisConfig, DesktopTranscriptRequest } from '../../../../shared/meeting/types/desktopAnalysis'
+import type { AnalysisRoutingMetadata, AnalysisSessionReset, DesktopAnalysisConfig, DesktopTranscriptRequest } from '../../../../shared/meeting/types/desktopAnalysis'
 import { codexAnalysis, disposeCodexAnalysis, probeCodexConnection } from './codexAnalysisService'
 import { probeOpenAiConnection } from '../../../../shared/analysis/llm/openaiAnalysisService'
 import { ipcMain } from 'electron'
@@ -11,7 +11,7 @@ import type {
   SpeakingHints,
 } from '../../../../shared/meeting/types/analysis'
 import type { MindMapSnapshot } from '../../../../shared/meeting/types/mindmap'
-import { toAnalysisFailure, type AnalysisErrorResult } from '../../../../shared/analysis/llm/analysisFailure'
+import type { AnalysisErrorResult } from '../../../../shared/analysis/llm/analysisFailure'
 import { normalizeMeetingMemory } from '../../../../shared/meeting/context/meetingMemory'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
@@ -34,6 +34,9 @@ import {
   GENERATE_SPEAKING_HINTS_CHANNEL,
 } from './channels'
 
+import { AnalysisRouter, redactAnalysisError, toDesktopAnalysisFailure } from './analysisRouter'
+
+const router = new AnalysisRouter()
 type TranscriptRequest = DesktopTranscriptRequest
 
 interface InterviewQuestionRequest extends TranscriptRequest {
@@ -43,6 +46,7 @@ interface InterviewQuestionRequest extends TranscriptRequest {
 type RealtimeAnalysisResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       bundle: PhaseConsensusAnalysisBundle
     }
   | AnalysisErrorResult
@@ -50,6 +54,7 @@ type RealtimeAnalysisResult =
 type SpeakingHintsResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       hints: SpeakingHints
     }
   | AnalysisErrorResult
@@ -57,6 +62,7 @@ type SpeakingHintsResult =
 type MindMapResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       snapshot: MindMapSnapshot
     }
   | AnalysisErrorResult
@@ -64,6 +70,7 @@ type MindMapResult =
 type MeetingSummaryResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       summary: MeetingSummary
     }
   | AnalysisErrorResult
@@ -71,6 +78,7 @@ type MeetingSummaryResult =
 type MeetingMinutesResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       minutes: MeetingMinutes
     }
   | AnalysisErrorResult
@@ -78,6 +86,7 @@ type MeetingMinutesResult =
 type InterviewQuestionResult =
   | {
       ok: true
+      routing?: AnalysisRoutingMetadata
       answer: InterviewQaAnswer
     }
   | AnalysisErrorResult
@@ -107,6 +116,13 @@ const validateRequest = (request: TranscriptRequest) => {
   ) {
     throw new Error('无效的转写请求')
   }
+
+  validateConfig(request.analysisConfig)
+  validateConfig(request.fallbackAnalysisConfig)
+  if (request.fallbackAnalysisConfig && (!request.analysisConfig || request.fallbackAnalysisConfig.provider === request.analysisConfig.provider)) {
+    throw new Error('备用渠道必须与首选渠道不同。')
+  }
+  if (request.analysisSessionId !== undefined && typeof request.analysisSessionId !== 'string') throw new Error('无效的分析会话。')
 
   if (
     (request.previousParticipantView !== undefined && !normalizeParticipantView(request.previousParticipantView)) ||
@@ -160,7 +176,6 @@ const validateConfig = (config?: DesktopAnalysisConfig) => {
 const selectAnalysis = (config?: DesktopAnalysisConfig) => {
   validateConfig(config)
   if (config?.provider === 'codex') return codexAnalysis(config)
-  disposeCodexAnalysis()
   return {
     realtime: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>
       analyzeTranscriptRealtimeBundle(segments, context, config),
@@ -180,7 +195,10 @@ const selectAnalysis = (config?: DesktopAnalysisConfig) => {
 export const registerLlmIpcHandlers = () => {
   ipcMain.removeHandler(PROBE_ANALYSIS_CHANNEL)
   ipcMain.removeHandler(RESET_ANALYSIS_CHANNEL)
-  ipcMain.handle(RESET_ANALYSIS_CHANNEL, () => disposeCodexAnalysis())
+  ipcMain.handle(RESET_ANALYSIS_CHANNEL, (_event, options?: AnalysisSessionReset) => {
+    router.reset(options)
+    disposeCodexAnalysis()
+  })
   ipcMain.handle(PROBE_ANALYSIS_CHANNEL, async (_event, config: DesktopAnalysisConfig) => {
     try {
       validateConfig(config)
@@ -190,7 +208,7 @@ export const registerLlmIpcHandlers = () => {
         : { ...await probeOpenAiConnection(config), authMethod: 'apiKey' }
       return { ok: true, ...result }
     } catch (error) {
-      return { ok: false, error: error instanceof Error ? error.message : '分析连接测试失败。' }
+      return { ok: false, error: redactAnalysisError(error, [config]) }
     }
   })
   ipcMain.removeHandler(ANALYZE_TRANSCRIPT_REALTIME_CHANNEL)
@@ -206,17 +224,18 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateRequest(request)
 
-        const bundle = await selectAnalysis(request.analysisConfig).realtime(
+        const { value: bundle, routing } = await router.run(request, (config) => selectAnalysis(config).realtime(
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           bundle,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, '未知分析错误')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
@@ -227,17 +246,18 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateRequest(request)
 
-        const hints = await selectAnalysis(request.analysisConfig).hints(
+        const { value: hints, routing } = await router.run(request, (config) => selectAnalysis(config).hints(
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           hints,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, '未知发言建议生成错误')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
@@ -248,17 +268,18 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateRequest(request)
 
-        const snapshot = await selectAnalysis(request.analysisConfig).mindMap(
+        const { value: snapshot, routing } = await router.run(request, (config) => selectAnalysis(config).mindMap(
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           snapshot,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, '未知导图生成错误')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
@@ -269,17 +290,18 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateRequest(request)
 
-        const summary = await selectAnalysis(request.analysisConfig).summary(
+        const { value: summary, routing } = await router.run(request, (config) => selectAnalysis(config).summary(
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           summary,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, '未知总结发言生成错误')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
@@ -290,17 +312,18 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateRequest(request)
 
-        const minutes = await selectAnalysis(request.analysisConfig).minutes(
+        const { value: minutes, routing } = await router.run(request, (config) => selectAnalysis(config).minutes(
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           minutes,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, '未知会议纪要生成错误')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
@@ -314,18 +337,19 @@ export const registerLlmIpcHandlers = () => {
       try {
         validateInterviewQuestionRequest(request)
 
-        const answer = await selectAnalysis(request.analysisConfig).answer(
+        const { value: answer, routing } = await router.run(request, (config) => selectAnalysis(config).answer(
           request.question,
           request.segments,
           toPromptContext(request),
-        )
+        ))
 
         return {
           ok: true,
           answer,
+          routing,
         }
       } catch (error) {
-        return toAnalysisFailure(error, 'Unknown interview question error')
+        return toDesktopAnalysisFailure(error, request)
       }
     },
   )
