@@ -30,7 +30,7 @@ Do not build:
 - real-time transcript
 - discussion phase detection
 - consensus and disagreement extraction
-- speaking hints (15s / 30s / 60s)
+- speaking hints (60s / 120s)
 - mind map
 - spoken meeting summary + structured meeting minutes
 - timeline replay

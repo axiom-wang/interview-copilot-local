@@ -16,7 +16,6 @@ export const answerInterviewQuestionSchema = {
     },
     suggestedReply: {
       type: 'string',
-      minLength: 60,
     },
   },
 } as const

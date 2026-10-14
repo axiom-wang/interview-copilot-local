@@ -107,7 +107,7 @@ test('question evidence searches all history and preserves old pinned statements
 const outputs: Record<string, unknown> = {
   detect_phase: { phase: 'alignment-building', confidence: 0.9, reason: '在比较', nextAction: '核对约束' },
   extract_consensus_and_tensions: { consensus: [], tensions: [], missing: [], scenarioFocus: [] },
-  generate_speaking_hints: { functionType: '补齐信息', whyNow: '确认变化', hint15s: '核对预算', hint30s: '核对预算', hint60s: '核对预算' },
+  generate_speaking_hints: { functionType: '补齐信息', whyNow: '确认变化', hint60s: '核对预算', hint120s: '核对预算与变化依据' },
   generate_mind_map: { topic: '会议', nodes: [], edges: [] },
   generate_meeting_summary: { speech60s: '会议总结', keyPoints: [], nextSteps: [] },
   generate_meeting_minutes: { title: '纪要', overview: '会议', topics: [], decisions: [], openQuestions: [], actionItems: [] },
@@ -225,10 +225,9 @@ test('AI participation separates tentative contributions from facts and permits 
   assert.match(prompt, /尚未实际发言或被团队接受，不是会议事实/)
   assert.match(prompt, /预算是否含运费/)
   assert.match(prompt, /真人未回应且无新证据时不要重复/)
-  assert.match(buildSpeakingHintsPrompt([], context), /hint15s、hint30s、hint60s 均为空字符串/)
-  const hints = parseSpeakingHints({ functionType: '倾听观察', whyNow: '等待成本负责人说完', hint15s: '不应该发出的重复建议' }, 100)
-  assert.equal(hints.hint15s, '')
-  assert.equal(hints.hint30s, '')
+  assert.match(buildSpeakingHintsPrompt([], context), /hint60s、hint120s 均为空字符串/)
+  const hints = parseSpeakingHints({ functionType: '倾听观察', whyNow: '等待成本负责人说完', hint60s: '不应该发出的重复建议', hint120s: '也不应该发出的长建议' }, 100)
+  assert.equal(hints.hint120s, '')
   assert.equal(hints.hint60s, '')
   const analysis = parseConsensusAnalysis({ consensus: ['保持原结论'], tensions: [], missing: [], participantView: previousParticipantView, scenarioFocus: [{ label: '当前议题', detail: '建议核对预算', evidenceIds: ['missing'] }] }, 100)
   assert.deepEqual(groundConsensusEvidence(analysis, [segment('real', '预算尚未明确')]).consensus, ['保持原结论'])

@@ -18,22 +18,48 @@ const LIVE_LAYOUT_STORAGE_KEY = 'interview-copilot-local/live-layout'
 const DEFAULT_COPILOT_RATIO = 0.6
 const MIN_COPILOT_RATIO = 0.45
 const MAX_COPILOT_RATIO = 0.72
+const DEFAULT_HINTS_RATIO = 0.58
+const MIN_HINTS_PX = 180
+const MIN_ANALYSIS_PX = 160
+const STACK_RAIL = 10
+
+interface LiveLayout {
+  copilotRatio: number
+  hintsRatio: number
+}
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value))
 
-const readCopilotRatio = () => {
+const readRatio = (value: unknown, min: number, max: number, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) ? clamp(value, min, max) : fallback
+
+const readLayout = (): LiveLayout => {
   try {
     const stored = JSON.parse(
       window.localStorage.getItem(LIVE_LAYOUT_STORAGE_KEY) ?? '{}',
-    ) as { copilotRatio?: unknown }
+    ) as { copilotRatio?: unknown; hintsRatio?: unknown }
 
-    return typeof stored.copilotRatio === 'number' && Number.isFinite(stored.copilotRatio)
-      ? clamp(stored.copilotRatio, MIN_COPILOT_RATIO, MAX_COPILOT_RATIO)
-      : DEFAULT_COPILOT_RATIO
+    return {
+      copilotRatio: readRatio(
+        stored.copilotRatio,
+        MIN_COPILOT_RATIO,
+        MAX_COPILOT_RATIO,
+        DEFAULT_COPILOT_RATIO,
+      ),
+      hintsRatio: readRatio(stored.hintsRatio, 0.05, 0.95, DEFAULT_HINTS_RATIO),
+    }
   } catch {
-    return DEFAULT_COPILOT_RATIO
+    return { copilotRatio: DEFAULT_COPILOT_RATIO, hintsRatio: DEFAULT_HINTS_RATIO }
   }
+}
+
+const hintsHeightFor = (ratio: number, stackHeight: number) => {
+  const available = Math.max(stackHeight - STACK_RAIL, 1)
+  const minHints = Math.min(MIN_HINTS_PX, available)
+  const maxHints = Math.max(minHints, available - Math.min(MIN_ANALYSIS_PX, available - minHints))
+
+  return clamp(ratio * available, minHints, maxHints)
 }
 
 const getSpeakerDisplayName = (
@@ -59,9 +85,10 @@ const isTypingTarget = (target: EventTarget | null) =>
 
 export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const { ref: layoutRef, width: layoutWidth } = useElementSize<HTMLDivElement>()
-  const [copilotRatio, setCopilotRatio] = useState(readCopilotRatio)
+  const { ref: stackRef, height: stackHeight } = useElementSize<HTMLDivElement>()
+  const [layout, setLayout] = useState(readLayout)
   const [reviewTab, setReviewTab] = useState('summary')
-  const ratioRef = useRef(copilotRatio)
+  const stackHeightRef = useRef(stackHeight)
 
   const liveSegments = useAppStore((state) => state.liveSegments)
   const speakerProfiles = useAppStore((state) => state.speakerProfiles)
@@ -104,16 +131,16 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const clearAiQaHistory = useAppStore((state) => state.clearAiQaHistory)
 
   useEffect(() => {
-    ratioRef.current = copilotRatio
+    stackHeightRef.current = stackHeight
+  }, [stackHeight])
+
+  useEffect(() => {
     try {
-      window.localStorage.setItem(
-        LIVE_LAYOUT_STORAGE_KEY,
-        JSON.stringify({ copilotRatio }),
-      )
+      window.localStorage.setItem(LIVE_LAYOUT_STORAGE_KEY, JSON.stringify(layout))
     } catch {
       // Resizing still works for this session when storage is unavailable.
     }
-  }, [copilotRatio])
+  }, [layout])
 
   useEffect(() => {
     if (!isStreaming) {
@@ -175,8 +202,33 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
 
   const resizeColumns = (delta: number) => {
     const width = Math.max(layoutWidth - 10, 1)
-    setCopilotRatio(clamp(ratioRef.current + delta / width, MIN_COPILOT_RATIO, MAX_COPILOT_RATIO))
+    setLayout((current) => ({
+      ...current,
+      copilotRatio: clamp(
+        current.copilotRatio + delta / width,
+        MIN_COPILOT_RATIO,
+        MAX_COPILOT_RATIO,
+      ),
+    }))
   }
+
+  const resizeHints = (delta: number) => {
+    const available = Math.max(stackHeightRef.current - STACK_RAIL, 1)
+    setLayout((current) => {
+      const nextHeight = clamp(
+        hintsHeightFor(current.hintsRatio, stackHeightRef.current) + delta,
+        Math.min(MIN_HINTS_PX, available),
+        Math.max(
+          Math.min(MIN_HINTS_PX, available),
+          available - Math.min(MIN_ANALYSIS_PX, available),
+        ),
+      )
+
+      return { ...current, hintsRatio: nextHeight / available }
+    })
+  }
+
+  const hintsHeight = hintsHeightFor(layout.hintsRatio, stackHeight)
 
   const generateSummaryAndMinutes = () => {
     setReviewTab('summary')
@@ -215,34 +267,54 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
 
   const copilotColumn =
     mode === 'live' ? (
-      <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full">
+      <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full lg:overflow-hidden">
         <PhasePanel
           className="shrink-0"
           isLoading={isAnalyzing}
           phaseAnalysis={phaseAnalysis}
           variant="compact"
         />
-        <HintsPanel
-          autoRefresh={autoRefreshHints}
-          className="lg:min-h-[300px] lg:flex-[3_1_0%]"
-          density="live"
-          hints={speakingHints}
-          isRefreshing={isRefreshingHints}
-          isStale={speakingHintsStale}
-          lastUpdatedAt={lastHintsUpdatedAt}
-          onRefresh={() => {
-            void refreshSpeakingHints()
-          }}
-          onToggleAutoRefresh={setAutoRefreshHints}
-        />
-        <Tabs
-          className="lg:min-h-[240px] lg:flex-[2_1_0%]"
-          defaultTabId="consensus"
-          items={[
-            { id: 'consensus', label: '共识分歧', content: consensusPanel },
-            { id: 'qa', label: 'AI 问答', content: aiQaPanel },
-          ]}
-        />
+        <div
+          className="copilot-stack min-h-0 lg:flex-1"
+          ref={stackRef}
+          style={
+            stackHeight > 0
+              ? ({
+                  '--copilot-stack-rows': `${Math.round(hintsHeight)}px ${STACK_RAIL}px minmax(0, 1fr)`,
+                } as CSSProperties)
+              : undefined
+          }
+        >
+          <HintsPanel
+            autoRefresh={autoRefreshHints}
+            className="min-h-[280px] lg:h-full lg:min-h-0"
+            density="live"
+            hints={speakingHints}
+            isRefreshing={isRefreshingHints}
+            isStale={speakingHintsStale}
+            lastUpdatedAt={lastHintsUpdatedAt}
+            onRefresh={() => {
+              void refreshSpeakingHints()
+            }}
+            onToggleAutoRefresh={setAutoRefreshHints}
+          />
+          <ResizeHandle
+            ariaLabel="调整发言建议与分析区高度"
+            onDelta={resizeHints}
+            onReset={() =>
+              setLayout((current) => ({ ...current, hintsRatio: DEFAULT_HINTS_RATIO }))
+            }
+            orientation="horizontal"
+          />
+          <Tabs
+            className="min-h-[240px] lg:h-full lg:min-h-0"
+            defaultTabId="consensus"
+            items={[
+              { id: 'consensus', label: '共识分歧', content: consensusPanel },
+              { id: 'qa', label: 'AI 问答', content: aiQaPanel },
+            ]}
+          />
+        </div>
       </div>
     ) : (
       <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
@@ -293,7 +365,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
         ref={layoutRef}
         style={
           {
-            '--live-workspace-columns': `${copilotRatio}fr 10px ${1 - copilotRatio}fr`,
+            '--live-workspace-columns': `${layout.copilotRatio}fr 10px ${1 - layout.copilotRatio}fr`,
           } as CSSProperties
         }
       >
@@ -302,7 +374,9 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
         <ResizeHandle
           ariaLabel="调整建议区与转写区宽度"
           onDelta={resizeColumns}
-          onReset={() => setCopilotRatio(DEFAULT_COPILOT_RATIO)}
+          onReset={() =>
+            setLayout((current) => ({ ...current, copilotRatio: DEFAULT_COPILOT_RATIO }))
+          }
           orientation="vertical"
         />
 

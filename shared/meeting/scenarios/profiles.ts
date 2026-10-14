@@ -5,8 +5,8 @@ export const DEFAULT_SCENARIO_ID: MeetingScenarioId = 'general'
 
 const sharedHintRules = [
   '口语化、克制、尊重他人',
-  '强调“我们”“大家”，避免抢功或强势压人',
-  '避免空泛框架词堆砌，给出可执行的推进动作',
+  '按实际观点自然使用“我”或“我们”，不强行表态或抢功',
+  '说具体内容和理由，避免框架词与固定承接套路',
 ]
 
 const profiles: MeetingScenarioProfile[] = [

@@ -1,7 +1,7 @@
 export const speakingHintsSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['functionType', 'whyNow', 'hint15s', 'hint30s', 'hint60s'],
+  required: ['functionType', 'whyNow', 'hint60s', 'hint120s'],
   properties: {
     functionType: {
       type: 'string',
@@ -10,8 +10,7 @@ export const speakingHintsSchema = {
     whyNow: {
       type: 'string',
     },
-    hint15s: { type: 'string' },
-    hint30s: {
+    hint120s: {
       type: 'string',
     },
     hint60s: {

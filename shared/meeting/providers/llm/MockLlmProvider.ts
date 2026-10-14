@@ -1,5 +1,5 @@
 import mockAnalysis from '../../sample/mockAnalysis.json'
-import { normalizeFunctionType } from '../../services/analysisNormalization'
+import { normalizeSpeakingHints } from '../../services/analysisNormalization'
 import { legacyMindMapToFlowMap } from '../../services/mindMapTransform'
 import type {
   ConsensusAnalysis,
@@ -83,18 +83,7 @@ export class MockLlmProvider implements LlmProvider {
     void _context
     const scenario = pickScenario(segments)
     const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
-    const hint15s =
-      scenario.hints.hint15s?.trim() || '我先帮大家把讨论结构收一下。'
-
-    return {
-      functionType: normalizeFunctionType(scenario.hints.functionType),
-      whyNow:
-        scenario.hints.whyNow?.trim() || '当前最需要的是先把讨论推进到下一步。',
-      hint15s,
-      hint30s: scenario.hints.hint30s?.trim() || hint15s,
-      hint60s: scenario.hints.hint60s?.trim() || hint15s,
-      updatedAt,
-    }
+    return normalizeSpeakingHints(scenario.hints, updatedAt)
   }
 
   async generateMindMap(

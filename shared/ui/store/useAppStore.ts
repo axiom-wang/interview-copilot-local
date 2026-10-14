@@ -170,7 +170,7 @@ let analysisTimeoutId: number | null = null
 let hintsRefreshTimeoutId: number | null = null
 let lastHintsRequestedAt: number | null = null
 let queueAutoHintsRefresh = () => {}
-let rememberPartialMeetingMemory = (_error: unknown) => {}
+let rememberPartialMeetingMemory: (error: unknown) => void = () => {}
 const ignoredLiveSegmentIds = new Set<string>()
 
 const ANALYSIS_DEBOUNCE_MS = 1500
@@ -406,10 +406,9 @@ const createFallbackSpeakingHints = (
 
   return {
     functionType: normalizeFunctionType(undefined),
-    whyNow: '当前建议尚未手动刷新，先给出稳妥的默认推进动作。',
-    hint15s: `建议点击“刷新建议”获取当前${profile.label}的实时发言建议。`,
-    hint30s: '当前建议尚未手动更新，请先点击“刷新建议”，再按 15/30/60 秒脚本发言。',
-    hint60s: '为了保证建议贴合当前讨论，请手动刷新后再发言：先给结论，再给依据，最后推进下一步。',
+    whyNow: `点击“刷新建议”获取当前${profile.label}的实时发言建议。`,
+    hint60s: '',
+    hint120s: '',
     updatedAt,
   }
 }

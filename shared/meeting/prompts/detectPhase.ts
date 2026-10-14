@@ -1,4 +1,4 @@
-import { resolveScenarioProfile } from '../scenarios'
+import { resolveScenarioProfile, type MeetingScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
@@ -7,43 +7,23 @@ import {
   formatSegmentsForPrompt,
 } from './promptUtils'
 
+export const buildDetectPhaseTask = (profile: MeetingScenarioProfile) => `
+以最近 90 秒的讨论重点判断当前议题阶段，全程记录用于核对主线。阶段可以往返，不能把阶段分类当作必走流程。
+${Object.entries(profile.phaseDefinitions).map(([phase, definition]) =>
+  `- ${phase}（${profile.phaseLabels[phase as keyof typeof profile.phaseLabels]}）：${definition}`).join('\n')}
+参考信号：${profile.phaseSignals.join('；')}。
+只选当前最主导阶段，reason 简述依据或切换迹象，confidence 表示证据充分程度，nextAction 按题目与现场需要给出下一步。
+输出 JSON：{"phase":"阶段枚举", "confidence":0.8, "nextAction":"下一步", "reason":"判断依据"}
+`.trim()
+
 export const buildDetectPhasePrompt = (
   segments: TranscriptSegment[],
   context?: AnalysisPromptContext,
-) => {
-  const profile = resolveScenarioProfile(context?.scenarioId)
-  const phaseDefinitions = Object.entries(profile.phaseDefinitions)
-    .map(([phase, definition]) => `- ${phase}（${profile.phaseLabels[phase as keyof typeof profile.phaseLabels]}）：\n  ${definition}`)
-    .join('\n')
-  const phaseSignals = profile.phaseSignals
-    .map((signal) => `   - ${signal}`)
-    .join('\n')
-
-  return composePromptWithGlobalSystemPrompt(`
-请结合全程会议记录，以最近 90 秒的讨论重点判断当前议题所处阶段；允许切换议题或回到早期阶段。
-
-阶段定义如下：
-${phaseDefinitions}
-
-判断要求：
-1. 只选一个最主导阶段。
-2. 不要被个别句子误导，要看最近这段讨论的整体主线。
-3. 如果阶段正在切换，选择“当前更占主导”的那个阶段，并在 reason 中体现切换迹象。
-4. 特别关注以下场景信号：
-${phaseSignals}
-
-输出严格为 JSON：
-{
-  "phase": "problem-framing | option-divergence | alignment-building | decision-lock",
-  "confidence": 0-1之间的小数,
-  "nextAction": "一句话描述当前最合适的下一步动作",
-  "reason": "用简洁中文说明为什么判断为该阶段，最好指出1-2个明显信号"
-}
+) => composePromptWithGlobalSystemPrompt(`
+${buildDetectPhaseTask(resolveScenarioProfile(context?.scenarioId))}
 
 ${formatOptionalPromptContext(context)}
 
-转写内容：
+最近 90 秒转写：
 ${formatSegmentsForPrompt(segments)}
-`.trim(), profile)
-}
-
+`, resolveScenarioProfile(context?.scenarioId))

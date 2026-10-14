@@ -21,10 +21,10 @@
         ]
       },
       "hints": {
-        "functionType": "Framing and structure",
-        "hint15s": "Suggest a simple structure: goal, target user, pain point, solution, metric.",
-        "hint30s": "Propose selecting one primary user group first so later ideas stay comparable.",
-        "hint60s": "Bridge the team by summarizing the goal, then invite quick votes on the target user and top pain point."
+        "functionType": "推进结构",
+        "whyNow": "先明确目标用户，才能比较后续方案。",
+        "hint60s": "刚才提到找课程、坚持锻炼和约朋友，可能对应不同的人。有人想开始运动，却不知道去哪；也有人已经有计划，但总是中断。我觉得先选清楚我们最想帮哪一类人，后面的方案才有办法比较。如果目标是让已经想运动的人坚持下来，约同伴值得重点看；如果目标是让没开始的人迈出第一步，课程信息可能更直接。我们可以先回到题目，看它要求解决的是哪个问题，再确定主要对象。",
+        "hint120s": "刚才提到找课程、坚持锻炼和约朋友，可能对应不同的人。有人想开始运动，却不知道去哪；也有人已经有计划，但总是中断。我觉得先选清楚我们最想帮哪一类人，后面的方案才有办法比较。如果目标是让已经想运动的人坚持下来，约同伴值得重点看；如果目标是让没开始的人迈出第一步，课程信息可能更直接。我们可以先回到题目，看它要求解决的是哪个问题，再确定主要对象。还有一个区别是，信息不够和缺少动力，需要的解决办法不一样。把两者混在一起，产品可能什么都做，但没有哪一点足够有用。我建议选定对象后，用一个具体场景检验：这个人这周本来打算运动，最后为什么没去？是没有合适的时间和地点，还是一个人容易放弃？目前没有材料证明哪个原因更普遍，所以这里只是两种待验证的解释。先把这个区别弄清楚，再谈功能，能减少后面反复换方向。"
       },
       "mindMap": {
         "topic": "Campus fitness app discussion",
@@ -58,10 +58,10 @@
         ]
       },
       "hints": {
-        "functionType": "Option narrowing",
-        "hint15s": "Vote between the top pain points and explain the tradeoff in one sentence.",
-        "hint30s": "Recommend accountability as the wedge if the team values habit formation over feature breadth.",
-        "hint60s": "Close the divergence loop by comparing user need intensity, distribution ease, and MVP simplicity."
+        "functionType": "检验推理",
+        "whyNow": "两个方向需要按同一目标比较。",
+        "hint60s": "课程发现和同伴监督都可能有用，但解决的问题不同。如果我们想提高持续运动的次数，我更倾向先讨论同伴监督：它尝试改变的是临时放弃，而不是帮人多看几条课程信息。不过这个判断有个前提，就是用户已经愿意运动，只是难以坚持。如果用户连适合自己的活动都没找到，课程发现就应该更靠前。我建议用题目材料核对这个前提，再比较两个方案各自需要什么投入，避免只凭哪个功能听起来更丰富来选择。",
+        "hint120s": "课程发现和同伴监督都可能有用，但解决的问题不同。如果我们想提高持续运动的次数，我更倾向先讨论同伴监督：它尝试改变的是临时放弃，而不是帮人多看几条课程信息。不过这个判断有个前提，就是用户已经愿意运动，只是难以坚持。如果用户连适合自己的活动都没找到，课程发现就应该更靠前。我建议用题目材料核对这个前提，再比较两个方案各自需要什么投入，避免只凭哪个功能听起来更丰富来选择。同伴监督还要解决一个问题：两个人时间对不上，或者其中一个人不来了，另一个人会不会也放弃？如果这类情况很常见，单纯配对可能并不够。可以考虑先让已经认识的人约固定活动，这只是一个新建议，还需要验证。课程发现也有自己的难点，比如信息是否及时、活动是否真的可参加。两个方向都不是完全没有成本。最终应该选最能回应题目目标、又能用较小投入检验效果的那个，而不是把所有功能一起塞进第一版。"
       },
       "mindMap": {
         "topic": "Campus fitness app",
@@ -97,10 +97,10 @@
         ]
       },
       "hints": {
-        "functionType": "Team alignment",
-        "hint15s": "Summarize the team's current conclusion in three bullets and propose owner assignments.",
-        "hint30s": "Bridge to execution by naming the audience, core loop, metric, and rollout in one pass.",
-        "hint60s": "Help the team close by converting agreement into a clear conclusion with owner assignments."
+        "functionType": "收敛结论",
+        "whyNow": "已有方向，需要讲清选择依据和待确认项。",
+        "hint60s": "目前我们更倾向服务在校住宿学生，通过同伴约定帮助他们保持运动。这条主线可以直接说明：对象是谁、为什么会中断、同伴约定怎样帮助他。效果也应该看实际一起运动的次数，而不是只看注册人数。推广和留存的具体办法还有待确认，汇报时不要把它们说成已经决定的方案。我建议先检查题目要求还有没有漏答，再把已确认的选择和未决的问题分开写清楚。这样最后表达会比较准确，也便于保留刚才不同意见里有价值的部分。",
+        "hint120s": "目前我们更倾向服务在校住宿学生，通过同伴约定帮助他们保持运动。这条主线可以直接说明：对象是谁、为什么会中断、同伴约定怎样帮助他。效果也应该看实际一起运动的次数，而不是只看注册人数。推广和留存的具体办法还有待确认，汇报时不要把它们说成已经决定的方案。我建议先检查题目要求还有没有漏答，再把已确认的选择和未决的问题分开写清楚。这样最后表达会比较准确，也便于保留刚才不同意见里有价值的部分。这里还需要检查指标的口径。如果说每周一起运动的次数，就要明确是每个用户的平均次数，还是所有用户的总次数；否则人数变多，也可能让总数上涨，却不能说明每个人更愿意坚持。风险部分可以保留新鲜感过去后是否继续使用这个问题，但我们目前没有结果，不能直接说方案一定有效。先把这些限定说清楚，会比补一套没讨论过的实施计划更有说服力。"
       },
       "mindMap": {
         "topic": "Campus fitness app recommendation",
@@ -135,10 +135,10 @@
         ]
       },
       "hints": {
-        "functionType": "Final delivery",
-        "hint15s": "Offer a tight closing sentence that reinforces feasibility and user value.",
-        "hint30s": "Package the answer into target user, MVP loop, metric, and rollout with one risk callout.",
-        "hint60s": "Support the final delivery by sequencing speakers and adding one strong concluding recommendation."
+        "functionType": "汇报总结",
+        "whyNow": "最后表达应保留结论、依据和未决问题。",
+        "hint60s": "我们的建议是先面向在校住宿学生，用同伴约定支持持续运动，关注实际共同运动的行为。相比一开始铺开很多功能，这个方向更集中地回应了坚持的问题。团队也讨论了校园推广和新鲜感过去后的留存风险，但指标口径仍需要统一，因此不能把所有细节都说成已经定稿。最后汇报可以沿着这个结论展开，讲清选择理由，再指出尚待验证的部分。题目要求如果还有其他交付，我们应逐项核对，不必为了收尾整齐而省略不同意见。",
+        "hint120s": "我们的建议是先面向在校住宿学生，用同伴约定支持持续运动，关注实际共同运动的行为。相比一开始铺开很多功能，这个方向更集中地回应了坚持的问题。团队也讨论了校园推广和新鲜感过去后的留存风险，但指标口径仍需要统一，因此不能把所有细节都说成已经定稿。最后汇报可以沿着这个结论展开，讲清选择理由，再指出尚待验证的部分。题目要求如果还有其他交付，我们应逐项核对，不必为了收尾整齐而省略不同意见。我们选择同伴约定，是因为讨论把难以坚持看作主要问题，并不意味着课程发现完全没有价值。它仍可能服务尚未找到合适活动的人，只是当前没有放在最优先的位置。效果方面，我们希望观察用户是否重复参加共同运动，而不是只看下载或注册。至于校园推广怎样执行、留存风险怎样检验，应该使用团队真正讨论过的内容；没有达成一致的细节就注明待确认。这样汇报既回答主要问题，也能让听者看清我们依据什么作出取舍，以及哪些判断还需要进一步验证。"
       },
       "mindMap": {
         "topic": "Final recommendation structure",

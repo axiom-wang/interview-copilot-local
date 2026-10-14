@@ -125,9 +125,8 @@ ${
 - 缺口：${snapshot.consensusAnalysis.missing.join('；') || '暂无'}
 - 动作类型：${snapshot.speakingHints.functionType}
 - Why Now：${whyNow}
-- 15 秒建议：${snapshot.speakingHints.hint15s}
-- 30 秒建议：${snapshot.speakingHints.hint30s}
-- 60 秒建议：${snapshot.speakingHints.hint60s}
+- 60 秒建议：${snapshot.speakingHints.hint60s || '未保存'}
+- 120 秒建议：${snapshot.speakingHints.hint120s || '未保存'}
 - 导图主题：${mindMapTopic}`
           })
           .join('\n\n')

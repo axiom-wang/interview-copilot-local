@@ -2,8 +2,7 @@ import { groundConsensusEvidence } from '../../../../shared/meeting/context/grou
 import type { CodexConfig } from '../../../../shared/meeting/types/desktopAnalysis'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
-import { buildDetectPhasePrompt } from '../../../../shared/meeting/prompts/detectPhase'
-import { buildExtractConsensusPrompt } from '../../../../shared/meeting/prompts/extractConsensus'
+import { buildRealtimeAnalysisPrompt } from '../../../../shared/meeting/prompts/realtimeAnalysis'
 import { detectPhaseSchema } from '../../../../shared/meeting/schemas/detectPhase.schema.ts'
 import { extractConsensusSchema } from '../../../../shared/meeting/schemas/extractConsensus.schema.ts'
 import { parseConsensusAnalysis, parsePhaseAnalysis } from '../../../../shared/analysis/llm/responseParsing'
@@ -57,7 +56,7 @@ export const codexAnalysis = (config: CodexConfig) => {
       context = await prepareAnalysisContext(segments, context, undefined, createResponse)
       const recent = getRecentSegmentsByWindow(segments, 90_000)
       const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
-      const prompt = `请完成以下两项会议分析，将结果分别放入 phaseAnalysis 和 consensusAnalysis，最终只输出一个 JSON 对象。\n\n阶段分析任务：\n${buildDetectPhasePrompt(recent, context)}\n\n共识分析任务：\n${buildExtractConsensusPrompt(recent, context)}`
+      const prompt = buildRealtimeAnalysisPrompt(recent, context)
       const result = await client.structured(prompt, {
         type: 'object',
         properties: { phaseAnalysis: detectPhaseSchema, consensusAnalysis: extractConsensusSchema },

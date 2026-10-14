@@ -12,82 +12,16 @@ export const buildGenerateMindMapPrompt = (
   context?: AnalysisPromptContext,
 ) => {
   const profile = resolveScenarioProfile(context?.scenarioId)
-  const dimensions = profile.valueDimensions
-    .slice(0, 6)
-    .map((dimension) => `   - ${dimension}`)
-    .join('\n')
-
   return composePromptWithGlobalSystemPrompt(`
-请根据全程会议记录，结合最近 3 分钟的变化，生成一个适合 React Flow 渲染的“讨论思维导图”。保留早期仍有效的目标、约束和决定；已撤销内容不能显示为当前结论。
+根据全程讨论和最近 3 分钟的变化生成当前思维导图，保留仍有效的早期约束与决定，移除已撤销结论。
+按实际内容组织分支，相关时参考：${profile.valueDimensions.join('、')}。节点简短、无重复；不为填满结构制造内容，未决事项明确标识。
 
-导图目标：
-- 不是逐字记录，而是把当前讨论压缩成一个清晰结构
-- 帮助用户快速看懂：会议目标、已讨论主线、关键分支、待收敛点
-
-节点设计要求：
-1. 总节点数量控制在 4-8 个之间
-2. 必须包含 1 个 root 节点
-3. 其余节点为 branch 或 leaf
-4. 节点标签必须简短，优先 4-10 个字
-5. 不要生成重复节点、空节点、装饰性节点
-6. 优先体现这些高价值维度：
-${dimensions}
-7. 如果内容仍很发散，可保留“待决”分支；如果已趋于收敛，应更突出结论主线
-
-布局要求：
-1. root 节点居中偏左，例如 x≈80~180, y≈180~260
-2. branch 节点分布在右侧，保持大致纵向均匀
-3. leaf 节点在对应 branch 右侧
-4. 坐标尽量平稳，避免重叠
-5. 输出 edges，保证能直接连线
-
-输出严格为 JSON：
-{
-  "topic": "讨论主题",
-  "nodes": [
-    {
-      "id": "root-1",
-      "type": "root",
-      "position": { "x": 120, "y": 220 },
-      "data": { "label": "讨论主题" }
-    },
-    {
-      "id": "branch-1",
-      "type": "branch",
-      "position": { "x": 380, "y": 120 },
-      "data": { "label": "核心方案" }
-    },
-    {
-      "id": "leaf-1",
-      "type": "leaf",
-      "position": { "x": 640, "y": 120 },
-      "data": { "label": "先试点" }
-    }
-  ],
-  "edges": [
-    {
-      "id": "e-root-1-branch-1",
-      "source": "root-1",
-      "target": "branch-1"
-    },
-    {
-      "id": "e-branch-1-leaf-1",
-      "source": "branch-1",
-      "target": "leaf-1"
-    }
-  ]
-}
-
-请注意：
-- 只输出 JSON
-- 节点标签尽量抽象到“可汇报结构”，不要抄整句发言
-- 忽略闲聊和重复表态
-- 只有全程记录也不足时才输出最简结构；不要因最近 3 分钟内容少而丢失之前主线
+返回适合 React Flow 的 JSON：topic 为主题；nodes 包含唯一 id、type（root/branch/leaf）、position（x/y）和 data.label；edges 包含唯一 id、source 和 target，引用真实节点。
+包含一个 root，其余按需要生成，通常总计 4—8 个节点。root 在左侧，branch 和 leaf 依次向右，纵向留出间距避免重叠。材料少时使用更简结构，不因最近窗口短而丢失历史主线。
 
 ${formatOptionalPromptContext(context)}
 
-转写内容：
+最近 3 分钟转写：
 ${formatSegmentsForPrompt(segments)}
 `.trim(), profile)
 }
-

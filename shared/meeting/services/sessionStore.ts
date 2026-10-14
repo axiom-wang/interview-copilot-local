@@ -3,7 +3,7 @@ import { normalizeScenarioFocus } from '../context/scenarioFocus'
 import { normalizeMeetingMemory } from '../context/meetingMemory'
 import mockAnalysis from '../sample/mockAnalysis.json'
 import mockTranscript from '../sample/mockTranscript.json'
-import { normalizeFunctionType } from './analysisNormalization'
+import { normalizeSpeakingHints as normalizeHintsRecord } from './analysisNormalization'
 import { normalizeMindMapSnapshot } from './mindMapTransform'
 import { resolveScenarioProfile } from '../scenarios'
 import type {
@@ -145,24 +145,7 @@ const normalizeSpeakingHints = (
   updatedAt: number,
 ): SpeakingHints => {
   const record = isRecord(value) ? value : {}
-  if (normalizeFunctionType(asString(record.functionType)) === '倾听观察') {
-    return { functionType: '倾听观察', whyNow: asString(record.whyNow, '先听完当前发言。'),
-      hint15s: '', hint30s: '', hint60s: '', updatedAt }
-  }
-
-  const hint15s = asString(
-    record.hint15s,
-    '我先帮大家把当前讨论收一下，再推进下一步。',
-  )
-
-  return {
-    functionType: normalizeFunctionType(asString(record.functionType)),
-    whyNow: asString(record.whyNow),
-    hint15s,
-    hint30s: asString(record.hint30s, hint15s),
-    hint60s: asString(record.hint60s, hint15s),
-    updatedAt,
-  }
+  return normalizeHintsRecord(record, updatedAt)
 }
 
 const normalizeMeetingSummary = (

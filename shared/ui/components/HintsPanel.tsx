@@ -18,7 +18,7 @@ interface HintsPanelProps {
   embedded?: boolean
 }
 
-const FALLBACK_WHY_NOW = '建议优先承接当前主线，避免在关键收束点重新发散。'
+const FALLBACK_WHY_NOW = '结合现场讨论，选择适合的时机发言。'
 
 const formatTimestamp = (timestamp: number | null | undefined) =>
   timestamp
@@ -49,9 +49,8 @@ const useNow = (intervalMs: number, enabled: boolean) => {
 }
 
 const HINT_ROWS = [
-  { key: 'hint15s', label: '15 秒' },
-  { key: 'hint30s', label: '30 秒' },
   { key: 'hint60s', label: '60 秒' },
+  { key: 'hint120s', label: '120 秒' },
 ] as const
 
 function LiveHints({
@@ -145,7 +144,7 @@ function LiveHints({
                   <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
                     {row.label}
                   </dt>
-                  <dd className="theme-title text-[15px] leading-7">{hints[row.key]}</dd>
+                  <dd className="theme-title whitespace-pre-line text-[15px] leading-7">{hints[row.key] || '未保存该时长的建议'}</dd>
                 </div>
               ))}
             </dl> : null}
@@ -156,7 +155,7 @@ function LiveHints({
               {autoRefresh ? '听到第一段完整发言后自动生成' : '自动更新已关闭'}
             </p>
             <p className="theme-muted text-sm leading-6">
-              有值得补充的内容时，给出 15 / 30 / 60 秒三种说法；没有新贡献时，会建议继续倾听。也可以按 R 立即生成。
+              有值得补充的内容时，给出 60 / 120 秒两种说法；没有新贡献时，会建议继续倾听。也可以按 R 立即生成。
             </p>
           </div>
         )}
@@ -236,7 +235,7 @@ export function HintsPanel(props: HintsPanelProps) {
                   <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
                     {row.label}
                   </dt>
-                  <dd className="theme-body text-sm leading-7">{hints[row.key]}</dd>
+                  <dd className="theme-body whitespace-pre-line text-sm leading-7">{hints[row.key] || '未保存该时长的建议'}</dd>
                 </div>
               ))}
             </dl> : null}

@@ -19,6 +19,8 @@ export interface PhaseAnalysis {
 
 export type SpeakingFunctionType =
   | '倾听观察'
+  | '提出观点'
+  | '检验推理'
   | '推进结构'
   | '补齐信息'
   | '化解分歧'
@@ -54,9 +56,8 @@ export interface ConsensusAnalysis {
 export interface SpeakingHints {
   functionType: SpeakingFunctionType
   whyNow: string
-  hint15s: string
-  hint30s: string
   hint60s: string
+  hint120s: string
   updatedAt: number
 }
 
@@ -131,9 +132,8 @@ export interface MockAnalysisScenario {
   hints: {
     functionType: string
     whyNow?: string
-    hint15s: string
-    hint30s?: string
-    hint60s?: string
+    hint60s: string
+    hint120s: string
   }
   mindMap: {
     topic: string

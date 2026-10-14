@@ -3,7 +3,7 @@ import { normalizeScenarioFocus } from '../../meeting/context/scenarioFocus'
 import {
   coerceString,
   coerceStringArray,
-  normalizeFunctionType,
+  normalizeSpeakingHints,
 } from '../../meeting/services/analysisNormalization'
 import { normalizeMindMapSnapshot } from '../../meeting/services/mindMapTransform'
 import type {
@@ -97,24 +97,7 @@ export const parseSpeakingHints = (
     throw new Error('hints response format is invalid')
   }
 
-  if (normalizeFunctionType(coerceString(value.functionType)) === '倾听观察') {
-    return { functionType: '倾听观察', whyNow: coerceString(value.whyNow, '先听完当前发言，再判断是否有值得补充的内容。'),
-      hint15s: '', hint30s: '', hint60s: '', updatedAt }
-  }
-
-  const hint15s = coerceString(
-    value.hint15s,
-    '我先帮大家把讨论结构快速收一下，再看最关键的分歧点。',
-  )
-
-  return {
-    functionType: normalizeFunctionType(coerceString(value.functionType)),
-    whyNow: coerceString(value.whyNow),
-    hint15s,
-    hint30s: coerceString(value.hint30s, hint15s),
-    hint60s: coerceString(value.hint60s, hint15s),
-    updatedAt,
-  }
+  return normalizeSpeakingHints(value, updatedAt)
 }
 
 export const parseMeetingSummary = (
@@ -188,11 +171,11 @@ export const parseInterviewQaAnswer = (
 
   const conclusion = coerceString(
     value.conclusion,
-    '当前更稳妥的做法，是先顺着题目目标和团队主线给出一个克制判断。',
+    '当前信息不足，暂时无法给出明确判断。',
   )
   const suggestedReply = coerceString(
     value.suggestedReply,
-    '我觉得我们可以先顺着题目目标，把当前已经形成的共识说清楚，而不是急着再铺很多新点。基于刚才的讨论，我会更倾向于先给出一个稳妥判断，再补一句为什么我们这样取舍，这样既能体现思考，也能帮助团队收敛。然后如果大家认可，我们可以顺势把下一步要确认的结论或者分工一起推进掉。',
+    '',
   )
   const reasoning = coerceStringArray(value.reasoning, { maxItems: 4 })
 

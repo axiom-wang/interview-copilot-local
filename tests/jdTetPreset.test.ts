@@ -25,8 +25,8 @@ test('every TET analysis task includes the supplied case and excludes stale role
       roleContext: 'OLD_ROLE_ONLY: 我必须担任组长并分配发言顺序。',
     })
     assert.ok(prompt.includes('预算限定为八万元'))
-    assert.ok(prompt.includes('成本、毛利与利润'))
-    assert.ok(prompt.includes('参与者没有预先分配的固定角色'))
+    assert.ok(prompt.includes('商业维度仅在题目相关时使用'))
+    assert.ok(prompt.includes('题目明确指定角色或规则时遵循题目'))
     assert.ok(!prompt.includes('OLD_ROLE_ONLY'))
   }
 })

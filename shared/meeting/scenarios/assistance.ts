@@ -16,8 +16,8 @@ export const SCENARIO_ASSISTANCE: Record<MeetingScenarioId, ScenarioAssistance> 
     guidance: '优先寻找未被覆盖但有依据的贡献、衔接队友的切入点和团队结论。不要重复他人观点或鼓励争抢发言；没有新增价值时可以建议倾听。',
   },
   'jd-tet': {
-    title: '商业案例推进重点', dimensions: ['任务覆盖', '商业取舍', '有依据的贡献'],
-    guidance: '围绕题目任务、商业取舍和可补充的证据组织重点；不预设候选人角色，不虚构经营数据或评分标准。',
+    title: '群面讨论重点', dimensions: ['题目要求', '判断依据', '贡献机会'],
+    guidance: '围绕题目要求、判断依据和当前可贡献的内容组织重点，依据实际任务调整分析方式。',
   },
   'design-review': {
     title: '评审关注点', dimensions: ['证据与验收', '风险与取舍', '通过条件'],
