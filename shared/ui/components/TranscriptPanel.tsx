@@ -23,6 +23,7 @@ interface TranscriptPanelProps {
   className?: string
   density?: 'full' | 'compact'
   followLatest?: boolean
+  status?: { tone: 'info' | 'warning'; message: string }
   onMarkAsMe?: (speakerId: string) => void
   onRenameSpeaker?: (speakerId: string, name?: string) => void
   onClearSpeakerBinding?: (speakerId: string) => void
@@ -122,6 +123,7 @@ export function TranscriptPanel({
   className,
   density = 'full',
   followLatest = false,
+  status,
   onMarkAsMe,
   onRenameSpeaker,
   onClearSpeakerBinding,
@@ -318,6 +320,18 @@ export function TranscriptPanel({
           ) : null}
         </div>
 
+        {status ? (
+          <p
+            className={clsx(
+              'mt-2 h-5 truncate text-xs leading-5',
+              status.tone === 'warning' ? 'text-[color:var(--warning-text)]' : 'theme-muted',
+            )}
+            title={status.message}
+          >
+            {status.message}
+          </p>
+        ) : null}
+
         {pinnedSegments.length > 0 ? (
           <div className="mt-2.5 flex flex-wrap gap-1.5">
             {pinnedSegments.map((segment) => (
@@ -338,7 +352,7 @@ export function TranscriptPanel({
       <div className="relative min-h-0 flex-1 overflow-hidden">
         <div
           className={clsx(
-            'flex h-full min-h-0 flex-col overflow-y-auto',
+            'flex h-full min-h-0 flex-col overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]',
             compact ? 'gap-3 px-4 py-3' : 'gap-4 px-5 py-4',
           )}
           ref={listRef}

@@ -35,7 +35,7 @@ export function PhasePanel({
     if (isLoading && !phaseAnalysis) {
       return (
         <section className={clsx('panel-card px-4 py-3', className)}>
-          <div className="flex items-center gap-3">
+          <div className="flex h-7 items-center gap-3">
             <div className="panel-skeleton h-6 w-20 rounded-[var(--radius-pill,999px)]" />
             <div className="panel-skeleton h-4 min-w-0 flex-1 rounded-[var(--radius-control)]" />
             <div className="panel-skeleton h-4 w-10 shrink-0 rounded-[var(--radius-control)]" />
@@ -47,7 +47,7 @@ export function PhasePanel({
     if (!phaseAnalysis) {
       return (
         <section className={clsx('panel-card px-4 py-3', className)}>
-          <div className="flex items-center gap-3">
+          <div className="flex h-7 items-center gap-3">
             <span className="status-badge shrink-0">阶段</span>
             <p className="theme-muted min-w-0 truncate text-sm">
               等待第一轮分析结果
@@ -64,7 +64,7 @@ export function PhasePanel({
           className,
         )}
       >
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="flex h-7 shrink-0 items-center gap-3">
           <span className="status-badge shrink-0" data-tone="primary">
             {profile.phaseLabels[phaseAnalysis.phase]}
           </span>

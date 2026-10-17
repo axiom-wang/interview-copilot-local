@@ -193,12 +193,16 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
 
   const runtimeMessage = errorMessage
     ? { tone: 'error' as const, message: errorMessage }
-    : speakerStability === 'unstable' && mode === 'live'
+    : null
+
+  const transcriptStatus = mode === 'live'
+    ? speakerStability === 'unstable'
       ? {
           tone: 'warning' as const,
-          message: '说话人识别不稳定。可在转写里点说话人旁的「⋯」改名，或标记哪位是你。',
+          message: '发言人待识别，可点说话人旁的「⋯」改名，或标记哪位是你。',
         }
-      : null
+      : { tone: 'info' as const, message: '转写内容会实时更新。' }
+    : undefined
 
   const resizeColumns = (delta: number) => {
     const width = Math.max(layoutWidth - 10, 1)
@@ -399,6 +403,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
             pinnedSegments={pinnedSegments}
             segments={liveSegments}
             speakerProfiles={speakerProfiles}
+            status={transcriptStatus}
             title="转写"
           />
         </div>
