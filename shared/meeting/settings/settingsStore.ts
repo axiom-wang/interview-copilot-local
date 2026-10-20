@@ -22,11 +22,15 @@ const normalizeAst = (value: Partial<AstModelSettings> | undefined): AstModelSet
 })
 
 const normalizeLlm = (value: Partial<LlmModelSettings> | undefined): LlmModelSettings => ({
-  provider: value?.provider === 'codex' ? 'codex' : 'api',
+  provider: value?.provider === 'codex' || value?.provider === 'claude' ? value.provider : 'api',
   autoFallbackEnabled: typeof value?.autoFallbackEnabled === 'boolean' ? value.autoFallbackEnabled : true,
   codex: {
     executablePath: asString(value?.codex?.executablePath),
     model: asString(value?.codex?.model),
+  },
+  claude: {
+    executablePath: asString(value?.claude?.executablePath),
+    model: asString(value?.claude?.model),
   },
   apiKey: asString(value?.apiKey),
   model: asString(value?.model, DEFAULT_MODEL_SETTINGS.llm.model),

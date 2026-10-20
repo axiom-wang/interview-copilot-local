@@ -22,7 +22,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss(), electron({
       main: {
         entry: fileURLToPath(new URL('./electron/main.ts', import.meta.url)),
-        vite: { build: { rollupOptions: { external: ['ws'] } } },
+        vite: { build: { rollupOptions: { external: ['ws', '@anthropic-ai/claude-agent-sdk'] } } },
       },
       preload: { input: fileURLToPath(new URL('./electron/preload.ts', import.meta.url)) },
     })],

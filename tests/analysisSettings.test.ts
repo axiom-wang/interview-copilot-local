@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { loadModelSettings, saveModelSettings } from '../shared/meeting/settings/settingsStore'
 import { DEFAULT_LLM_SETTINGS, isLlmConfigured, toDesktopAnalysisConfig, toDesktopFallbackConfig } from '../shared/meeting/settings/types'
+import { RendererClaudeLlmProvider } from '../apps/desktop/renderer/providers/llm/RendererClaudeLlmProvider'
 import { RendererCodexLlmProvider } from '../apps/desktop/renderer/providers/llm/RendererCodexLlmProvider'
 import { RendererOpenAiLlmProvider } from '../apps/desktop/renderer/providers/llm/RendererOpenAiLlmProvider'
 import { HttpOpenAiLlmProvider } from '../apps/web/providers/llm/HttpOpenAiLlmProvider'
@@ -153,4 +154,81 @@ test('renderer shares fallback work and ignores metadata from a prior analysis s
   assert.equal(provider.label, 'OpenAI Responses')
   provider.resetSession()
   assert.equal(provider.label, '本地 Codex')
+})
+
+test('Claude settings round-trip under the existing key and old settings load with Claude defaults', (t) => {
+  const memory = new Map<string, string>()
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: {
+    getItem: (key: string) => memory.get(key) ?? null,
+    setItem: (key: string, value: string) => memory.set(key, value),
+  } })
+  t.after(() => {
+    if (previous) Object.defineProperty(globalThis, 'localStorage', previous)
+    else Reflect.deleteProperty(globalThis, 'localStorage')
+  })
+  const key = 'meeting-assistant/model-settings/test-user'
+  for (const llm of [
+    { apiKey: 'old-key', model: 'old-model' },
+    { provider: 'codex', codex: { executablePath: '/bin/codex', model: 'c' }, apiKey: 'old-key' },
+    { provider: 'claude' },
+    { provider: 'unknown', claude: { executablePath: 7, model: null } },
+  ]) {
+    memory.set(key, JSON.stringify({ ast: {}, llm }))
+    const loaded = loadModelSettings('test-user').llm
+    assert.deepEqual(loaded.claude, { executablePath: '', model: '' })
+    assert.equal(loaded.provider, llm.provider === 'codex' || llm.provider === 'claude' ? llm.provider : 'api')
+    assert.equal(loaded.apiKey, llm.apiKey ?? '')
+  }
+  const settings = loadModelSettings('test-user')
+  settings.llm.provider = 'claude'
+  settings.llm.claude = { executablePath: '/Users/me/.local/bin/claude', model: 'opus' }
+  saveModelSettings('test-user', settings)
+  assert.ok(memory.has(key) && memory.size === 1)
+  const reloaded = loadModelSettings('test-user').llm
+  assert.equal(reloaded.provider, 'claude')
+  assert.deepEqual(toDesktopAnalysisConfig(reloaded), { provider: 'claude', executablePath: '/Users/me/.local/bin/claude', model: 'opus' })
+  assert.ok(!JSON.stringify(toDesktopAnalysisConfig(reloaded)).includes('apiKey'))
+  assert.deepEqual(DEFAULT_LLM_SETTINGS.claude, { executablePath: '', model: '' })
+})
+
+test('Claude needs the desktop bridge like Codex and does not require an API key', () => {
+  assert.equal(isLlmConfigured({ ...DEFAULT_LLM_SETTINGS, provider: 'claude' }, true), true)
+  assert.equal(isLlmConfigured({ ...DEFAULT_LLM_SETTINGS, provider: 'claude' }, false), false)
+})
+
+test('Claude and Codex fall back to the API; the API falls back to Codex', () => {
+  const settings = { ...DEFAULT_LLM_SETTINGS, apiKey: 'user-key' }
+  const api = { provider: 'api', apiKey: 'user-key', model: settings.model, baseURL: settings.baseURL }
+  assert.deepEqual(toDesktopFallbackConfig({ ...settings, provider: 'claude' }), api)
+  assert.deepEqual(toDesktopFallbackConfig({ ...settings, provider: 'codex' }), api)
+  assert.equal(toDesktopFallbackConfig(settings)?.provider, 'codex')
+  assert.equal(toDesktopFallbackConfig({ ...settings, provider: 'claude', autoFallbackEnabled: false }), undefined)
+})
+
+test('Claude renderer provider sends its config with the session and shows its label until the API takes over', async (t) => {
+  const requests: Array<Record<string, unknown>> = []
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  let routing: Record<string, unknown> = { actualProvider: 'claude' }
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { interviewCopilot: {
+    analyzeTranscriptRealtime: async (request: Record<string, unknown>) => {
+      requests.push(request)
+      return { ok: true, bundle: { phaseAnalysis: { phase: 'problem-framing' }, consensusAnalysis: { consensus: [] } }, routing }
+    },
+  } } })
+  t.after(() => { if (previous) Object.defineProperty(globalThis, 'window', previous); else Reflect.deleteProperty(globalThis, 'window') })
+  const backup = { provider: 'api' as const, apiKey: 'key', model: 'model', baseURL: 'https://example.com/v1' }
+  const provider = new RendererClaudeLlmProvider({ executablePath: '', model: 'opus' }, backup, () => 'session-1')
+  const segments = [{ id: '1', speaker: 'A', timestamp: 100, text: '预算', isFinal: true }]
+  assert.deepEqual(provider.automaticAnalysis, { intervalMs: 8000, finalOnly: true, singleFlight: true })
+  assert.equal(provider.label, '本地 Claude')
+  await Promise.all([provider.detectPhase(segments), provider.extractConsensusAndTensions(segments)])
+  assert.equal(requests.length, 1)
+  assert.deepEqual(requests[0].analysisConfig, { provider: 'claude', executablePath: '', model: 'opus' })
+  assert.deepEqual(requests[0].fallbackAnalysisConfig, backup)
+  assert.equal(requests[0].analysisSessionId, 'session-1')
+  routing = { actualProvider: 'api', fallbackReason: '已从 Claude 切换至 API，本场会议继续使用 API。原因：路径无效' }
+  await provider.detectPhase([{ ...segments[0], text: '修正' }])
+  assert.equal(provider.label, 'OpenAI Responses')
+  assert.match(provider.warning!, /已从 Claude 切换至 API/)
 })

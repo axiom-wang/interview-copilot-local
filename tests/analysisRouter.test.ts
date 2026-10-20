@@ -7,13 +7,14 @@ import type { DesktopAnalysisConfig, DesktopTranscriptRequest } from '../shared/
 
 const api: DesktopAnalysisConfig = { provider: 'api', apiKey: 'test-private-key', model: 'test-model', baseURL: 'https://example.com/v1' }
 const codex: DesktopAnalysisConfig = { provider: 'codex', executablePath: '', model: '' }
+const claude: DesktopAnalysisConfig = { provider: 'claude', executablePath: '', model: '' }
 const request = (primary = codex, backup: DesktopAnalysisConfig | undefined = api): DesktopTranscriptRequest => ({
   analysisConfig: primary, fallbackAnalysisConfig: backup, analysisSessionId: 'meeting-one',
   segments: [{ id: 'a', speaker: 'A', text: '先确认预算', timestamp: 1000, isFinal: true }],
   scenarioId: 'design-review', roleContext: '评审者', questionContext: '预算',
 })
 
-for (const [primary, backup] of [[codex, api], [api, codex]]) {
+for (const [primary, backup] of [[codex, api], [api, codex], [claude, api]]) {
   test(`${primary.provider} fails over to ${backup.provider} and all later tasks stay there`, async () => {
     const router = new AnalysisRouter()
     const input = request(primary, backup)
@@ -38,6 +39,35 @@ for (const [primary, backup] of [[codex, api], [api, codex]]) {
     assert.equal(failed.actualProvider, backup.provider)
   })
 }
+
+test('Claude failure switches to the OpenAI API with a readable reason and hidden secrets', async () => {
+  const router = new AnalysisRouter()
+  const input = request(claude, api)
+  const result = await router.run(input, async (config) => {
+    if (config!.provider === 'claude') throw new Error(`Claude 路径必须是已存在的可执行文件的绝对路径。sk-ant-api03-abcdefghijklmnop ${api.apiKey}`)
+    return 'from api'
+  })
+  assert.equal(result.value, 'from api')
+  assert.equal(result.routing.actualProvider, 'api')
+  assert.match(result.routing.fallbackReason!, /已从 Claude 切换至 API，本场会议继续使用 API。原因：Claude 路径/)
+  assert.deepEqual(Object.keys(result.routing.channelFailures!), ['claude'])
+  const shown = JSON.stringify(result.routing)
+  assert.ok(!shown.includes('sk-ant-api03') && !shown.includes(api.apiKey))
+
+  const failing = new AnalysisRouter()
+  const error = await failing.run(input, async (config) => {
+    throw new Error(`${config!.provider} failed: sk-ant-api03-abcdefghijklmnop ${api.apiKey} Bearer abc`)
+  }).catch((cause: unknown) => toDesktopAnalysisFailure(cause, input))
+  assert.ok('ok' in error && !error.ok)
+  assert.match(error.error, /两种分析渠道均失败：Claude：.*；API：/)
+  assert.deepEqual(Object.keys(error.channelFailures!).sort(), ['api', 'claude'])
+  assert.ok(!JSON.stringify(error).includes('abcdefghijklmnop') && !JSON.stringify(error).includes(api.apiKey))
+})
+
+test('Claude primary without fallback reports only Claude', async () => {
+  const input = { ...request(claude), fallbackAnalysisConfig: undefined }
+  await assert.rejects(new AnalysisRouter().run(input, async () => { throw new Error('未找到 Claude Code CLI') }), /Claude 分析失败：未找到 Claude Code CLI/)
+})
 
 test('healthy primary does not call backup; disabled fallback uses only selected config', async () => {
   for (const backup of [api, undefined]) {
@@ -134,28 +164,28 @@ test('stop releases pending work but preserves routing; a new meeting resets it'
   assert.equal(next.routing.fallbackReason, undefined)
 })
 
-test('reset rejects active, queued and delayed old requests without switching the new session', async () => {
+for (const primary of [codex, claude]) test(`reset rejects active, queued and delayed old ${primary.provider} requests without switching the new session`, async () => {
   const router = new AnalysisRouter()
   let finish!: () => void
   let started!: () => void
   const begun = new Promise<void>((resolve) => { started = resolve })
   let oldCalls = 0
-  const active = router.run(request(), async () => {
+  const active = router.run(request(primary), async () => {
     oldCalls++; started()
     await new Promise<void>((resolve) => { finish = resolve })
     throw new Error('old primary failed')
   })
-  const queued = router.run(request(), async () => { oldCalls++; return 'old' })
+  const queued = router.run(request(primary), async () => { oldCalls++; return 'old' })
   const settled = Promise.allSettled([active, queued])
   await begun
   router.reset({ analysisSessionId: 'new-session' })
-  const next = await router.run({ ...request(), analysisSessionId: 'new-session' }, async (config) => config!.provider)
-  assert.equal(next.value, 'codex')
+  const next = await router.run({ ...request(primary), analysisSessionId: 'new-session' }, async (config) => config!.provider)
+  assert.equal(next.value, primary.provider)
   finish()
   const results = await settled
   assert.deepEqual(results.map((result) => result.status), ['rejected', 'rejected'])
   assert.equal(oldCalls, 1)
-  await assert.rejects(router.run(request(), async () => { oldCalls++; return 'stale' }), /旧请求/)
+  await assert.rejects(router.run(request(primary), async () => { oldCalls++; return 'stale' }), /旧请求/)
   assert.equal(oldCalls, 1)
 })
 

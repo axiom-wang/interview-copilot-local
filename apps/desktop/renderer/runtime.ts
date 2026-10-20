@@ -4,6 +4,7 @@ import { toDesktopAnalysisConfig, toDesktopFallbackConfig } from '../../../share
 import { RendererVolcAsrProvider } from './providers/ast/RendererVolcAsrProvider'
 import { RendererOpenAiLlmProvider } from './providers/llm/RendererOpenAiLlmProvider'
 import { RendererCodexLlmProvider } from './providers/llm/RendererCodexLlmProvider'
+import { RendererClaudeLlmProvider } from './providers/llm/RendererClaudeLlmProvider'
 
 export const createDesktopRuntime = (): MeetingRuntime => {
   let sessionId = crypto.randomUUID()
@@ -15,9 +16,12 @@ export const createDesktopRuntime = (): MeetingRuntime => {
     createAstProvider: () => new RendererVolcAsrProvider(),
     createLlmProvider: (settings) => {
       const fallback = toDesktopFallbackConfig(settings)
-      provider = settings.provider === 'codex'
-        ? new RendererCodexLlmProvider(settings.codex, fallback, () => sessionId)
-        : new RendererOpenAiLlmProvider(toDesktopAnalysisConfig(settings), fallback, () => sessionId)
+      const getSessionId = () => sessionId
+      switch (settings.provider) {
+        case 'codex': provider = new RendererCodexLlmProvider(settings.codex, fallback, getSessionId); break
+        case 'claude': provider = new RendererClaudeLlmProvider(settings.claude, fallback, getSessionId); break
+        default: provider = new RendererOpenAiLlmProvider(toDesktopAnalysisConfig(settings), fallback, getSessionId)
+      }
       return provider
     },
     createAuthProvider: () => new MockAuthProvider(),

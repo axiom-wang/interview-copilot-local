@@ -6,9 +6,15 @@ export interface CodexConfig {
   model: string
 }
 
+export interface ClaudeConfig {
+  executablePath: string
+  model: string
+}
+
 export type DesktopAnalysisConfig =
   | { provider: 'api'; apiKey: string; model: string; baseURL: string }
   | ({ provider: 'codex' } & CodexConfig)
+  | ({ provider: 'claude' } & ClaudeConfig)
 
 export interface DesktopTranscriptRequest extends AnalysisPromptContext {
   segments: TranscriptSegment[]

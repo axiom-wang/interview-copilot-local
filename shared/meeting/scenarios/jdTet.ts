@@ -3,6 +3,7 @@ import type { MeetingScenarioProfile } from './types'
 export const JD_TET_PROFILE: MeetingScenarioProfile = {
   id: 'jd-tet',
   parentScenarioId: 'group-interview',
+  interactionModel: 'discussion',
   label: '京东 TET 群面',
   description: '根据题目要求与现场讨论，提供群面分析和发言建议',
   roleContextEnabled: false,

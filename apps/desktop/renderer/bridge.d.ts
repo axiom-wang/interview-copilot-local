@@ -103,6 +103,7 @@ declare global {
     interviewCopilot?: {
       platform: string
       resetAnalysisSession?: (options?: AnalysisSessionReset) => Promise<void>
+      prewarmAnalysis?: (request: { analysisConfig: DesktopAnalysisConfig; scenarioId?: string }) => Promise<void>
       probeAnalysisConnection?: (config: DesktopAnalysisConfig) => Promise<DesktopProbeResult>
       analyzeTranscriptRealtime?: (
         request: TranscriptRequest,

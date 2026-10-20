@@ -36,7 +36,7 @@
 | 能力 | 本地桌面版 | 线上网页版 |
 | --- | --- | --- |
 | 入口 | `apps/desktop` | `apps/web` |
-| 文本分析 | Codex 或 OpenAI Responses API | OpenAI Responses API，通过 Netlify Functions |
+| 文本分析 | Codex、Claude 或 OpenAI Responses API | OpenAI Responses API，通过 Netlify Functions |
 | 语音转写 | Electron IPC 直接连接火山引擎 | 浏览器通过独立实时服务连接火山引擎 |
 | 登录 | 现有本地登录门 | Netlify Identity（开发环境可用 mock） |
 | 产物 | `apps/desktop/dist` + `apps/desktop/dist-electron` | `apps/web/dist` |
@@ -52,7 +52,7 @@
 - Node.js 22.13 或更高版本
 - pnpm 12.8.1（项目固定版本）；已有 `npm run` 启动方式继续可用
 - 可用的麦克风（实时转写）
-- 文本分析：OpenAI API 凭证，或桌面版已安装并登录的 Codex CLI
+- 文本分析：OpenAI API 凭证，或桌面版已安装并登录的 Codex CLI / Claude Code CLI
 - 用户自备的火山引擎流式语音识别 2.0 凭证
 
 ## 本地桌面版启动
@@ -117,6 +117,22 @@ Codex 在 Electron 主进程中通过 `app-server` 的 stdio 协议运行；它�
 停止收音仅释放进程并取消未完成分析，之后的总结、纪要仍保留本场会议的备用渠道；新会议、重启应用或保存模型设置后重新使用首选。双方都失败时保留已有结果和更新时间，尚无结果则保持空态；桌面版不再生成模拟分析。连接测试直接测试指定渠道，不触发降级，也不改变会议渠道。设置和会话沿用原有本地存储，临时降级状态不写入会议文件。
 
 本地 Codex 程序不等于离线模型：会议文本仍发送至 Codex 配置的模型服务，需要联网，延迟取决于模型与网络。此通道不启用 shell、MCP、连接器、插件或网页搜索来分析会议文本。App Server 协议可能随 CLI 版本变化，升级后可先重新测试连接。
+
+## 桌面版使用本地 Claude
+
+「模型设置 → 文本分析 → 首选渠道」还可选择 **本地 Claude**，复用本机 Claude Code CLI 的登录，不需要 API Key：
+
+1. 安装 Claude Code CLI 并在终端运行 `claude` 登录。
+2. 选择本地 Claude。模型留空使用 Sonnet；程序路径留空时依次搜索 PATH、`~/.local/bin`、`/opt/homebrew/bin`、`/usr/local/bin`、`~/.nvm/versions/node/*/bin`。从 Finder 打开应用时 PATH 不完整，找不到时请填写绝对路径。
+3. 点击「测试连接」，会完成一次真实的结构化分析请求并显示模型和登录方式，再保存配置。
+
+分析通过 `@anthropic-ai/claude-agent-sdk` 驱动 CLI：不开放任何工具，不加载用户、项目和本地设置（CLAUDE.md、settings、MCP），工作目录为临时空目录，单次超时 90 秒。环境中的 `ANTHROPIC_API_KEY` 不会传给 CLI。提示词、JSON Schema 和结果解析与其他渠道共用。
+
+为降低延迟，会议期间使用**常驻会话**：每种任务（按 Schema 和推理强度区分）保留一个 CLI 进程，省去每次启动的开销；每轮结束后立即 `/clear`，各任务互相看不到对方的内容。最多同时保留 3 个进程（每个约 230 MB 内存），闲置 5 分钟自动回收；常驻进程异常退出时自动换新进程重试一次；会话重置只取消进行中的请求，空闲进程保留；应用退出或切换通道时全部关闭。连接测试使用一次性进程。
+
+实时分析（每 8 秒一次）还做了输出精简：Claude 通道去掉了界面不显示的 `nextBestAction`，并要求各字段保持简短、共识/分歧/缺口每类最多 3 条。实测输出 token 约减半，耗时由约 11 秒降到约 5 秒。
+
+备用渠道：首选为本地 Claude 或 Codex 时，故障后固定切换到 OpenAI API（需填写 API Key 和模型）；首选为 API 时仍切换到 Codex。Claude 与 Codex、API 的配置分别保留。会议文本仍会发送至 Claude 模型服务，需要联网。网页版没有此选项。
 
 ## 常用命令
 

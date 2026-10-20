@@ -4,7 +4,7 @@ import {
 } from './profiles'
 import type { MeetingScenarioId } from './types'
 
-export type { MeetingScenarioId, MeetingScenarioProfile } from './types'
+export type { MeetingScenarioId, MeetingScenarioProfile, QaScenarioCopy, ScenarioInteractionModel } from './types'
 export { DEFAULT_SCENARIO_ID, SCENARIO_PROFILES } from './profiles'
 
 export const resolveScenarioProfile = (id?: string) =>

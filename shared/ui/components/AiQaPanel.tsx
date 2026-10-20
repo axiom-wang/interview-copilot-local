@@ -2,6 +2,7 @@ import clsx from 'clsx'
 import { resolveScenarioProfile, type MeetingScenarioId } from '../../meeting/scenarios'
 import { useAppStore } from '../store/useAppStore'
 import type { InterviewQaTurn } from '../../meeting/types/analysis'
+import { InterviewAnswerCard } from './InterviewAnswerCard'
 
 const formatAskedAt = (timestamp: number) =>
   new Intl.DateTimeFormat('zh-CN', {
@@ -43,6 +44,7 @@ export function AiQaPanel({
   const activeScenarioId = useAppStore((state) => state.scenarioId)
   const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
   const compact = density === 'compact'
+  const isQa = profile.interactionModel === 'qa'
 
   return (
     <section
@@ -96,7 +98,9 @@ export function AiQaPanel({
             embedded || compact ? 'min-h-[64px]' : 'min-h-[88px] leading-7',
           )}
           onChange={(event) => onQuestionDraftChange(event.currentTarget.value)}
-          placeholder="例如：如果现在轮到我发言，我应该怎么先承接前面的讨论，再给出一个有判断的观点？"
+          placeholder={isQa
+            ? profile.qa?.questionPlaceholder ?? '输入要提问的内容'
+            : '例如：如果现在轮到我发言，我应该怎么先承接前面的讨论，再给出一个有判断的观点？'}
           value={questionDraft}
         />
 
@@ -150,7 +154,14 @@ export function AiQaPanel({
             embedded || compact ? 'mt-3' : 'mt-5',
           )}
         >
-          {history.map((item) => (
+          {history.map((item) => item.answer.interview ? (
+            <div
+              className="theme-inline-card-strong rounded-[var(--radius-card)] p-4"
+              key={item.id}
+            >
+              <InterviewAnswerCard turn={item} />
+            </div>
+          ) : (
             <article
               className="theme-inline-card-strong rounded-[var(--radius-card)] p-4"
               key={item.id}

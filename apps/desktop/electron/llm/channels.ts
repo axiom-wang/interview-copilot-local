@@ -18,3 +18,4 @@ export const ANSWER_INTERVIEW_QUESTION_CHANNEL =
 
 export const PROBE_ANALYSIS_CHANNEL = 'meeting-assistant:probe-analysis'
 export const RESET_ANALYSIS_CHANNEL = 'meeting-assistant:reset-analysis'
+export const PREWARM_ANALYSIS_CHANNEL = 'meeting-assistant:prewarm-analysis'

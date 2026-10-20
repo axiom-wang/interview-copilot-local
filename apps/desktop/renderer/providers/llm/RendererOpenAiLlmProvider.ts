@@ -74,10 +74,15 @@ const buildRequestKey = (
   ].join('|')
 }
 
+const PROVIDER_LABELS: Record<DesktopAnalysisConfig['provider'], string> = {
+  api: 'OpenAI Responses', codex: '本地 Codex', claude: '本地 Claude',
+}
+
 export class RendererOpenAiLlmProvider implements LlmProvider {
   readonly id: string = 'openai-responses'
   get label(): string {
-    return (this.routing?.actualProvider ?? this.analysisConfig?.provider) === 'codex' ? '本地 Codex' : 'OpenAI Responses'
+    const provider = this.routing?.actualProvider ?? this.analysisConfig?.provider
+    return provider ? PROVIDER_LABELS[provider] : PROVIDER_LABELS.api
   }
 
   get warning(): string | undefined { return this.routing?.fallbackReason }
@@ -98,6 +103,14 @@ export class RendererOpenAiLlmProvider implements LlmProvider {
     this.analysisConfig = analysisConfig
     this.fallbackAnalysisConfig = fallbackAnalysisConfig
     this.getSessionId = getSessionId
+  }
+
+  async prewarm(context?: AnalysisPromptContext) {
+    if (!this.analysisConfig) return
+    await window.interviewCopilot?.prewarmAnalysis?.({
+      analysisConfig: this.analysisConfig,
+      scenarioId: context?.scenarioId,
+    })
   }
 
   resetSession(preserveRouting = false) {

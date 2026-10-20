@@ -1,4 +1,4 @@
-import type { CodexConfig, DesktopAnalysisConfig } from '../types/desktopAnalysis'
+import type { ClaudeConfig, CodexConfig, DesktopAnalysisConfig } from '../types/desktopAnalysis'
 
 export interface AstModelSettings {
   apiKey: string
@@ -7,9 +7,10 @@ export interface AstModelSettings {
 }
 
 export interface LlmModelSettings {
-  provider: 'api' | 'codex'
+  provider: 'api' | 'codex' | 'claude'
   autoFallbackEnabled: boolean
   codex: CodexConfig
+  claude: ClaudeConfig
   apiKey: string
   model: string
   baseURL: string
@@ -30,6 +31,7 @@ export const DEFAULT_LLM_SETTINGS: LlmModelSettings = {
   provider: 'api',
   autoFallbackEnabled: true,
   codex: { executablePath: '', model: '' },
+  claude: { executablePath: '', model: '' },
   apiKey: '',
   model: 'gpt-5.4-mini',
   baseURL: 'https://api.openai.com/v1',
@@ -46,7 +48,7 @@ export const isAstConfigured = (settings: AstModelSettings) =>
 export const isLlmConfigured = (
   settings: LlmModelSettings,
   supportsCodex = false,
-) => settings.provider === 'codex'
+) => settings.provider !== 'api'
   ? supportsCodex
   : Boolean(settings.apiKey.trim() && settings.model.trim())
 
@@ -66,10 +68,11 @@ export const maskSecret = (value: string) => {
   return `${trimmed.slice(0, 4)}••••${trimmed.slice(-4)}`
 }
 
-export const toDesktopAnalysisConfig = (settings: LlmModelSettings): DesktopAnalysisConfig =>
-  settings.provider === 'codex'
-    ? { provider: 'codex', ...settings.codex }
-    : { provider: 'api', apiKey: settings.apiKey, model: settings.model, baseURL: settings.baseURL }
+export const toDesktopAnalysisConfig = (settings: LlmModelSettings): DesktopAnalysisConfig => {
+  if (settings.provider === 'codex') return { provider: 'codex', ...settings.codex }
+  if (settings.provider === 'claude') return { provider: 'claude', ...settings.claude }
+  return { provider: 'api', apiKey: settings.apiKey, model: settings.model, baseURL: settings.baseURL }
+}
 
 export const toDesktopFallbackConfig = (settings: LlmModelSettings): DesktopAnalysisConfig | undefined =>
   settings.autoFallbackEnabled

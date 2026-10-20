@@ -136,6 +136,16 @@ test('all analysis tasks receive the entire meeting, role and chronology rules',
   }
 })
 
+test('scenarios declare an interaction model and only one-on-one interview is qa', () => {
+  const qaIds = Object.values(SCENARIO_PROFILES)
+    .filter((profile) => profile.interactionModel === 'qa')
+    .map((profile) => profile.id)
+  assert.deepEqual(qaIds, ['one-on-one-interview'])
+  for (const profile of Object.values(SCENARIO_PROFILES)) {
+    assert.ok(['discussion', 'qa'].includes(profile.interactionModel))
+  }
+})
+
 test('every scenario defines distinct focus and brainstorming does not force premature consensus', () => {
   const signatures = new Set<string>()
   for (const profile of Object.values(SCENARIO_PROFILES)) {

@@ -183,11 +183,13 @@ function TimelineView({ session }: { session: SessionRecord }) {
             scenarioId={session.scenarioId}
             variant="compact"
           />
-          <HintsPanel
-            className="min-h-[320px] lg:min-h-0 lg:flex-1"
-            hints={activeSnapshot?.speakingHints ?? null}
-            lastUpdatedAt={activeSnapshot?.timestamp ?? null}
-          />
+          {resolveScenarioProfile(session.scenarioId).interactionModel === 'qa' ? null : (
+            <HintsPanel
+              className="min-h-[320px] lg:min-h-0 lg:flex-1"
+              hints={activeSnapshot?.speakingHints ?? null}
+              lastUpdatedAt={activeSnapshot?.timestamp ?? null}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -269,7 +271,7 @@ function SessionDetail({ session }: { session: SessionRecord }) {
             label: '时间线回放',
             content: <TimelineView session={session} />,
           },
-          {
+          ...(resolveScenarioProfile(session.scenarioId).interactionModel === 'qa' ? [] : [{
             id: 'consensus',
             label: '共识分歧',
             content: (
@@ -283,7 +285,7 @@ function SessionDetail({ session }: { session: SessionRecord }) {
                 speakerProfiles={session.speakerProfiles ?? {}}
               />
             ),
-          },
+          }]),
           {
             id: 'mindmap',
             label: '思维导图',

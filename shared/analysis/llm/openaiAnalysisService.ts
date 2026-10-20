@@ -3,13 +3,16 @@ import { acceptMemoryEvents, findHistoricalEvidence, formatEvidence, prepareMeet
 import { buildMeetingMemoryPrompt } from '../../meeting/prompts/meetingMemory'
 import { meetingMemorySchema } from '../../meeting/schemas/meetingMemory.schema'
 import { buildAnswerInterviewQuestionPrompt } from '../../meeting/prompts/answerInterviewQuestion'
+import { buildAnswerOneOnOneInterviewPrompt } from '../../meeting/prompts/answerOneOnOneInterview'
 import { buildDetectPhasePrompt } from '../../meeting/prompts/detectPhase'
 import { buildExtractConsensusPrompt } from '../../meeting/prompts/extractConsensus'
 import { buildGenerateMeetingMinutesPrompt } from '../../meeting/prompts/generateMeetingMinutes'
 import { buildGenerateMeetingSummaryPrompt } from '../../meeting/prompts/generateMeetingSummary'
 import { buildGenerateMindMapPrompt } from '../../meeting/prompts/generateMindMap'
 import { buildSpeakingHintsPrompt } from '../../meeting/prompts/speakingHints'
+import { resolveScenarioProfile } from '../../meeting/scenarios'
 import { answerInterviewQuestionSchema } from '../../meeting/schemas/answerInterviewQuestion.schema.ts'
+import { answerOneOnOneInterviewSchema } from '../../meeting/schemas/answerOneOnOneInterview.schema.ts'
 import { detectPhaseSchema } from '../../meeting/schemas/detectPhase.schema.ts'
 import { extractConsensusSchema } from '../../meeting/schemas/extractConsensus.schema.ts'
 import { generateMeetingMinutesSchema } from '../../meeting/schemas/generateMeetingMinutes.schema.ts'
@@ -34,6 +37,7 @@ import {
 import {
   parseConsensusAnalysis,
   parseInterviewQaAnswer,
+  parseOneOnOneInterviewAnswer,
   parseMeetingMinutes,
   parseMeetingSummary,
   parseMindMapSnapshot,
@@ -357,9 +361,20 @@ export const answerInterviewQuestionOnly = async (
   context = await prepareAnalysisContext(segments, context, configOverride, createResponse, question)
   const questionSegments = segments.filter((segment) => segment.text.trim().length > 0)
   const updatedAt = questionSegments.at(-1)?.timestamp ?? Date.now()
+  const recentSegments = getRecentSegmentsByWindow(questionSegments, 90_000)
+
+  if (resolveScenarioProfile(context?.scenarioId).interactionModel === 'qa') {
+    return createResponse(
+      buildAnswerOneOnOneInterviewPrompt(question, recentSegments, context),
+      'answer_one_on_one_interview',
+      answerOneOnOneInterviewSchema,
+      (value) => parseOneOnOneInterviewAnswer(value, updatedAt),
+      configOverride,
+    )
+  }
 
   return createResponse(
-    buildAnswerInterviewQuestionPrompt(question, getRecentSegmentsByWindow(questionSegments, 90_000), context),
+    buildAnswerInterviewQuestionPrompt(question, recentSegments, context),
     'answer_interview_question',
     answerInterviewQuestionSchema,
     (value) => parseInterviewQaAnswer(value, updatedAt),

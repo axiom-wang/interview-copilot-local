@@ -4,16 +4,38 @@ export type MeetingScenarioId =
   | 'general'
   | 'group-interview'
   | 'jd-tet'
+  | 'one-on-one-interview'
   | 'design-review'
   | 'brainstorm'
   | 'team-sync'
+
+// discussion: continuous listening with discussion analysis;
+// qa: push-to-talk questions answered on demand, no continuous listening.
+export type ScenarioInteractionModel = 'discussion' | 'qa'
+
+// Copy for scenarios with the `qa` interaction model (push-to-talk questions).
+export interface QaScenarioCopy {
+  assistantRole: string
+  transcriptRule: string
+  askerLabel: string
+  transcriptTitle: string
+  captureStatus: string
+  emptyTranscript: string
+  startLabel: string
+  startNote: string
+  questionPlaceholder: string
+  captureHint: string
+}
 
 export interface MeetingScenarioProfile {
   id: MeetingScenarioId
   label: string
   description: string
+  interactionModel: ScenarioInteractionModel
   parentScenarioId?: MeetingScenarioId
   roleContextEnabled?: boolean
+  topicContextRequired?: boolean
+  qa?: QaScenarioCopy
   contextTitle?: string
   topicHelp?: string
   preparationNote?: string

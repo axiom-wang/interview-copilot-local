@@ -66,6 +66,9 @@ export function ContextFields({ compact = false }: { compact?: boolean }) {
         <span className="flex items-baseline justify-between gap-3">
           <span className="theme-title text-sm font-semibold">
             {profile.topicContextLabel}
+            {profile.topicContextRequired ? (
+              <span className="ml-1 text-[color:var(--danger-text)]">*</span>
+            ) : null}
           </span>
           <span className="theme-quiet text-xs tabular-nums">
             {questionContextDraft.trim().length} 字

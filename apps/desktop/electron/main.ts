@@ -1,3 +1,4 @@
+import { shutdownClaudeAnalysis } from './llm/claudeAnalysisService'
 import { shutdownCodexAnalysis } from './llm/codexAnalysisService'
 import { app, BrowserWindow, globalShortcut } from 'electron'
 import { existsSync, mkdirSync } from 'node:fs'
@@ -82,5 +83,6 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   shutdownCodexAnalysis()
+  shutdownClaudeAnalysis()
   globalShortcut.unregisterAll()
 })

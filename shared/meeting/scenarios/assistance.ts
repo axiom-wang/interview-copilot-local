@@ -19,6 +19,10 @@ export const SCENARIO_ASSISTANCE: Record<MeetingScenarioId, ScenarioAssistance> 
     title: '群面讨论重点', dimensions: ['题目要求', '判断依据', '贡献机会'],
     guidance: '围绕题目要求、判断依据和当前可贡献的内容组织重点，依据实际任务调整分析方式。',
   },
+  'one-on-one-interview': {
+    title: '回答要点', dimensions: ['问题意图', '岗位要求', '可用经历'],
+    guidance: '优先识别面试官问题在考察什么、对应岗位 JD 的哪项要求、可用哪段真实经历回答；不编造经历、公司或数字。',
+  },
   'design-review': {
     title: '评审关注点', dimensions: ['证据与验收', '风险与取舍', '通过条件'],
     guidance: '优先识别缺失证据、方案取舍、风险依赖和通过条件；明确已通过、待修改、待验证，不把提出方案当作评审通过。',

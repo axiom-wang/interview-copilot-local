@@ -1,5 +1,6 @@
 import type { MeetingScenarioId, MeetingScenarioProfile } from './types'
 import { JD_TET_PROFILE } from './jdTet'
+import { ONE_ON_ONE_INTERVIEW_PROFILE } from './oneOnOneInterview'
 
 export const DEFAULT_SCENARIO_ID: MeetingScenarioId = 'general'
 
@@ -14,6 +15,7 @@ const profiles: MeetingScenarioProfile[] = [
     id: 'general',
     label: '通用会议',
     description: '适用于一般多人讨论、决策与协作会议',
+    interactionModel: 'discussion',
     analystRole: '中文多人会议实时辅助分析器',
     domainHint: '多人讨论、决策、协作与信息同步场景',
     valueDimensions: ['会议目标', '参与对象', '事实与背景', '约束条件', '方案选项', '比较与取舍', '风险与兜底', '行动与负责人'],
@@ -47,6 +49,7 @@ const profiles: MeetingScenarioProfile[] = [
     id: 'group-interview',
     label: '群面 / 小组面试',
     description: '适用于无领导小组讨论和群体面试',
+    interactionModel: 'discussion',
     analystRole: '中文群面实时辅助分析器',
     domainHint: '互联网、产品、HR、运营等结构化群体面试场景',
     valueDimensions: ['题目目标', '用户或对象', '核心痛点', '约束条件', '方案选项', '比较与取舍', '风险与兜底', '分工与落地', '汇报与总结'],
@@ -80,6 +83,7 @@ const profiles: MeetingScenarioProfile[] = [
     id: 'design-review',
     label: '需求与方案评审',
     description: '适用于需求、产品、技术与设计方案评审',
+    interactionModel: 'discussion',
     analystRole: '中文方案评审实时辅助分析器',
     domainHint: '跨职能需求澄清、方案评审与决策场景',
     valueDimensions: ['背景与目标', '用户价值', '需求范围', '方案与改动点', '成本与可行性', '风险与依赖', '取舍与决策', '验收与行动'],
@@ -113,6 +117,7 @@ const profiles: MeetingScenarioProfile[] = [
     id: 'brainstorm',
     label: '头脑风暴',
     description: '适用于创意发散、聚类与优选',
+    interactionModel: 'discussion',
     analystRole: '中文头脑风暴实时辅助分析器',
     domainHint: '多人创意生成、聚类、筛选与方案孵化场景',
     valueDimensions: ['命题与目标', '目标对象', '创意方向', '差异化价值', '可行性', '组合机会', '筛选标准', '优选方案'],
@@ -146,6 +151,7 @@ const profiles: MeetingScenarioProfile[] = [
     id: 'team-sync',
     label: '团队同步 / 站会',
     description: '适用于进展同步、阻塞处理与行动确认',
+    interactionModel: 'discussion',
     analystRole: '中文团队同步实时辅助分析器',
     domainHint: '项目进展同步、站会、阻塞协调与行动跟踪场景',
     valueDimensions: ['目标与里程碑', '已完成进展', '当前工作', '阻塞与风险', '依赖关系', '优先级变化', '负责人', '下一步与时间'],
@@ -178,5 +184,5 @@ const profiles: MeetingScenarioProfile[] = [
 ]
 
 export const SCENARIO_PROFILES = Object.fromEntries(
-  [...profiles, JD_TET_PROFILE].map((profile) => [profile.id, profile]),
+  [...profiles, JD_TET_PROFILE, ONE_ON_ONE_INTERVIEW_PROFILE].map((profile) => [profile.id, profile]),
 ) as Record<MeetingScenarioId, MeetingScenarioProfile>

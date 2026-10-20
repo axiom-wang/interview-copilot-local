@@ -48,4 +48,6 @@ export interface LlmProvider {
     segments: TranscriptSegment[],
     context?: AnalysisPromptContext,
   ): Promise<InterviewQaAnswer>
+  // Optional: start whatever the first answer will need before it is asked.
+  prewarm?(context?: AnalysisPromptContext): Promise<void>
 }

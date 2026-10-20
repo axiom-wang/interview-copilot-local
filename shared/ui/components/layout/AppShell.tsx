@@ -239,7 +239,12 @@ function RecordingIndicator() {
   const scenarioId = useAppStore((state) => state.scenarioId)
   const activeView = useAppStore((state) => state.activeView)
   const setActiveView = useAppStore((state) => state.setActiveView)
+  const listeningStatusLabel = useAppStore((state) => state.listeningStatusLabel)
+  const questionCapture = useAppStore((state) => state.questionCapture)
   const [elapsedSec, setElapsedSec] = useState(0)
+  const isQa = resolveScenarioProfile(scenarioId).interactionModel === 'qa'
+  // In qa scenarios the microphone is only live while a question is being captured.
+  const idleQa = isQa && questionCapture !== 'recording'
 
   useEffect(() => {
     if (!isStreaming || !currentSessionStartedAt) {
@@ -276,13 +281,13 @@ function RecordingIndicator() {
       <span
         className={clsx(
           'recording-dot inline-block h-2.5 w-2.5 shrink-0 rounded-full',
-          isPaused ? 'bg-[color:var(--warning)]' : 'bg-[color:var(--danger)]',
+          isPaused || idleQa ? 'bg-[color:var(--warning)]' : 'bg-[color:var(--danger)]',
         )}
-        data-paused={isPaused}
+        data-paused={isPaused || idleQa}
       />
       <span className="theme-title font-semibold tabular-nums">{formatElapsed(elapsedSec)}</span>
       <span className="theme-muted hidden md:inline">
-        {isPaused ? '已暂停' : '收音中'}
+        {isQa ? listeningStatusLabel : isPaused ? '已暂停' : '收音中'}
       </span>
       <span className="status-badge hidden truncate lg:inline-flex">
         {resolveScenarioProfile(scenarioId).label}
@@ -298,6 +303,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPaused = useAppStore((state) => state.isPaused)
   const liveSegments = useAppStore((state) => state.liveSegments)
   const togglePause = useAppStore((state) => state.togglePause)
+  const scenarioId = useAppStore((state) => state.scenarioId)
   const stopStream = useAppStore((state) => state.stopStream)
   const pinCurrentSegment = useAppStore((state) => state.pinCurrentSegment)
   const applyModelSettings = useAppStore((state) => state.applyModelSettings)
@@ -325,6 +331,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   ]
 
   const showLiveControls = activeView === 'live' && isStreaming
+  const isQa = resolveScenarioProfile(scenarioId).interactionModel === 'qa'
 
   return (
     <div className="app-shell">
@@ -366,22 +373,26 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 会议背景
               </button>
-              <button
-                className="btn-ghost"
-                disabled={liveSegments.length === 0}
-                onClick={pinCurrentSegment}
-                title="标记最新一段发言（快捷键 M）"
-                type="button"
-              >
-                标记
-              </button>
-              <button
-                className={isPaused ? 'btn-primary' : 'btn-secondary'}
-                onClick={() => void togglePause()}
-                type="button"
-              >
-                {isPaused ? '继续' : '暂停'}
-              </button>
+              {isQa ? null : (
+                <>
+                  <button
+                    className="btn-ghost"
+                    disabled={liveSegments.length === 0}
+                    onClick={pinCurrentSegment}
+                    title="标记最新一段发言（快捷键 M）"
+                    type="button"
+                  >
+                    标记
+                  </button>
+                  <button
+                    className={isPaused ? 'btn-primary' : 'btn-secondary'}
+                    onClick={() => void togglePause()}
+                    type="button"
+                  >
+                    {isPaused ? '继续' : '暂停'}
+                  </button>
+                </>
+              )}
               <button
                 className="btn-danger"
                 onClick={() => void stopStream()}

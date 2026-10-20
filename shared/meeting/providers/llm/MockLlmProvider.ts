@@ -1,4 +1,5 @@
 import mockAnalysis from '../../sample/mockAnalysis.json'
+import { resolveScenarioProfile } from '../../scenarios'
 import { normalizeSpeakingHints } from '../../services/analysisNormalization'
 import { legacyMindMapToFlowMap } from '../../services/mindMapTransform'
 import type {
@@ -189,6 +190,25 @@ export class MockLlmProvider implements LlmProvider {
   ): Promise<InterviewQaAnswer> {
     const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
     const normalizedQuestion = question.trim() || '当前应该怎么回答'
+
+    if (resolveScenarioProfile(context?.scenarioId).interactionModel === 'qa') {
+      const hasBackground = Boolean(context?.roleContext?.trim())
+
+      return {
+        conclusion: `“${normalizedQuestion}”主要考察相关经历中的个人贡献与思考过程。`,
+        reasoning: [],
+        suggestedReply: hasBackground
+          ? '我先直接回答：这类问题我会从目标、我的具体做法和结果三个层面来讲。结合我经历里最相关的一段，我负责的是其中最关键的环节，过程中做过一次明确的取舍，最后让工作推进得更稳。'
+          : '我先说一下思路：这类问题我会讲清当时的目标、我自己具体做了什么，以及最后的结果和反思。具体经历我需要结合实际情况来补充。',
+        interview: {
+          questionType: 'behavioral',
+          keyPoints: ['先给结论', '讲清个人行动', '说明结果与反思'],
+          grounding: hasBackground ? 'background' : context?.questionContext?.trim() ? 'jd' : 'none',
+          missingContext: hasBackground ? '' : '未提供经历要点，无法引用具体项目。',
+        },
+        updatedAt,
+      }
+    }
     const latestLines = segments
       .filter((segment) => segment.text.trim().length > 0)
       .slice(-3)

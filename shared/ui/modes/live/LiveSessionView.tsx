@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { AiQaPanel } from '../../components/AiQaPanel'
 import { ConsensusPanel } from '../../components/ConsensusPanel'
 import { HintsPanel } from '../../components/HintsPanel'
+import { InterviewAnswerPanel } from '../../components/InterviewAnswerPanel'
 import { PhasePanel } from '../../components/PhasePanel'
 import { RuntimeMessageStrip } from '../../components/RuntimeMessageStrip'
 import { SummaryPreviewPanel } from '../../components/SummaryPreviewPanel'
@@ -10,6 +11,7 @@ import { ResizeHandle } from '../../components/ui/ResizeHandle'
 import { Tabs } from '../../components/ui/Tabs'
 import { useElementSize } from '../../hooks/useElementSize'
 import { exportLiveTranscriptAsTxt } from '../../../meeting/services/transcriptExport'
+import { resolveScenarioProfile } from '../../../meeting/scenarios'
 import { useAppStore } from '../../store/useAppStore'
 import type { SpeakerProfile } from '../../../meeting/types/speaker'
 import { LiveReviewBar } from './LiveReviewBar'
@@ -128,6 +130,11 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const generateMeetingMinutes = useAppStore((state) => state.generateMeetingMinutes)
   const setAiQuestionDraft = useAppStore((state) => state.setAiQuestionDraft)
   const askAiQuestion = useAppStore((state) => state.askAiQuestion)
+  const questionCapture = useAppStore((state) => state.questionCapture)
+  const startQuestionCapture = useAppStore((state) => state.startQuestionCapture)
+  const finishQuestionCapture = useAppStore((state) => state.finishQuestionCapture)
+  const profile = resolveScenarioProfile(scenarioId)
+  const isQa = profile.interactionModel === 'qa'
   const clearAiQaHistory = useAppStore((state) => state.clearAiQaHistory)
 
   useEffect(() => {
@@ -160,6 +167,14 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
 
       const key = event.key.toLowerCase()
 
+      if (isQa) {
+        if (event.code === 'Space') {
+          event.preventDefault()
+          void startQuestionCapture()
+        }
+        return
+      }
+
       if (key === 'm') {
         event.preventDefault()
         pinCurrentSegment()
@@ -169,9 +184,33 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       }
     }
 
+    // Releasing the key, or leaving the window while holding it, ends the capture.
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (isQa && event.code === 'Space') {
+        event.preventDefault()
+        void finishQuestionCapture()
+      }
+    }
+    const handleBlur = () => {
+      if (isQa) void finishQuestionCapture()
+    }
+
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isStreaming, pinCurrentSegment, refreshSpeakingHints])
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleBlur)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [
+    isStreaming,
+    isQa,
+    startQuestionCapture,
+    finishQuestionCapture,
+    pinCurrentSegment,
+    refreshSpeakingHints,
+  ])
 
   const pinnedSegments = liveSegments
     .filter((segment) => pinnedSegmentIds.includes(segment.id))
@@ -189,14 +228,16 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const disableAiQuestionAsk =
     isAnsweringQuestion ||
     aiQuestionDraft.trim().length === 0 ||
-    (finalSegmentCount === 0 && pinnedSegmentIds.length === 0)
+    (!isQa && finalSegmentCount === 0 && pinnedSegmentIds.length === 0)
 
   const runtimeMessage = errorMessage
     ? { tone: 'error' as const, message: errorMessage }
     : null
 
   const transcriptStatus = mode === 'live'
-    ? speakerStability === 'unstable'
+    ? isQa
+      ? { tone: 'info' as const, message: profile.qa?.captureStatus ?? '只在按住按键时收音。' }
+      : speakerStability === 'unstable'
       ? {
           tone: 'warning' as const,
           message: '发言人待识别，可点说话人旁的「⋯」改名，或标记哪位是你。',
@@ -239,6 +280,8 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
     void Promise.all([generateMeetingSummary(), generateMeetingMinutes()])
   }
 
+  const latestInterviewTurn = aiQaHistory[0]?.answer.interview ? aiQaHistory[0] : null
+
   const consensusPanel = (
     <ConsensusPanel
       analysis={consensusAnalysis}
@@ -272,12 +315,14 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const copilotColumn =
     mode === 'live' ? (
       <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full lg:overflow-hidden">
-        <PhasePanel
-          className="shrink-0"
-          isLoading={isAnalyzing}
-          phaseAnalysis={phaseAnalysis}
-          variant="compact"
-        />
+        {isQa ? null : (
+          <PhasePanel
+            className="shrink-0"
+            isLoading={isAnalyzing}
+            phaseAnalysis={phaseAnalysis}
+            variant="compact"
+          />
+        )}
         <div
           className="copilot-stack min-h-0 lg:flex-1"
           ref={stackRef}
@@ -289,19 +334,36 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
               : undefined
           }
         >
-          <HintsPanel
-            autoRefresh={autoRefreshHints}
-            className="min-h-[280px] lg:h-full lg:min-h-0"
-            density="live"
-            hints={speakingHints}
-            isRefreshing={isRefreshingHints}
-            isStale={speakingHintsStale}
-            lastUpdatedAt={lastHintsUpdatedAt}
-            onRefresh={() => {
-              void refreshSpeakingHints()
-            }}
-            onToggleAutoRefresh={setAutoRefreshHints}
-          />
+          {isQa ? (
+            <InterviewAnswerPanel
+              capture={questionCapture}
+              className="min-h-[280px] lg:h-full lg:min-h-0"
+              error={aiQaError}
+              isAnswering={isAnsweringQuestion}
+              latestTurn={latestInterviewTurn}
+              onCaptureEnd={() => {
+                void finishQuestionCapture()
+              }}
+              captureHint={profile.qa?.captureHint}
+              onCaptureStart={() => {
+                void startQuestionCapture()
+              }}
+            />
+          ) : (
+            <HintsPanel
+              autoRefresh={autoRefreshHints}
+              className="min-h-[280px] lg:h-full lg:min-h-0"
+              density="live"
+              hints={speakingHints}
+              isRefreshing={isRefreshingHints}
+              isStale={speakingHintsStale}
+              lastUpdatedAt={lastHintsUpdatedAt}
+              onRefresh={() => {
+                void refreshSpeakingHints()
+              }}
+              onToggleAutoRefresh={setAutoRefreshHints}
+            />
+          )}
           <ResizeHandle
             ariaLabel="调整发言建议与分析区高度"
             onDelta={resizeHints}
@@ -312,9 +374,9 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
           />
           <Tabs
             className="min-h-[240px] lg:h-full lg:min-h-0"
-            defaultTabId="consensus"
+            defaultTabId={isQa ? 'qa' : 'consensus'}
             items={[
-              { id: 'consensus', label: '共识分歧', content: consensusPanel },
+              ...(isQa ? [] : [{ id: 'consensus', label: '共识分歧', content: consensusPanel }]),
               { id: 'qa', label: 'AI 问答', content: aiQaPanel },
             ]}
           />
@@ -343,7 +405,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
                 />
               ),
             },
-            { id: 'consensus', label: '共识分歧', content: consensusPanel },
+            ...(isQa ? [] : [{ id: 'consensus', label: '共识分歧', content: consensusPanel }]),
             { id: 'qa', label: 'AI 问答', content: aiQaPanel },
           ]}
           onActiveIdChange={setReviewTab}
@@ -390,7 +452,9 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
             density="compact"
             emptyMessage={
               mode === 'live'
-                ? '正在收音，听到发言后会实时出现在这里。'
+                ? isQa
+                  ? profile.qa?.emptyTranscript ?? '还没有录入内容。'
+                  : '正在收音，听到发言后会实时出现在这里。'
                 : '这场会议没有转写内容。'
             }
             followLatest={mode === 'live'}
@@ -404,7 +468,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
             segments={liveSegments}
             speakerProfiles={speakerProfiles}
             status={transcriptStatus}
-            title="转写"
+            title={isQa ? profile.qa?.transcriptTitle ?? '提问' : '转写'}
           />
         </div>
       </div>

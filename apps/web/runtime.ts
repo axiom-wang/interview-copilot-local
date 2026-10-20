@@ -11,7 +11,7 @@ export const createWebRuntime = (): MeetingRuntime => {
     environment: 'web', supportsCodex: false, supportsLiveAssist: Boolean(wsUrl),
     createAstProvider: () => new RemoteVolcAsrProvider(wsUrl),
     createLlmProvider: (settings) => {
-      if (settings.provider === 'codex') return new UnavailableLlmProvider()
+      if (settings.provider !== 'api') return new UnavailableLlmProvider()
       const provider = new HttpOpenAiLlmProvider()
       provider.setModelConfig(settings)
       return provider
@@ -26,7 +26,7 @@ export const createWebRuntime = (): MeetingRuntime => {
       if (!response.ok || !result?.ok) throw new Error(result?.error || `语音转写连接测试失败（${response.status}）。`)
     },
     probeLlmConnection: async (settings) => {
-      if (settings.provider === 'codex') throw new Error('本地 Codex 通道仅在桌面版可用。')
+      if (settings.provider !== 'api') throw new Error('本地 Codex / Claude 通道仅在桌面版可用。')
       const provider = new HttpOpenAiLlmProvider()
       provider.setModelConfig(settings)
       return provider.probeConnection()

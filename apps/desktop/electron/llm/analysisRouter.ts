@@ -4,7 +4,8 @@ import { toAnalysisFailure } from '../../../../shared/analysis/llm/analysisFailu
 import type { AnalysisRoutingMetadata, AnalysisSessionReset, DesktopAnalysisConfig, DesktopTranscriptRequest } from '../../../../shared/meeting/types/desktopAnalysis'
 
 type Provider = DesktopAnalysisConfig['provider']
-const label = (provider: Provider) => provider === 'codex' ? 'Codex' : 'API'
+const PROVIDER_LABELS: Record<Provider, string> = { api: 'API', codex: 'Codex', claude: 'Claude' }
+const label = (provider: Provider) => PROVIDER_LABELS[provider]
 
 export const redactAnalysisError = (error: unknown, configs: Array<DesktopAnalysisConfig | undefined>) => {
   let message = error instanceof Error ? error.message : '分析渠道调用失败。'
@@ -13,7 +14,7 @@ export const redactAnalysisError = (error: unknown, configs: Array<DesktopAnalys
       for (const secret of [config.apiKey, config.apiKey.trim()]) message = message.split(secret).join('[已隐藏密钥]')
     }
   }
-  return message.replace(/Bearer\s+[^\s"']+/gi, 'Bearer [已隐藏密钥]')
+  return message.replace(/Bearer\s+[^\s"']+/gi, 'Bearer [已隐藏密钥]').replace(/\bsk-[\w-]{12,}/g, '[已隐藏密钥]')
 }
 
 class RoutingError extends Error {

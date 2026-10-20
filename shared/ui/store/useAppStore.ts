@@ -21,6 +21,7 @@ import {
   saveSession,
 } from '../../meeting/services/sessionStore'
 import { createPinnedSegment } from '../../meeting/services/transcriptBuffer'
+import { joinQuestionText } from '../../meeting/services/interviewTurns'
 import {
   DEFAULT_SCENARIO_ID,
   resolveScenarioProfile,
@@ -53,6 +54,9 @@ type AppView = 'live' | 'replay' | 'settings'
 type AstProviderId = 'volc-asr'
 type RuntimeEnvironment = 'electron' | 'web'
 
+// Push-to-talk question capture used by `qa` scenarios.
+export type QuestionCaptureState = 'idle' | 'connecting' | 'recording' | 'transcribing'
+
 interface AppState {
   mode: AppMode
   activeView: AppView
@@ -68,6 +72,7 @@ interface AppState {
   isGeneratingSummary: boolean
   isGeneratingMinutes: boolean
   isAnsweringQuestion: boolean
+  questionCapture: QuestionCaptureState
   selectedAstProviderId: AstProviderId
   activeAstProviderId: AstProviderId
   astProviderLabel: string
@@ -143,7 +148,9 @@ interface AppState {
   applyRoleContext: () => void
   clearQuestionContext: () => void
   clearRoleContext: () => void
-  askAiQuestion: () => Promise<void>
+  askAiQuestion: (questionOverride?: string, options?: { recognitionMs?: number }) => Promise<void>
+  startQuestionCapture: () => Promise<void>
+  finishQuestionCapture: () => Promise<void>
   clearAiQaHistory: () => void
   refreshAnalysis: () => Promise<void>
   refreshSpeakingHints: () => Promise<void>
@@ -167,6 +174,11 @@ let summaryRunToken = 0
 let minutesRunToken = 0
 let aiQuestionRunToken = 0
 let streamRunToken = 0
+let questionCaptureSegmentIds: Set<string> | null = null
+let questionCaptureStart: Promise<boolean> | null = null
+// Upper bound for the last final results to arrive after the recognizer session closes.
+const QUESTION_CAPTURE_SETTLE_MS = 300
+const QUESTION_CAPTURE_POLL_MS = 20
 let analysisTimeoutId: number | null = null
 let hintsRefreshTimeoutId: number | null = null
 let lastHintsRequestedAt: number | null = null
@@ -1028,6 +1040,27 @@ const getSegmentsForAnalysis = (segments: TranscriptSegment[]) => {
   return [...latestById.values()].sort((left, right) => left.timestamp - right.timestamp)
 }
 
+// Returns as soon as every captured segment is final, instead of always sleeping the full window.
+const waitForCapturedSegmentsFinal = async (read: () => Pick<AppState, 'liveSegments'>) => {
+  const deadline = Date.now() + QUESTION_CAPTURE_SETTLE_MS
+
+  for (;;) {
+    const captured = getSegmentsForAnalysis(read().liveSegments).filter((segment) =>
+      questionCaptureSegmentIds?.has(segment.id),
+    )
+
+    if (captured.length > 0 && captured.every((segment) => segment.isFinal)) {
+      return
+    }
+
+    if (Date.now() >= deadline) {
+      return
+    }
+
+    await new Promise((resolve) => window.setTimeout(resolve, QUESTION_CAPTURE_POLL_MS))
+  }
+}
+
 const getSegmentsForSummary = (segments: TranscriptSegment[]) => {
   const stableSegments = getSegmentsForAnalysis(segments)
   const finalSegments = stableSegments.filter((segment) => segment.isFinal)
@@ -1080,11 +1113,13 @@ const buildInterviewQaTurn = (
   question: string,
   answer: InterviewQaTurn['answer'],
   askedAt: number,
+  timing?: InterviewQaTurn['timing'],
 ): InterviewQaTurn => ({
   id: `qa-${askedAt}-${crypto.randomUUID()}`,
   question,
   answer,
   askedAt,
+  ...(timing ? { timing } : {}),
 })
 
 const isMindMapSnapshot = (
@@ -1106,6 +1141,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   isGeneratingSummary: false,
   isGeneratingMinutes: false,
   isAnsweringQuestion: false,
+  questionCapture: 'idle',
   selectedAstProviderId: 'volc-asr',
   activeAstProviderId: 'volc-asr',
   astProviderLabel: astProviders['volc-asr'].label,
@@ -1251,6 +1287,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
       return
     }
+    const startProfile = resolveScenarioProfile(get().scenarioId)
+    if (startProfile.topicContextRequired && !get().questionContext.trim()) {
+      set({ errorMessage: `请先填写${startProfile.topicContextLabel}，再开始。` })
+      return
+    }
+    const isQa = startProfile.interactionModel === 'qa'
 
     streamRunToken += 1
     analysisRunToken += 1
@@ -1272,10 +1314,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     clearHintsRefreshTimer()
     ignoredLiveSegmentIds.clear()
     lastHintsRequestedAt = null
+    questionCaptureSegmentIds = null
+    questionCaptureStart = null
 
     set({
       mode: 'live',
       isStreaming: true,
+      questionCapture: 'idle',
       isPaused: false,
       isAnalyzing: false,
       isRefreshingHints: false,
@@ -1317,14 +1362,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       lastUpdatedAt: null,
     })
 
-    const onSegment = (segment: TranscriptSegment) => {
+    const onSegment = (incoming: TranscriptSegment) => {
       if (activeToken !== streamRunToken) {
         return
       }
 
-      if (ignoredLiveSegmentIds.has(segment.id)) {
+      if (ignoredLiveSegmentIds.has(incoming.id)) {
         return
       }
+
+      // qa scenarios only keep what was said while the capture key is held.
+      if (isQa && !questionCaptureSegmentIds) {
+        return
+      }
+      questionCaptureSegmentIds?.add(incoming.id)
+      const segment = isQa ? { ...incoming, speaker: startProfile.qa?.askerLabel ?? incoming.speaker } : incoming
 
       set((state) => {
         const speakerProfiles = { ...state.speakerProfiles }
@@ -1388,7 +1440,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       })
 
-      if (llmProvider.automaticAnalysis?.finalOnly && !segment.isFinal) return
+      if (isQa || (llmProvider.automaticAnalysis?.finalOnly && !segment.isFinal)) return
       scheduleAnalysis(() => {
         void get().refreshAnalysis()
       })
@@ -1424,9 +1476,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         return
       }
 
+      // qa scenarios keep the microphone ready but only listen while the capture key is held.
+      if (isQa) {
+        void llmProvider.prewarm?.(buildQuestionAnswerPromptContext(get())).catch(() => {})
+        await selectedProvider.pause?.()
+
+        if (activeToken !== streamRunToken) {
+          return
+        }
+      }
+
       set({
         activeAstProviderId: selectedProviderId,
-        listeningStatusLabel: '监听中',
+        listeningStatusLabel: isQa ? '待提问' : '监听中',
       })
     } catch (error) {
       if (activeToken !== streamRunToken) {
@@ -1494,6 +1556,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   stopStream: async () => {
     await astProviders[get().activeAstProviderId].stop()
     streamRunToken += 1
+    questionCaptureSegmentIds = null
+    questionCaptureStart = null
     analysisRunToken += 1
     speakingHintsRunToken += 1
     mindMapRunToken += 1
@@ -1513,6 +1577,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       isGeneratingSummary: false,
       isGeneratingMinutes: false,
       isAnsweringQuestion: false,
+      questionCapture: 'idle',
       activeAstProviderId: get().selectedAstProviderId,
       listeningStatusLabel: '未监听',
       speakerStability: 'unknown',
@@ -2011,13 +2076,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       statusMessage: 'roleContext 已清空。',
     })
   },
-  askAiQuestion: async () => {
+  askAiQuestion: async (questionOverride, options) => {
     const state = get()
-    const question = normalizeContextInput(state.aiQuestionDraft).trim()
+    const question = normalizeContextInput(questionOverride ?? state.aiQuestionDraft).trim()
     const segments = getSegmentsForAnalysis(state.liveSegments)
     const promptContext = buildQuestionAnswerPromptContext(state)
+    // qa scenarios answer from the JD alone, so a first question needs no transcript.
+    const needsTranscript = resolveScenarioProfile(state.scenarioId).interactionModel !== 'qa'
 
-    if (!question || !segments.length) {
+    if (!question || (needsTranscript && !segments.length)) {
       return
     }
 
@@ -2048,7 +2115,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         isAnsweringQuestion: false,
         aiQaError: null,
         aiQaHistory: [
-          buildInterviewQaTurn(question, result.answer, askedAt),
+          buildInterviewQaTurn(question, result.answer, askedAt, {
+            recognitionMs: options?.recognitionMs,
+            answerMs: Date.now() - askedAt,
+          }),
           ...currentState.aiQaHistory,
         ].slice(0, MAX_QA_HISTORY_ITEMS),
         analysisProviderLabel: result.providerLabel,
@@ -2068,6 +2138,88 @@ export const useAppStore = create<AppState>((set, get) => ({
       })
     }
   },
+  startQuestionCapture: async () => {
+    const state = get()
+
+    if (
+      !state.isStreaming ||
+      state.questionCapture !== 'idle' ||
+      resolveScenarioProfile(state.scenarioId).interactionModel !== 'qa'
+    ) {
+      return
+    }
+
+    const token = streamRunToken
+    const provider = astProviders[state.activeAstProviderId]
+    questionCaptureSegmentIds = new Set()
+    set({ questionCapture: 'connecting', listeningStatusLabel: '连接中', aiQaError: null })
+
+    questionCaptureStart = (async () => {
+      try {
+        await provider.resume?.()
+      } catch (error) {
+        if (token === streamRunToken) {
+          questionCaptureSegmentIds = null
+          set({ questionCapture: 'idle', listeningStatusLabel: '待提问', aiQaError: toErrorMessage(error) })
+        }
+        return false
+      }
+
+      if (token !== streamRunToken) {
+        return false
+      }
+
+      if (get().questionCapture === 'connecting') {
+        set({ questionCapture: 'recording', listeningStatusLabel: '收音中' })
+      }
+      return true
+    })()
+    await questionCaptureStart
+  },
+  finishQuestionCapture: async () => {
+    const state = get()
+
+    if (state.questionCapture !== 'connecting' && state.questionCapture !== 'recording') {
+      return
+    }
+
+    const token = streamRunToken
+    const provider = astProviders[state.activeAstProviderId]
+    const releasedAt = Date.now()
+    set({ questionCapture: 'transcribing', listeningStatusLabel: '识别中' })
+
+    const started = await (questionCaptureStart ?? Promise.resolve(false))
+    questionCaptureStart = null
+
+    if (!started || token !== streamRunToken) {
+      return
+    }
+
+    try {
+      await provider.pause?.()
+    } catch (error) {
+      set({ aiQaError: toErrorMessage(error) })
+    }
+    await waitForCapturedSegmentsFinal(get)
+
+    if (token !== streamRunToken) {
+      return
+    }
+
+    const capturedIds = questionCaptureSegmentIds ?? new Set<string>()
+    questionCaptureSegmentIds = null
+    const question = joinQuestionText(
+      getSegmentsForAnalysis(get().liveSegments).filter((segment) => capturedIds.has(segment.id)),
+    )
+    set({ questionCapture: 'idle', listeningStatusLabel: '待提问' })
+
+    if (!question) {
+      set({ aiQaError: '没有识别到问题，请按住后完整说一遍。' })
+      return
+    }
+
+    await get().askAiQuestion(question, { recognitionMs: Date.now() - releasedAt })
+  },
   clearAiQaHistory: () => {
     aiQuestionRunToken += 1
     set({
@@ -2082,7 +2234,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const segments = getSegmentsForAnalysis(state.liveSegments)
     const promptContext = buildPromptContext(state)
 
-    if (!segments.length || state.isPaused) {
+    // qa scenarios only record questions; discussion analysis does not apply.
+    if (!segments.length || state.isPaused || resolveScenarioProfile(state.scenarioId).interactionModel === 'qa') {
       return
     }
     if (llmProvider.automaticAnalysis?.singleFlight && state.isAnalyzing) {
@@ -2471,7 +2624,10 @@ queueAutoHintsRefresh = () => {
   clearHintsRefreshTimer()
   const latest = useAppStore.getState()
   const delay = hintsAutoRefreshDelayMs({
-    enabled: latest.autoRefreshHints,
+    // qa scenarios answer on demand instead of producing speaking hints.
+    enabled:
+      latest.autoRefreshHints &&
+      resolveScenarioProfile(latest.scenarioId).interactionModel !== 'qa',
     isStreaming: latest.isStreaming,
     isPaused: latest.isPaused,
     isRefreshing: latest.isRefreshingHints,

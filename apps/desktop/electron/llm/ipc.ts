@@ -1,5 +1,6 @@
 import { normalizeParticipantView } from '../../../../shared/meeting/context/participantView'
 import type { AnalysisRoutingMetadata, AnalysisSessionReset, DesktopAnalysisConfig, DesktopTranscriptRequest } from '../../../../shared/meeting/types/desktopAnalysis'
+import { claudeAnalysis, prewarmClaudeAnalysis, probeClaudeConnection, resetClaudeAnalysis } from './claudeAnalysisService'
 import { codexAnalysis, disposeCodexAnalysis, probeCodexConnection } from './codexAnalysisService'
 import { probeOpenAiConnection } from '../../../../shared/analysis/llm/openaiAnalysisService'
 import { ipcMain } from 'electron'
@@ -25,6 +26,7 @@ import {
 } from '../../../../shared/analysis/llm/openaiAnalysisService'
 import {
   PROBE_ANALYSIS_CHANNEL,
+  PREWARM_ANALYSIS_CHANNEL,
   RESET_ANALYSIS_CHANNEL,
   ANALYZE_TRANSCRIPT_REALTIME_CHANNEL,
   ANSWER_INTERVIEW_QUESTION_CHANNEL,
@@ -167,6 +169,10 @@ const validateConfig = (config?: DesktopAnalysisConfig) => {
     if (typeof config.executablePath !== 'string' || typeof config.model !== 'string') {
       throw new Error('无效的 Codex 配置。')
     }
+  } else if (config.provider === 'claude') {
+    if (typeof config.executablePath !== 'string' || typeof config.model !== 'string') {
+      throw new Error('无效的 Claude 配置。')
+    }
   } else if (config.provider !== 'api' || typeof config.apiKey !== 'string' ||
     typeof config.model !== 'string' || typeof config.baseURL !== 'string') {
     throw new Error('无效的文本分析配置。')
@@ -176,6 +182,7 @@ const validateConfig = (config?: DesktopAnalysisConfig) => {
 const selectAnalysis = (config?: DesktopAnalysisConfig) => {
   validateConfig(config)
   if (config?.provider === 'codex') return codexAnalysis(config)
+  if (config?.provider === 'claude') return claudeAnalysis(config)
   return {
     realtime: (segments: TranscriptSegment[], context?: AnalysisPromptContext) =>
       analyzeTranscriptRealtimeBundle(segments, context, config),
@@ -192,21 +199,37 @@ const selectAnalysis = (config?: DesktopAnalysisConfig) => {
   }
 }
 
+const probeConnection = async (config: DesktopAnalysisConfig) => {
+  switch (config.provider) {
+    case 'codex': return probeCodexConnection(config)
+    case 'claude': return probeClaudeConnection(config)
+    default: return { ...await probeOpenAiConnection(config), authMethod: 'apiKey' }
+  }
+}
+
 export const registerLlmIpcHandlers = () => {
   ipcMain.removeHandler(PROBE_ANALYSIS_CHANNEL)
   ipcMain.removeHandler(RESET_ANALYSIS_CHANNEL)
+  ipcMain.removeHandler(PREWARM_ANALYSIS_CHANNEL)
+  // 预热只是优化：失败不影响后续请求，真正的错误会在首次分析时报告。
+  ipcMain.handle(PREWARM_ANALYSIS_CHANNEL, (_event, request: { analysisConfig?: DesktopAnalysisConfig; scenarioId?: string }) => {
+    try {
+      validateConfig(request?.analysisConfig)
+      if (request?.analysisConfig?.provider === 'claude') prewarmClaudeAnalysis(request.analysisConfig, request.scenarioId)
+    } catch {
+      // Ignore: the first real request reports configuration problems.
+    }
+  })
   ipcMain.handle(RESET_ANALYSIS_CHANNEL, (_event, options?: AnalysisSessionReset) => {
     router.reset(options)
     disposeCodexAnalysis()
+    resetClaudeAnalysis()
   })
   ipcMain.handle(PROBE_ANALYSIS_CHANNEL, async (_event, config: DesktopAnalysisConfig) => {
     try {
       validateConfig(config)
       if (!config) throw new Error('缺少分析通道配置。')
-      const result = config.provider === 'codex'
-        ? await probeCodexConnection(config)
-        : { ...await probeOpenAiConnection(config), authMethod: 'apiKey' }
-      return { ok: true, ...result }
+      return { ok: true, ...await probeConnection(config) }
     } catch (error) {
       return { ok: false, error: redactAnalysisError(error, [config]) }
     }

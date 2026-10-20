@@ -1,16 +1,23 @@
 # Project rules
 
 ## Product scope
-Build a Web SaaS app (Netlify) for AI-assisted multi-person meetings, with an optional Electron desktop shell.
+Build a Web SaaS app (Netlify) for AI-assisted meetings — multi-person meetings and one-on-one interviews — with an optional Electron desktop shell.
 
 Meeting scenarios (default: general meeting):
 - general
-- group-interview
+- group-interview (preset: jd-tet)
+- one-on-one-interview
 - design-review
 - brainstorm
 - team-sync
 
-Scenario-specific copy lives in `shared/meeting/scenarios/`. Do not hardcode group-interview wording in prompts or UI.
+Scenario-specific copy lives in `shared/meeting/scenarios/`. Do not hardcode group-interview or interview wording in prompts or UI.
+
+Each scenario declares an `interactionModel`:
+- `discussion`: continuous listening with discussion analysis (phase, consensus/disagreement, mind map, speaking hints)
+- `qa`: no continuous listening; the user holds a key to capture the interviewer's question, and on release the AI answers it (answer key points). Requires a JD (`topicContextRequired`) before starting
+
+Branch UI and analysis behavior on `interactionModel`, never on a specific scenario id.
 
 Modes:
 - Live Assist Mode
@@ -37,6 +44,7 @@ Do not build:
 - local persistence for sessions
 - login gate + model settings before live use
 - per-meeting scenario templates
+- one-on-one interview Q&A assistance (`qa` interaction model, push-to-talk questions answered with the JD as context)
 
 ## Architecture rules
 - One repository with independent `apps/desktop` (Electron) and `apps/web` (Netlify) entries

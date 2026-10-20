@@ -6,9 +6,15 @@ import {
   normalizeSpeakingHints,
 } from '../../meeting/services/analysisNormalization'
 import { normalizeMindMapSnapshot } from '../../meeting/services/mindMapTransform'
+import {
+  INTERVIEW_ANSWER_GROUNDINGS,
+  INTERVIEW_QUESTION_TYPES,
+} from '../../meeting/schemas/answerOneOnOneInterview.schema.ts'
 import type {
   ConsensusAnalysis,
+  InterviewAnswerGrounding,
   InterviewQaAnswer,
+  InterviewQuestionType,
   MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
@@ -186,6 +192,31 @@ export const parseInterviewQaAnswer = (
         ? reasoning
         : ['当前证据有限，建议优先基于题目目标和已形成共识做稳妥表达。'],
     suggestedReply,
+    updatedAt,
+  }
+}
+
+const pickEnum = <T extends string>(value: unknown, allowed: readonly T[], fallback: T): T =>
+  allowed.includes(value as T) ? (value as T) : fallback
+
+export const parseOneOnOneInterviewAnswer = (
+  value: unknown,
+  updatedAt: number,
+): InterviewQaAnswer => {
+  if (!isObject(value)) {
+    throw new Error('interview answer response format is invalid')
+  }
+
+  return {
+    conclusion: coerceString(value.questionIntent, '当前信息不足，暂时无法判断这道题的考察点。'),
+    reasoning: [],
+    suggestedReply: coerceString(value.suggestedReply, ''),
+    interview: {
+      questionType: pickEnum<InterviewQuestionType>(value.questionType, INTERVIEW_QUESTION_TYPES, 'other'),
+      keyPoints: coerceStringArray(value.keyPoints, { maxItems: 3 }),
+      grounding: pickEnum<InterviewAnswerGrounding>(value.grounding, INTERVIEW_ANSWER_GROUNDINGS, 'none'),
+      missingContext: coerceString(value.missingContext, ''),
+    },
     updatedAt,
   }
 }

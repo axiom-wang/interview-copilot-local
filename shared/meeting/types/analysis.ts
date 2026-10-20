@@ -90,11 +90,39 @@ export interface MeetingMinutes {
   updatedAt: number
 }
 
+export type InterviewQuestionType =
+  | 'self-intro'
+  | 'behavioral'
+  | 'technical'
+  | 'motivation'
+  | 'case'
+  | 'reverse-qa'
+  | 'other'
+
+// background: the candidate's own experience; jd: the job description only; none: no grounding.
+export type InterviewAnswerGrounding = 'background' | 'jd' | 'none'
+
+export interface InterviewAnswerDetail {
+  questionType: InterviewQuestionType
+  keyPoints: string[]
+  grounding: InterviewAnswerGrounding
+  missingContext: string
+}
+
 export interface InterviewQaAnswer {
   conclusion: string
   reasoning: string[]
   suggestedReply: string
+  // Present only for scenarios with the `qa` interaction model.
+  interview?: InterviewAnswerDetail
   updatedAt: number
+}
+
+export interface InterviewQaTiming {
+  // From releasing the capture key until the question text was ready.
+  recognitionMs?: number
+  // From sending the question until the answer arrived.
+  answerMs: number
 }
 
 export interface InterviewQaTurn {
@@ -102,6 +130,7 @@ export interface InterviewQaTurn {
   question: string
   answer: InterviewQaAnswer
   askedAt: number
+  timing?: InterviewQaTiming
 }
 
 export interface RealtimeAnalysisBundle {

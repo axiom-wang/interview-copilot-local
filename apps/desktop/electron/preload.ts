@@ -21,6 +21,7 @@ import {
 } from './ast/channels'
 import {
   RESET_ANALYSIS_CHANNEL,
+  PREWARM_ANALYSIS_CHANNEL,
   PROBE_ANALYSIS_CHANNEL,
   ANALYZE_TRANSCRIPT_REALTIME_CHANNEL,
   ANSWER_INTERVIEW_QUESTION_CHANNEL,
@@ -109,6 +110,8 @@ type StartVolcAsrSessionResult =
 contextBridge.exposeInMainWorld('interviewCopilot', {
   platform: process.platform,
   resetAnalysisSession: (options?: AnalysisSessionReset) => ipcRenderer.invoke(RESET_ANALYSIS_CHANNEL, options) as Promise<void>,
+  prewarmAnalysis: (request: { analysisConfig: DesktopAnalysisConfig; scenarioId?: string }) =>
+    ipcRenderer.invoke(PREWARM_ANALYSIS_CHANNEL, request) as Promise<void>,
   probeAnalysisConnection: (config: DesktopAnalysisConfig) =>
     ipcRenderer.invoke(PROBE_ANALYSIS_CHANNEL, config) as Promise<DesktopProbeResult>,
   analyzeTranscriptRealtime: (request: TranscriptRequest) =>

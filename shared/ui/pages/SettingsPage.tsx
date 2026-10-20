@@ -44,6 +44,8 @@ export function SettingsPage() {
   const supportsCodex = getMeetingRuntime().supportsCodex
   const isDesktop = getMeetingRuntime().environment === 'electron'
   const usesCodex = draft.llm.provider === 'codex'
+  const usesClaude = draft.llm.provider === 'claude'
+  const usesLocal = usesCodex || usesClaude
   const dirty = useSettingsStore((state) => state.dirty)
   const updateAstDraft = useSettingsStore((state) => state.updateAstDraft)
   const updateLlmDraft = useSettingsStore((state) => state.updateLlmDraft)
@@ -59,8 +61,9 @@ export function SettingsPage() {
   const [astTest, setAstTest] = useState<TestState>({ status: 'idle' })
   const [apiTest, setApiTest] = useState<TestState>({ status: 'idle' })
   const [codexTest, setCodexTest] = useState<TestState>({ status: 'idle' })
-  const llmTest = usesCodex ? codexTest : apiTest
-  const llmTesting = apiTest.status === 'testing' || codexTest.status === 'testing'
+  const [claudeTest, setClaudeTest] = useState<TestState>({ status: 'idle' })
+  const llmTest = usesCodex ? codexTest : usesClaude ? claudeTest : apiTest
+  const llmTesting = [apiTest, codexTest, claudeTest].some((test) => test.status === 'testing')
 
   const updateAst = (patch: Parameters<typeof updateAstDraft>[0]) => {
     updateAstDraft(patch)
@@ -71,6 +74,7 @@ export function SettingsPage() {
     updateLlmDraft(patch)
     setApiTest({ status: 'idle' })
     setCodexTest({ status: 'idle' })
+    setClaudeTest({ status: 'idle' })
   }
 
   const handleSave = () => {
@@ -94,8 +98,8 @@ export function SettingsPage() {
     }
   }
 
-  const testLlmConnection = async (provider: 'api' | 'codex') => {
-    const setLlmTest = provider === 'codex' ? setCodexTest : setApiTest
+  const testLlmConnection = async (provider: 'api' | 'codex' | 'claude') => {
+    const setLlmTest = provider === 'codex' ? setCodexTest : provider === 'claude' ? setClaudeTest : setApiTest
     setLlmTest({ status: 'testing' })
 
     try {
@@ -104,7 +108,9 @@ export function SettingsPage() {
         status: 'ok',
         message: provider === 'codex'
           ? `Codex 分析请求成功（${result.model}，${result.authMethod === 'chatgpt' ? 'ChatGPT 账号' : result.authMethod === 'apiKey' ? 'Codex API Key 登录' : 'Codex 当前登录方式'}）。`
-          : `文本分析连接成功（${result.model}）。`,
+          : provider === 'claude'
+            ? `Claude 分析请求成功（${result.model}，${result.authMethod === 'claude-login' ? 'Claude 账号登录' : result.authMethod === 'apiKey' ? 'Claude Code API Key 登录' : 'Claude Code 当前登录方式'}）。`
+            : `文本分析连接成功（${result.model}）。`,
       })
     } catch (error) {
       setLlmTest({
@@ -121,7 +127,7 @@ export function SettingsPage() {
       <div>
         <h1 className="theme-title text-xl font-semibold">模型设置</h1>
         <p className="theme-muted mt-1 text-sm leading-6">
-          配置只保存在当前设备。API 通道使用你填写的密钥；桌面版也可使用本机已登录的 Codex。
+          配置只保存在当前设备。API 通道使用你填写的密钥；桌面版也可使用本机已登录的 Codex 或 Claude。
         </p>
       </div>
 
@@ -206,9 +212,9 @@ export function SettingsPage() {
                   <h3 className="theme-title font-semibold">文本分析</h3>
                   <TestStatusBadge state={llmTest} />
                 </div>
-                <p className="theme-muted mt-1 text-xs">{usesCodex ? '本机 Codex · 云端模型分析' : 'OpenAI Responses API'}</p>
+                <p className="theme-muted mt-1 text-xs">{usesCodex ? '本机 Codex · 云端模型分析' : usesClaude ? '本机 Claude · 云端模型分析' : 'OpenAI Responses API'}</p>
               </div>
-              {(isDesktop || !usesCodex) ? (
+              {(isDesktop || !usesLocal) ? (
                 <button
                   className="btn-ghost shrink-0 text-xs"
                   onClick={() => setShowLlmSecrets((value) => !value)}
@@ -226,10 +232,11 @@ export function SettingsPage() {
                   className="theme-input w-full px-3 py-2"
                   disabled={llmTesting}
                   value={draft.llm.provider}
-                  onChange={(event) => updateLlm({ provider: event.currentTarget.value === 'codex' ? 'codex' : 'api' })}
+                  onChange={(event) => updateLlm({ provider: event.currentTarget.value === 'codex' || event.currentTarget.value === 'claude' ? event.currentTarget.value : 'api' })}
                 >
                   <option value="api">API（线上与桌面版）</option>
                   <option value="codex" disabled={!supportsCodex}>本地 Codex（仅桌面版）</option>
+                  {isDesktop ? <option value="claude" disabled={!supportsCodex}>本地 Claude（仅桌面版）</option> : null}
                 </select>
               </label>
               {isDesktop ? (
@@ -241,10 +248,10 @@ export function SettingsPage() {
               ) : null}
               {isDesktop && draft.llm.autoFallbackEnabled ? (
                 <p className="theme-muted text-xs leading-5">
-                  首选渠道重试失败后切换至另一渠道，成功后本场会议持续使用备用。备用 API 需要填写密钥和模型。
+                  首选渠道重试失败后切换至另一渠道（本地 Codex / Claude 的备用固定为 API），成功后本场会议持续使用备用。备用 API 需要填写密钥和模型。
                 </p>
               ) : null}
-              {(isDesktop || usesCodex) ? (
+              {((isDesktop && !usesClaude) || usesCodex) ? (
                 <>
                   <div className="flex items-center gap-2 pt-2">
                     <h3 className="theme-title text-sm font-semibold">Codex 配置{usesCodex ? '（首选）' : '（备用）'}</h3>
@@ -290,11 +297,52 @@ export function SettingsPage() {
                   <TestResult state={codexTest} />
                 </>
               ) : null}
-              {(isDesktop || !usesCodex) ? (
+              {isDesktop && usesClaude ? (
+                <>
+                  <div className="flex items-center gap-2 pt-2">
+                    <h3 className="theme-title text-sm font-semibold">Claude 配置（首选）</h3>
+                    <TestStatusBadge state={claudeTest} />
+                  </div>
+                  <p className="theme-muted text-sm leading-6">
+                    {supportsCodex
+                      ? '先安装 Claude Code CLI 并运行 claude 登录，再测试连接。Claude 使用本机登录方式与额度，不需要 API Key；API 使用下方独立配置。'
+                      : '当前环境无法启动本地 Claude。请打开桌面版，或切换到 API 通道。'}
+                  </p>
+                  <p className="theme-muted text-sm leading-6">
+                    会议文本仍会发送至 Claude 模型服务，需要联网。每次分析不启用工具、项目设置或 MCP；自动阶段分析约每 8 秒处理最新定稿文本。
+                  </p>
+                  <label className="block space-y-1.5 text-sm">
+                    <span className="theme-muted">Claude 模型（可选）</span>
+                    <input
+                      className="theme-input w-full px-3 py-2"
+                      disabled={llmTesting}
+                      value={draft.llm.claude.model}
+                      placeholder="留空使用 Sonnet"
+                      onChange={(event) => updateLlm({ claude: { ...draft.llm.claude, model: event.currentTarget.value } })}
+                    />
+                  </label>
+                  <label className="block space-y-1.5 text-sm">
+                    <span className="theme-muted">Claude 程序路径（可选）</span>
+                    <input
+                      className="theme-input w-full px-3 py-2"
+                      disabled={llmTesting}
+                      value={draft.llm.claude.executablePath}
+                      placeholder="留空自动查找，或填写绝对路径"
+                      onChange={(event) => updateLlm({ claude: { ...draft.llm.claude, executablePath: event.currentTarget.value } })}
+                    />
+                  </label>
+                  <button className="btn-secondary" disabled={llmTesting || !supportsCodex}
+                    onClick={() => void testLlmConnection('claude')} type="button">
+                    {claudeTest.status === 'testing' ? '测试中…' : '测试连接'}
+                  </button>
+                  <TestResult state={claudeTest} />
+                </>
+              ) : null}
+              {(isDesktop || !usesLocal) ? (
                 <>
                   {isDesktop ? (
                     <div className="flex items-center gap-2 border-t border-[color:var(--border)] pt-4">
-                      <h3 className="theme-title text-sm font-semibold">API 配置{usesCodex ? '（备用）' : '（首选）'}</h3>
+                      <h3 className="theme-title text-sm font-semibold">API 配置{usesLocal ? '（备用）' : '（首选）'}</h3>
                       <TestStatusBadge state={apiTest} />
                     </div>
                   ) : null}
@@ -368,6 +416,7 @@ export function SettingsPage() {
               resetDraft()
               setApiTest({ status: 'idle' })
               setCodexTest({ status: 'idle' })
+              setClaudeTest({ status: 'idle' })
             }}
             type="button"
           >
