@@ -1,6 +1,7 @@
 import { AudioCaptureService } from '../../../../../shared/ui/services/AudioCapture'
 import {
   isTerminalAstStatus,
+  type AstStartOptions,
   type AstProvider,
   type AstProviderStatusPayload,
   type AstStatusCallback,
@@ -66,6 +67,7 @@ export class RendererVolcAsrProvider implements AstProvider {
   async start(
     onSegment: TranscriptSegmentCallback,
     onStatus?: AstStatusCallback,
+    options?: AstStartOptions,
   ): Promise<void> {
     const token = ++this.lifecycleToken
     await this.stopInFlight
@@ -99,10 +101,16 @@ export class RendererVolcAsrProvider implements AstProvider {
     try {
       await this.audioCapture.start((chunk) => {
         this.handleAudioChunk(chunk)
-      })
+      }, options)
 
       if (token !== this.lifecycleToken) {
         await this.stopForToken(token)
+        return
+      }
+
+      if (options?.initiallyPaused) {
+        this.isPaused = true
+        this.bufferAudioUntilSessionStart = false
         return
       }
 
@@ -160,7 +168,7 @@ export class RendererVolcAsrProvider implements AstProvider {
     })
   }
 
-  async resume() {
+  async resume(signal?: AbortSignal) {
     if (!this.isPaused || !this.sendChunk) {
       return
     }
@@ -171,7 +179,7 @@ export class RendererVolcAsrProvider implements AstProvider {
     this.clearBufferedAudioChunks()
 
     try {
-      await this.audioCapture.resume()
+      await this.audioCapture.resume(signal)
 
       if (token !== this.lifecycleToken) {
         await this.stopForToken(token)

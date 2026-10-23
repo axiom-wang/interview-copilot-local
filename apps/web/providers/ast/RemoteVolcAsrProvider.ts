@@ -2,6 +2,7 @@ import { AudioCaptureService } from '../../../../shared/ui/services/AudioCapture
 import {
   isTerminalAstStatus,
   VOLC_ASR_SESSION_FINISHED_MESSAGE,
+  type AstStartOptions,
   type AstProvider,
   type AstProviderStatusPayload,
   type AstStatusCallback,
@@ -78,6 +79,7 @@ export class RemoteVolcAsrProvider implements AstProvider {
   async start(
     onSegment: TranscriptSegmentCallback,
     onStatus?: AstStatusCallback,
+    options?: AstStartOptions,
   ): Promise<void> {
     const token = ++this.lifecycleToken
     await this.stopInFlight
@@ -100,6 +102,12 @@ export class RemoteVolcAsrProvider implements AstProvider {
     this.clearBufferedAudioChunks()
 
     try {
+      if (options?.initiallyPaused) {
+        await this.audioCapture.start((chunk) => this.handleAudioChunk(chunk), options)
+        this.isPaused = true
+        this.bufferAudioUntilSessionStart = false
+        return
+      }
       await this.connectAndStartSession(token)
       await this.audioCapture.start((chunk) => {
         this.handleAudioChunk(chunk)
@@ -155,7 +163,7 @@ export class RemoteVolcAsrProvider implements AstProvider {
     })
   }
 
-  async resume() {
+  async resume(signal?: AbortSignal) {
     if (!this.isPaused) {
       return
     }
@@ -166,8 +174,10 @@ export class RemoteVolcAsrProvider implements AstProvider {
     this.clearBufferedAudioChunks()
 
     try {
+      await this.audioCapture.resume(signal)
+
+      if (token !== this.lifecycleToken) return
       await this.connectAndStartSession(token)
-      await this.audioCapture.resume()
 
       if (token !== this.lifecycleToken) {
         await this.stopForToken(token)
@@ -244,9 +254,34 @@ export class RemoteVolcAsrProvider implements AstProvider {
       return
     }
 
-    this.sendJson({
-      type: 'start',
-      credentials: this.credentials,
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        window.clearTimeout(timeout)
+        socket.removeEventListener('message', handleReady)
+        socket.removeEventListener('close', handleFailure)
+        socket.removeEventListener('error', handleFailure)
+      }
+      const fail = (message: string) => { cleanup(); reject(new Error(message)) }
+      const handleFailure = () => fail('实时转写服务在启动完成前断开。')
+      const handleReady = (event: MessageEvent) => {
+        if (typeof event.data !== 'string') return
+        let message: ServerMessage
+        try { message = JSON.parse(event.data) as ServerMessage } catch { return }
+        if (message.type === 'error') {
+          fail(message.message)
+        } else if (message.type === 'status' && message.payload.level === 'error') {
+          fail(message.payload.message)
+        } else if (message.type === 'segment' || message.type === 'turn' ||
+          (message.type === 'status' && message.payload.message === 'Volc ASR session started.')) {
+          cleanup()
+          resolve()
+        }
+      }
+      const timeout = window.setTimeout(() => fail('实时转写服务启动超时。'), 30_000)
+      socket.addEventListener('message', handleReady)
+      socket.addEventListener('close', handleFailure)
+      socket.addEventListener('error', handleFailure)
+      this.sendJson({ type: 'start', credentials: this.credentials })
     })
   }
 

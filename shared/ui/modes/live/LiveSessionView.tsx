@@ -154,6 +154,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       return
     }
 
+    let spaceHeld = false
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.repeat ||
@@ -170,6 +171,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       if (isQa) {
         if (event.code === 'Space') {
           event.preventDefault()
+          spaceHeld = true
           void startQuestionCapture()
         }
         return
@@ -186,12 +188,14 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
 
     // Releasing the key, or leaving the window while holding it, ends the capture.
     const handleKeyUp = (event: KeyboardEvent) => {
-      if (isQa && event.code === 'Space') {
+      if (spaceHeld && event.code === 'Space') {
+        spaceHeld = false
         event.preventDefault()
         void finishQuestionCapture()
       }
     }
     const handleBlur = () => {
+      spaceHeld = false
       if (isQa) void finishQuestionCapture()
     }
 
@@ -202,6 +206,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('blur', handleBlur)
+      if (isQa) void finishQuestionCapture()
     }
   }, [
     isStreaming,

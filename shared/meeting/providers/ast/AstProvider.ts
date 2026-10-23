@@ -20,14 +20,19 @@ export const isTerminalAstStatus = (payload: Pick<AstProviderStatusPayload, 'lev
 
 export type AstStatusCallback = (payload: AstProviderStatusPayload) => void
 
+export interface AstStartOptions {
+  initiallyPaused?: boolean
+}
+
 export interface AstProvider {
   readonly id: string
   readonly label: string
   start(
     onSegment: TranscriptSegmentCallback,
     onStatus?: AstStatusCallback,
+    options?: AstStartOptions,
   ): Promise<void>
   pause?(): Promise<void>
-  resume?(): Promise<void>
+  resume?(signal?: AbortSignal): Promise<void>
   stop(): Promise<void> | void
 }

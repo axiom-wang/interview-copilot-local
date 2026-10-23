@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ConsensusPanel } from '../components/ConsensusPanel'
+import { AiQaPanel } from '../components/AiQaPanel'
 import { HintsPanel } from '../components/HintsPanel'
 import { MindMapPanel } from '../components/MindMapPanel'
 import { PhasePanel } from '../components/PhasePanel'
@@ -271,6 +272,11 @@ function SessionDetail({ session }: { session: SessionRecord }) {
             label: '时间线回放',
             content: <TimelineView session={session} />,
           },
+          ...((session.aiQaHistory?.length ?? 0) > 0 ? [{
+            id: 'qa',
+            label: 'AI 问答',
+            content: <AiQaPanel className="h-full" embedded history={session.aiQaHistory ?? []} scenarioId={session.scenarioId} />,
+          }] : []),
           ...(resolveScenarioProfile(session.scenarioId).interactionModel === 'qa' ? [] : [{
             id: 'consensus',
             label: '共识分歧',

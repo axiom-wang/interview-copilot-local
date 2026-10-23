@@ -131,6 +131,19 @@ test('keeps at most three warm processes and recycles idle ones', async (t) => {
   assert.notEqual(((await short.structured('y', schema, 'low')) as Echo).pid, pid)
 })
 
+for (const action of ['cancelInFlight', 'dispose'] as const) {
+  test(`${action} closes temporary concurrent Claude processes as well as shared processes`, async (t) => {
+    const client = new ClaudeClient(install(t))
+    t.after(() => client.dispose())
+    const first = client.structured('HANG', schema, 'low')
+    const second = client.structured('HANG', schema, 'low')
+    const errors = action === 'cancelInFlight' ? /已取消/ : /已切换或应用已退出/
+    const finished = Promise.all([assert.rejects(first, errors), assert.rejects(second, errors)])
+    client[action]()
+    await finished
+  })
+}
+
 test('a warm process that died is replaced once; a fresh failure is reported', async (t) => {
   const flag = join(mkdtempSync(join(tmpdir(), 'meeting-crash-')), 'flag')
   t.after(() => { delete process.env.FAKE_CLAUDE_CRASH_FLAG; rmSync(flag, { force: true }) })

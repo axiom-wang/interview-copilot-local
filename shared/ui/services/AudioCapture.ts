@@ -78,32 +78,47 @@ export class AudioCaptureService {
   private chunkPumpLastTickAt: number | null = null
 
   private isActive = false
+  private lifecycleToken = 0
+  private removeAbortListener: (() => void) | null = null
 
-  async start(onChunk: (chunk: Uint8Array) => void) {
+  async start(onChunk: (chunk: Uint8Array) => void, options?: { initiallyPaused?: boolean }) {
     this.onChunk = onChunk
-    this.startChunkPump()
-    await this.resume()
+    if (!options?.initiallyPaused) await this.resume()
   }
 
   async pause() {
-    await this.teardownAudioGraph()
+    this.lifecycleToken += 1
+    this.removeAbortListener?.()
+    this.removeAbortListener = null
+    const teardown = this.teardownAudioGraph()
     this.stopChunkPump()
+    for (const chunk of this.pendingChunks) this.onChunk?.(chunk)
+    if (this.pendingSamples.length) {
+      this.onChunk?.(new Uint8Array(this.pendingSamples.buffer.slice(0)))
+    }
     this.pendingChunks = []
     this.pendingSamples = new Int16Array(0)
+    await teardown
   }
 
-  async resume() {
+  async resume(signal?: AbortSignal) {
     if (!this.onChunk) {
       throw new Error('Audio capture has not been initialized yet.')
     }
 
-    this.startChunkPump()
+    if (signal?.aborted) return
 
     if (this.isActive) {
       return
     }
 
+    const token = ++this.lifecycleToken
+    this.removeAbortListener?.()
+    const abort = () => { void this.pause().catch(() => {}) }
+    signal?.addEventListener('abort', abort, { once: true })
+    this.removeAbortListener = () => signal?.removeEventListener('abort', abort)
     await this.teardownAudioGraph()
+    if (token !== this.lifecycleToken) return
 
     const mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: {
@@ -114,12 +129,19 @@ export class AudioCaptureService {
       },
       video: false,
     })
+    if (token !== this.lifecycleToken) {
+      mediaStream.getTracks().forEach((track) => track.stop())
+      return
+    }
 
+    this.mediaStream = mediaStream
     const audioContext = new AudioContext({
       sampleRate: TARGET_SAMPLE_RATE,
     })
+    this.audioContext = audioContext
 
     await audioContext.resume()
+    if (token !== this.lifecycleToken) return
 
     const sourceNode = audioContext.createMediaStreamSource(mediaStream)
     const processorNode = audioContext.createScriptProcessor(
@@ -164,9 +186,13 @@ export class AudioCaptureService {
     this.sourceNode = sourceNode
     this.processorNode = processorNode
     this.isActive = true
+    this.startChunkPump()
   }
 
   async stop() {
+    this.lifecycleToken += 1
+    this.removeAbortListener?.()
+    this.removeAbortListener = null
     await this.teardownAudioGraph()
     this.stopChunkPump()
     this.pendingChunks = []
@@ -237,6 +263,7 @@ export class AudioCaptureService {
   }
 
   private async teardownAudioGraph() {
+    if (this.processorNode) this.processorNode.onaudioprocess = null
     this.processorNode?.disconnect()
     this.sourceNode?.disconnect()
     this.processorNode = null
@@ -245,11 +272,9 @@ export class AudioCaptureService {
     this.mediaStream?.getTracks().forEach((track) => track.stop())
     this.mediaStream = null
 
-    if (this.audioContext) {
-      await this.audioContext.close()
-      this.audioContext = null
-    }
-
+    const audioContext = this.audioContext
+    this.audioContext = null
     this.isActive = false
+    if (audioContext) await audioContext.close()
   }
 }

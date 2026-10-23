@@ -1,5 +1,6 @@
 import type {
   ConsensusAnalysis,
+  InterviewQaTurn,
   MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
@@ -27,6 +28,7 @@ export interface ReplaySnapshot {
 }
 
 export interface SessionRecord {
+  aiQaHistory?: InterviewQaTurn[]
   meetingMemory?: import('./meetingMemory').MeetingMemory
   questionContext?: string
   roleContext?: string

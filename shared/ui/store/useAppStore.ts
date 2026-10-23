@@ -176,6 +176,8 @@ let aiQuestionRunToken = 0
 let streamRunToken = 0
 let questionCaptureSegmentIds: Set<string> | null = null
 let questionCaptureStart: Promise<boolean> | null = null
+let questionCaptureReady = false
+let questionCaptureAbort: AbortController | null = null
 // Upper bound for the last final results to arrive after the recognizer session closes.
 const QUESTION_CAPTURE_SETTLE_MS = 300
 const QUESTION_CAPTURE_POLL_MS = 20
@@ -1316,6 +1318,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     lastHintsRequestedAt = null
     questionCaptureSegmentIds = null
     questionCaptureStart = null
+    questionCaptureReady = false
+    questionCaptureAbort?.abort()
+    questionCaptureAbort = null
 
     set({
       mode: 'live',
@@ -1470,20 +1475,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     try {
-      await selectedProvider.start(onSegment, onStatus)
+      await selectedProvider.start(onSegment, onStatus, { initiallyPaused: isQa })
 
       if (activeToken !== streamRunToken) {
         return
       }
 
-      // qa scenarios keep the microphone ready but only listen while the capture key is held.
       if (isQa) {
         void llmProvider.prewarm?.(buildQuestionAnswerPromptContext(get())).catch(() => {})
-        await selectedProvider.pause?.()
-
-        if (activeToken !== streamRunToken) {
-          return
-        }
+        questionCaptureReady = true
       }
 
       set({
@@ -1554,10 +1554,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
   stopStream: async () => {
-    await astProviders[get().activeAstProviderId].stop()
     streamRunToken += 1
+    const stopToken = streamRunToken
+    questionCaptureAbort?.abort()
+    questionCaptureAbort = null
+    questionCaptureReady = false
     questionCaptureSegmentIds = null
     questionCaptureStart = null
+    set({ isStreaming: false, questionCapture: 'idle' })
     analysisRunToken += 1
     speakingHintsRunToken += 1
     mindMapRunToken += 1
@@ -1567,6 +1571,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     clearAnalysisTimer()
     clearHintsRefreshTimer()
     void getMeetingRuntime().resetAnalysisSession({ preserveRouting: true })
+    await astProviders[get().activeAstProviderId].stop()
+    if (stopToken !== streamRunToken) return
     ignoredLiveSegmentIds.clear()
     set({
       isStreaming: false,
@@ -1906,13 +1912,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   saveCurrentSession: (options) => {
     const state = get()
 
-    if (!state.liveSegments.length || !state.currentSessionId) {
+    if (!state.currentSessionId) {
       return
     }
 
     const alreadySaved = state.savedSessions.some(
       (session) => session.id === state.currentSessionId,
     )
+    if (!alreadySaved && !state.liveSegments.length && !state.aiQaHistory.length) return
 
     if (!alreadySaved && options?.createIfMissing === false) {
       return
@@ -1927,7 +1934,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const session: SessionRecord = {
       id: state.currentSessionId,
       title: formatSessionTitle(state.currentSessionStartedAt ?? endedAt),
-      startedAt: state.currentSessionStartedAt ?? state.liveSegments[0].timestamp,
+      startedAt: state.currentSessionStartedAt ?? state.liveSegments[0]?.timestamp ?? endedAt,
       endedAt,
       transcriptSegments: state.liveSegments,
       speakerProfiles: state.speakerProfiles,
@@ -1943,6 +1950,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       meetingMemory: state.meetingMemory,
       questionContext: state.questionContext,
       roleContext: state.roleContext,
+      aiQaHistory: state.aiQaHistory,
     }
 
     const savedSessions = saveSession(session)
@@ -2120,11 +2128,12 @@ export const useAppStore = create<AppState>((set, get) => ({
             answerMs: Date.now() - askedAt,
           }),
           ...currentState.aiQaHistory,
-        ].slice(0, MAX_QA_HISTORY_ITEMS),
+        ].slice(0, needsTranscript ? MAX_QA_HISTORY_ITEMS : undefined),
         analysisProviderLabel: result.providerLabel,
         errorMessage: result.warning ?? currentState.errorMessage,
         statusMessage: 'AI 问答已更新。',
       }))
+      get().saveCurrentSession({ createIfMissing: false })
     } catch (error) {
       if (activeToken !== aiQuestionRunToken) {
         return
@@ -2143,6 +2152,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     if (
       !state.isStreaming ||
+      !questionCaptureReady ||
       state.questionCapture !== 'idle' ||
       resolveScenarioProfile(state.scenarioId).interactionModel !== 'qa'
     ) {
@@ -2151,12 +2161,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const token = streamRunToken
     const provider = astProviders[state.activeAstProviderId]
+    const captureAbort = new AbortController()
+    questionCaptureAbort = captureAbort
     questionCaptureSegmentIds = new Set()
     set({ questionCapture: 'connecting', listeningStatusLabel: '连接中', aiQaError: null })
 
     questionCaptureStart = (async () => {
       try {
-        await provider.resume?.()
+        await provider.resume?.(captureAbort.signal)
       } catch (error) {
         if (token === streamRunToken) {
           questionCaptureSegmentIds = null
@@ -2186,19 +2198,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     const token = streamRunToken
     const provider = astProviders[state.activeAstProviderId]
     const releasedAt = Date.now()
+    questionCaptureAbort?.abort()
+    questionCaptureAbort = null
     set({ questionCapture: 'transcribing', listeningStatusLabel: '识别中' })
 
     const started = await (questionCaptureStart ?? Promise.resolve(false))
-    questionCaptureStart = null
-
     if (!started || token !== streamRunToken) {
       return
     }
+    questionCaptureStart = null
 
     try {
       await provider.pause?.()
     } catch (error) {
-      set({ aiQaError: toErrorMessage(error) })
+      if (token !== streamRunToken) return
+      await get().stopStream()
+      if (get().currentSessionId === state.currentSessionId && !get().isStreaming) {
+        set({ aiQaError: toErrorMessage(error) })
+      }
+      return
     }
     await waitForCapturedSegmentsFinal(get)
 
@@ -2228,6 +2246,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       aiQaError: null,
       statusMessage: '已清空当前会话中的 AI 问答记录。',
     })
+    get().saveCurrentSession({ createIfMissing: false })
   },
   refreshAnalysis: async () => {
     const state = get()

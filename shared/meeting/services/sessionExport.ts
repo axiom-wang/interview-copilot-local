@@ -69,6 +69,14 @@ export const exportSessionAsMarkdown = (session: SessionRecord) => {
       : '- 暂无'
 
   const profile = resolveScenarioProfile(session.scenarioId)
+  const qaSection = (session.aiQaHistory ?? []).map((turn) => `### ${formatDateTime(turn.askedAt)} · ${turn.question}
+
+${turn.answer.conclusion}
+
+${(turn.answer.interview?.keyPoints ?? turn.answer.reasoning).map((point) => `- ${point}`).join('\n')}
+
+建议回答：${turn.answer.suggestedReply}
+${turn.answer.interview?.missingContext ?? ''}`).join('\n\n')
   const summarySection = session.meetingSummary
     ? `### ${formatDateTime(session.meetingSummary.updatedAt)}
 
@@ -162,6 +170,7 @@ ${snapshotSection}
 ## 完整转写
 
 ${transcriptSection}
+${qaSection ? `\n## AI 问答\n\n${qaSection}\n` : ''}
 `
 
   triggerDownload(

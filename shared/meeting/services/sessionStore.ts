@@ -6,8 +6,10 @@ import mockTranscript from '../sample/mockTranscript.json'
 import { normalizeSpeakingHints as normalizeHintsRecord } from './analysisNormalization'
 import { normalizeMindMapSnapshot } from './mindMapTransform'
 import { resolveScenarioProfile } from '../scenarios'
+import { INTERVIEW_ANSWER_GROUNDINGS, INTERVIEW_QUESTION_TYPES } from '../schemas/answerOneOnOneInterview.schema'
 import type {
   ConsensusAnalysis,
+  InterviewQaTurn,
   MeetingMinutes,
   MeetingSummary,
   PhaseAnalysis,
@@ -439,6 +441,39 @@ const normalizeReplaySnapshots = (
     .sort((left, right) => left.timestamp - right.timestamp)
 }
 
+const normalizeQaHistory = (value: unknown): InterviewQaTurn[] => {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((item): InterviewQaTurn[] => {
+    if (!isRecord(item) || !asString(item.question) || !isRecord(item.answer)) return []
+    const answer = item.answer
+    const detail = isRecord(answer.interview) ? answer.interview : null
+    const askedAt = asFiniteNumber(item.askedAt, 0)
+    const timing = isRecord(item.timing) ? item.timing : null
+    return [{
+      id: asString(item.id, `qa-${askedAt}`),
+      question: asString(item.question),
+      askedAt,
+      answer: {
+        conclusion: asString(answer.conclusion),
+        reasoning: uniqueStrings(answer.reasoning),
+        suggestedReply: asString(answer.suggestedReply),
+        updatedAt: asFiniteNumber(answer.updatedAt, askedAt),
+        ...(detail ? { interview: {
+          questionType: INTERVIEW_QUESTION_TYPES.find((type) => type === detail.questionType) ?? 'other',
+          keyPoints: uniqueStrings(detail.keyPoints, 3),
+          grounding: INTERVIEW_ANSWER_GROUNDINGS.find((type) => type === detail.grounding) ?? 'none',
+          missingContext: asString(detail.missingContext),
+        } } : {}),
+      },
+      ...(timing ? { timing: {
+        answerMs: Math.max(0, asFiniteNumber(timing.answerMs, 0)),
+        ...(typeof timing.recognitionMs === 'number' && Number.isFinite(timing.recognitionMs)
+          ? { recognitionMs: Math.max(0, timing.recognitionMs) } : {}),
+      } } : {}),
+    }]
+  })
+}
+
 const normalizeSessionRecord = (
   value: unknown,
   index: number,
@@ -483,6 +518,7 @@ const normalizeSessionRecord = (
     meetingMemory: normalizeMeetingMemory(value.meetingMemory),
     questionContext: asString(value.questionContext, ''),
     roleContext: asString(value.roleContext, ''),
+    aiQaHistory: normalizeQaHistory(value.aiQaHistory),
     title: asString(value.title, `Session ${index + 1}`),
     startedAt,
     endedAt,

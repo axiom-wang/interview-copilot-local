@@ -212,6 +212,7 @@ export interface ClaudeClientOptions {
 
 export class ClaudeClient {
   private readonly sessions = new Map<string, ClaudeSession>()
+  private readonly transientSessions = new Set<ClaudeSession>()
   private disposed = false
   private readonly config: ClaudeConfig
   private readonly turnTimeout: number
@@ -253,6 +254,7 @@ export class ClaudeClient {
     const executable = resolveClaudeExecutable(this.config.executablePath)
     for (let attempt = 0; ; attempt++) {
       const { session, shared } = this.acquire(executable, schema, effort)
+      if (!shared) this.transientSessions.add(session)
       const reused = session.turns > 0 || session.prewarmed
       try {
         return await session.run(prompt, this.turnTimeout)
@@ -261,7 +263,10 @@ export class ClaudeClient {
         if (error instanceof SessionDied && reused && attempt === 0) continue
         throw error
       } finally {
-        if (!shared) session.close('dispose')
+        if (!shared) {
+          session.close('dispose')
+          this.transientSessions.delete(session)
+        }
       }
     }
   }
@@ -294,12 +299,15 @@ export class ClaudeClient {
 
   // 会议重置时只中止进行中的请求，空闲的常驻会话已清空上下文，继续保留。
   cancelInFlight() {
-    for (const session of this.sessions.values()) if (session.busy) session.close('cancel')
+    for (const session of [...this.sessions.values(), ...this.transientSessions]) {
+      if (session.busy) session.close('cancel')
+    }
   }
 
   dispose() {
     this.disposed = true
-    for (const session of this.sessions.values()) session.close('dispose')
+    for (const session of [...this.sessions.values(), ...this.transientSessions]) session.close('dispose')
     this.sessions.clear()
+    this.transientSessions.clear()
   }
 }

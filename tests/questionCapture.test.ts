@@ -21,12 +21,21 @@ test('qa scenarios only listen while the capture key is held and answer the capt
   t.after(() => { if (previous) Object.defineProperty(globalThis, 'window', previous); else Reflect.deleteProperty(globalThis, 'window') })
 
   const calls: string[] = []
+  let finishStartup: (() => void) | undefined
+  let startup = new Promise<void>((resolve) => { finishStartup = resolve })
+  let finishResume: (() => void) | undefined
+  let resumeWait: Promise<void> | undefined
+  let captureSignal: AbortSignal | undefined
+  let failPause = false
   let emit: TranscriptSegmentCallback = () => {}
   const asked: { question: string; segments: TranscriptSegment[]; context?: AnalysisPromptContext }[] = []
   const provider = new MockLlmProvider()
   provider.answerInterviewQuestion = async (question, segments, context) => {
     asked.push({ question, segments, context })
-    return { conclusion: '考察个人贡献', reasoning: [], suggestedReply: '我负责……', updatedAt: 1 }
+    return {
+      conclusion: '考察个人贡献', reasoning: [], suggestedReply: '我负责……', updatedAt: 1,
+      interview: { questionType: 'behavioral', keyPoints: ['个人行动'], grounding: 'jd', missingContext: '缺少真实经历' },
+    }
   }
   provider.detectPhase = async () => { throw new Error('qa scenarios must not run discussion analysis') }
   const prewarmed: (string | undefined)[] = []
@@ -35,9 +44,13 @@ test('qa scenarios only listen while the capture key is held and answer the capt
     environment: 'web', supportsCodex: false, supportsLiveAssist: true,
     createAstProvider: () => ({
       id: 'mock', label: 'mock', setCredentials: () => {},
-      start: async (onSegment) => { emit = onSegment; calls.push('start') },
-      pause: async () => { calls.push('pause') },
-      resume: async () => { calls.push('resume') },
+      start: async (onSegment, _onStatus, options) => {
+        assert.equal(options?.initiallyPaused, true)
+        emit = onSegment; calls.push('start')
+        await startup
+      },
+      pause: async () => { calls.push('pause'); if (failPause) throw new Error('pause failed') },
+      resume: async (signal) => { captureSignal = signal; calls.push('resume'); await resumeWait },
       stop: () => { calls.push('stop') },
     }),
     createLlmProvider: () => provider, createAuthProvider: () => new MockAuthProvider(),
@@ -54,8 +67,13 @@ test('qa scenarios only listen while the capture key is held and answer the capt
 
   useAppStore.setState({ questionContext: '岗位：增长产品经理', errorMessage: null })
   useAppStore.getState().applyModelSettings(useSettingsStore.getState().settings)
-  await useAppStore.getState().startStream()
-  assert.deepEqual(calls, ['stop', 'start', 'pause'])
+  const starting = useAppStore.getState().startStream()
+  await useAppStore.getState().startQuestionCapture()
+  assert.ok(!calls.includes('resume'), 'capture cannot race provider initialization')
+  finishStartup?.()
+  await starting
+  startup = Promise.resolve()
+  assert.deepEqual(calls, ['stop', 'start'])
   assert.equal(useAppStore.getState().listeningStatusLabel, '待提问')
   assert.deepEqual(prewarmed, ['one-on-one-interview'])
 
@@ -69,7 +87,8 @@ test('qa scenarios only listen while the capture key is held and answer the capt
   emit(segment('q2', '你具体负责什么？', true))
   await useAppStore.getState().finishQuestionCapture()
 
-  assert.deepEqual(calls, ['stop', 'start', 'pause', 'resume', 'pause'])
+  assert.deepEqual(calls, ['stop', 'start', 'resume', 'pause'])
+  assert.equal(captureSignal?.aborted, true)
   assert.equal(useAppStore.getState().questionCapture, 'idle')
   assert.equal(asked.length, 1)
   assert.equal(asked[0].question, '说说你最有挑战的项目，你具体负责什么？')
@@ -91,4 +110,47 @@ test('qa scenarios only listen while the capture key is held and answer the capt
   await useAppStore.getState().finishQuestionCapture()
   assert.equal(asked.length, 2)
   assert.match(useAppStore.getState().aiQaError ?? '', /没有识别到问题/)
+
+  resumeWait = new Promise<void>((resolve) => { finishResume = resolve })
+  const connecting = useAppStore.getState().startQuestionCapture()
+  emit(segment('q4', '连接很慢时的问题', true))
+  const released = useAppStore.getState().finishQuestionCapture()
+  assert.equal(captureSignal?.aborted, true, 'release stops audio before the recognizer has connected')
+  finishResume?.()
+  await connecting
+  await released
+  resumeWait = undefined
+  assert.equal(asked.at(-1)?.question, '连接很慢时的问题')
+
+  for (let index = 0; index < 7; index++) {
+    await useAppStore.getState().askAiQuestion(`手动问题 ${index}`)
+  }
+  assert.equal(useAppStore.getState().aiQaHistory.length, 10, 'qa history retains the whole session')
+  await useAppStore.getState().stopStream()
+  const { loadSessions } = await import('../shared/meeting/services/sessionStore')
+  const saved = loadSessions().find((session) => session.id === useAppStore.getState().currentSessionId)
+  assert.deepEqual(saved?.aiQaHistory, JSON.parse(JSON.stringify(useAppStore.getState().aiQaHistory)))
+
+  useAppStore.getState().startNewMeeting()
+  useAppStore.setState({ scenarioId: 'one-on-one-interview', questionContext: '岗位 JD' })
+  await useAppStore.getState().startStream()
+  await useAppStore.getState().askAiQuestion('纯文字提问')
+  assert.equal(useAppStore.getState().liveSegments.length, 0)
+  await useAppStore.getState().stopStream()
+  const typed = loadSessions().find((session) => session.id === useAppStore.getState().currentSessionId)
+  assert.equal(typed?.aiQaHistory?.[0].question, '纯文字提问')
+  useAppStore.getState().clearAiQaHistory()
+  assert.deepEqual(loadSessions().find((session) => session.id === typed?.id)?.aiQaHistory, [])
+
+  useAppStore.getState().startNewMeeting()
+  useAppStore.setState({ scenarioId: 'one-on-one-interview', questionContext: '岗位 JD' })
+  await useAppStore.getState().startStream()
+  await useAppStore.getState().startQuestionCapture()
+  emit(segment('failed-pause', '暂停出错时的问题', true))
+  failPause = true
+  await useAppStore.getState().finishQuestionCapture()
+  assert.equal(useAppStore.getState().isStreaming, false)
+  assert.ok(useAppStore.getState().currentSessionEndedAt)
+  assert.match(useAppStore.getState().aiQaError ?? '', /pause failed/)
+  assert.ok(loadSessions().some((session) => session.id === useAppStore.getState().currentSessionId))
 })

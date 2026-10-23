@@ -12,14 +12,14 @@ const formatAskedAt = (timestamp: number) =>
   }).format(timestamp)
 
 interface AiQaPanelProps {
-  questionDraft: string
+  questionDraft?: string
   history: InterviewQaTurn[]
-  isAnswering: boolean
-  error: string | null
-  disableAsk: boolean
-  onQuestionDraftChange: (value: string) => void
-  onAsk: () => void
-  onClearHistory: () => void
+  isAnswering?: boolean
+  error?: string | null
+  disableAsk?: boolean
+  onQuestionDraftChange?: (value: string) => void
+  onAsk?: () => void
+  onClearHistory?: () => void
   scenarioId?: MeetingScenarioId
   className?: string
   /** Rendered inside a tab panel: the tab label already names the panel. */
@@ -28,7 +28,7 @@ interface AiQaPanelProps {
 }
 
 export function AiQaPanel({
-  questionDraft,
+  questionDraft = '',
   history,
   isAnswering,
   error,
@@ -59,7 +59,7 @@ export function AiQaPanel({
           <h2 className="theme-title text-base font-semibold">AI 问答</h2>
           <button
             className="btn-ghost px-3 py-1.5 text-xs"
-            disabled={history.length === 0}
+            disabled={history.length === 0 || !onClearHistory}
             onClick={onClearHistory}
             type="button"
           >
@@ -77,7 +77,7 @@ export function AiQaPanel({
           </div>
           <button
             className="btn-ghost"
-            disabled={history.length === 0}
+            disabled={history.length === 0 || !onClearHistory}
             onClick={onClearHistory}
             type="button"
           >
@@ -86,7 +86,7 @@ export function AiQaPanel({
         </div>
       )}
 
-      <div
+      {onAsk && onQuestionDraftChange ? <div
         className={clsx(
           'min-w-0 shrink-0 space-y-3',
           embedded ? 'mt-0' : compact ? 'mt-3' : 'mt-5 space-y-4',
@@ -139,7 +139,7 @@ export function AiQaPanel({
             {isAnswering ? '回答中...' : '提问'}
           </button>
         </div>
-      </div>
+      </div> : null}
 
       {error ? (
         <div className="sheet-danger mt-4 shrink-0 text-sm">
