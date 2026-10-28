@@ -26,6 +26,14 @@ export interface QaScenarioCopy {
   captureHint: string
 }
 
+// Copy for an opening round where each participant gives a prepared statement in turn.
+export interface OpeningRoundCopy {
+  label: string
+  rule: string
+  statementGuide: string
+  lengthHint: string
+}
+
 export interface MeetingScenarioProfile {
   id: MeetingScenarioId
   label: string
@@ -41,6 +49,7 @@ export interface MeetingScenarioProfile {
   referencePlaceholder?: string
   topicContextRequired?: boolean
   qa?: QaScenarioCopy
+  openingRound?: OpeningRoundCopy
   contextTitle?: string
   topicHelp?: string
   preparationNote?: string

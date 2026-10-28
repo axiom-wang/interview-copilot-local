@@ -53,6 +53,12 @@ export const resolveReferenceContext = (context?: AnalysisPromptContext) =>
 export const referenceContextHeading = (profile: MeetingScenarioProfile) =>
   `${profile.referenceContextLabel ?? '参考资料'}（${profile.referencePromptNote ?? '用户提供的参考资料，不是本场讨论事实；与题目冲突时以题目为准'}）`
 
+export const resolveOpeningRound = (context?: AnalysisPromptContext) =>
+  context?.openingRound ? resolveScenarioProfile(context.scenarioId).openingRound ?? null : null
+
+export const formatOpeningRoundStatus = (openingRound: NonNullable<MeetingScenarioProfile['openingRound']>) =>
+  `当前处于${openingRound.label}：${openingRound.rule}转写中已有的发言是其他人或用户的${openingRound.label}，自由讨论尚未开始。`
+
 const stringifyTranscriptLine = (segment: TranscriptSegment) => {
   const clock = new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
@@ -161,6 +167,9 @@ export const formatOptionalPromptContext = (
 
   const timing = formatTimingContext(context?.timing)
   if (timing) sections.push(timing)
+
+  const openingRound = resolveOpeningRound(context)
+  if (openingRound) sections.push(formatOpeningRoundStatus(openingRound))
 
   if (phaseContext) {
     const phaseLabel =

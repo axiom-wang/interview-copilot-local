@@ -23,6 +23,8 @@ export interface AnalysisPromptContext {
   roleContext?: string
   referenceContext?: string
   timing?: import('../context/timeBudget').TimingContext
+  // Set while participants give their opening statements in turn.
+  openingRound?: boolean
   phaseContext?: string
   summaryAssemblyContext?: SummaryAssemblyContext
 }

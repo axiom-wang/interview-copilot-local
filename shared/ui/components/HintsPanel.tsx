@@ -16,6 +16,12 @@ interface HintsPanelProps {
   density?: 'full' | 'live'
   /** Rendered inside a tab panel: the tab label already names the panel. */
   embedded?: boolean
+  /** Set while participants give opening statements in turn (live density only). */
+  openingRound?: {
+    label: string
+    canDraft: boolean
+    onEnd: () => void
+  }
 }
 
 const FALLBACK_WHY_NOW = '结合现场讨论，选择适合的时机发言。'
@@ -77,22 +83,28 @@ function LiveHints({
   autoRefresh,
   onToggleAutoRefresh,
   className,
+  openingRound,
 }: HintsPanelProps) {
   const now = useNow(5000, Boolean(lastUpdatedAt))
   const statusText = isRefreshing
     ? '正在更新…'
     : lastUpdatedAt
       ? formatAge(lastUpdatedAt, now)
-      : autoRefresh
+      : autoRefresh && !openingRound
         ? '等待第一段定稿发言'
         : '尚未生成'
+  const refreshLabel = openingRound ? (hints ? '按前面发言更新' : '生成') : '刷新'
 
   return (
     <section className={clsx('panel-card flex min-h-0 flex-col overflow-hidden', className)}>
       <div className="theme-divider flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-5 py-3">
         <div className="flex min-w-0 items-center gap-2">
           <h2 className="theme-title text-sm font-semibold">发言建议</h2>
-          {hints?.functionType ? (
+          {openingRound ? (
+            <span className="status-badge" data-tone="primary">
+              {openingRound.label}
+            </span>
+          ) : hints?.functionType ? (
             <span className="status-badge" data-tone="primary">
               {hints.functionType}
             </span>
@@ -107,7 +119,17 @@ function LiveHints({
           <span aria-live="polite" className="theme-muted mr-1 text-xs tabular-nums">
             {statusText}
           </span>
-          {onToggleAutoRefresh ? (
+          {openingRound ? (
+            <button
+              className="btn-ghost px-2 py-1 text-xs"
+              onClick={openingRound.onEnd}
+              title={`${openingRound.label}结束后，恢复自动跟随讨论的发言建议`}
+              type="button"
+            >
+              进入自由讨论
+            </button>
+          ) : null}
+          {onToggleAutoRefresh && !openingRound ? (
             <button
               aria-pressed={autoRefresh}
               className={clsx(
@@ -131,12 +153,12 @@ function LiveHints({
           ) : null}
           <button
             className="btn-secondary px-2.5 py-1 text-xs"
-            disabled={isRefreshing || !onRefresh}
+            disabled={isRefreshing || !onRefresh || (openingRound && !openingRound.canDraft)}
             onClick={() => onRefresh?.()}
-            title="立即刷新（快捷键 R）"
+            title={openingRound ? '快轮到你时点一下，按前面的陈述避开重复（快捷键 R）' : '立即刷新（快捷键 R）'}
             type="button"
           >
-            刷新
+            {refreshLabel}
           </button>
         </div>
       </div>
@@ -149,12 +171,23 @@ function LiveHints({
           </div>
         ) : hints ? (
           <div className={clsx('transition-opacity duration-200', isRefreshing && 'opacity-60')}>
-            <p className="text-xs font-semibold text-[color:var(--accent-text)]">{hints.functionType === '倾听观察' ? '先听一听' : '可以这样接话'}</p>
+            <p className="text-xs font-semibold text-[color:var(--accent-text)]">
+              {openingRound ? '轮到你时可以这样说' : hints.functionType === '倾听观察' ? '先听一听' : '可以这样接话'}
+            </p>
             <p className="theme-title mt-1.5 text-lg leading-8 font-medium text-pretty">
               {hints.whyNow || FALLBACK_WHY_NOW}
             </p>
             {hints.functionType !== '倾听观察' ? <p className="theme-divider theme-title mt-4 whitespace-pre-line border-t pt-3 text-[15px] leading-7">{hints.script || '未保存发言建议'}</p> : null}
             <HintNotes notes={hints.notes} />
+          </div>
+        ) : openingRound ? (
+          <div className="flex h-full min-h-32 flex-col items-start justify-center gap-1">
+            <p className="theme-title text-sm font-medium">
+              {openingRound.canDraft ? `读完题后点「生成」，准备你的${openingRound.label}` : '先填写面试题背景'}
+            </p>
+            <p className="theme-muted text-sm leading-6">
+              根据题目、参考资料和你的角色写一段完整陈述。前面有人发言后，快轮到你时点「按前面发言更新」，避开已被说过的观点。
+            </p>
           </div>
         ) : (
           <div className="flex h-full min-h-32 flex-col items-start justify-center gap-1">

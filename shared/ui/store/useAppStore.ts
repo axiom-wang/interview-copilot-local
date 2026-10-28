@@ -114,6 +114,7 @@ interface AppState {
   roleContext: string
   referenceContext: string
   timeBudget: TimeBudget | null
+  openingRound: boolean
   scenarioId: MeetingScenarioId
   aiQaHistory: InterviewQaTurn[]
   aiQaError: string | null
@@ -148,6 +149,7 @@ interface AppState {
   setRoleContextDraft: (value: string) => void
   setReferenceContextDraft: (value: string) => void
   setTimeBudget: (budget: TimeBudget | null) => void
+  setOpeningRound: (active: boolean) => void
   setScenarioId: (scenarioId: MeetingScenarioId) => void
   setAiQuestionDraft: (value: string) => void
   applyQuestionContext: () => void
@@ -905,12 +907,24 @@ const readQuestionDraft = (sessions: SessionRecord[]) => {
   return stored
 }
 
+const isOpeningRoundActive = (
+  state: Pick<AppState, 'scenarioId' | 'openingRound' | 'currentSessionEndedAt'>,
+) =>
+  state.openingRound &&
+  !state.currentSessionEndedAt &&
+  Boolean(resolveScenarioProfile(state.scenarioId).openingRound)
+
 const buildPreparationContext = (
   state: Pick<
     AppState,
-    'scenarioId' | 'referenceContext' | 'timeBudget' | 'currentSessionStartedAt' | 'currentSessionEndedAt'
+    | 'scenarioId'
+    | 'referenceContext'
+    | 'timeBudget'
+    | 'openingRound'
+    | 'currentSessionStartedAt'
+    | 'currentSessionEndedAt'
   >,
-): Pick<AnalysisPromptContext, 'referenceContext' | 'timing'> => {
+): Pick<AnalysisPromptContext, 'referenceContext' | 'timing' | 'openingRound'> => {
   const profile = resolveScenarioProfile(state.scenarioId)
 
   return {
@@ -920,6 +934,7 @@ const buildPreparationContext = (
     timing: profile.interactionModel === 'discussion'
       ? buildTimingContext(state.timeBudget, state.currentSessionStartedAt, state.currentSessionEndedAt ?? Date.now())
       : undefined,
+    openingRound: isOpeningRoundActive(state) || undefined,
   }
 }
 
@@ -935,6 +950,7 @@ const buildPromptContext = (
     | 'timeBudget'
     | 'currentSessionStartedAt'
     | 'currentSessionEndedAt'
+    | 'openingRound'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
     | 'mindMap'
@@ -997,6 +1013,7 @@ const buildQuestionAnswerPromptContext = (
     | 'timeBudget'
     | 'currentSessionStartedAt'
     | 'currentSessionEndedAt'
+    | 'openingRound'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
   >,
@@ -1239,6 +1256,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   roleContext: '',
   referenceContext: '',
   timeBudget: null,
+  openingRound: false,
   scenarioId: DEFAULT_SCENARIO_ID,
   aiQaHistory: [],
   aiQaError: null,
@@ -1405,6 +1423,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentSessionId: `session-${crypto.randomUUID()}`,
       currentSessionStartedAt: sessionStartedAt,
       currentSessionEndedAt: null,
+      openingRound: Boolean(startProfile.openingRound),
       liveSegments: [],
       speakerProfiles: {},
       speakerOrder: [],
@@ -1693,6 +1712,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       currentSessionId: null,
       currentSessionStartedAt: null,
       currentSessionEndedAt: null,
+      openingRound: false,
       liveSegments: [],
       speakerProfiles: {},
       speakerOrder: [],
@@ -2068,6 +2088,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   setReferenceContextDraft: (value) => {
     set({ referenceContextDraft: normalizeContextInput(value) })
   },
+  setOpeningRound: (active) => {
+    const state = get()
+    if (state.openingRound === active) return
+    set({
+      openingRound: active,
+      speakingHintsStale: Boolean(state.speakingHints),
+      statusMessage: active ? null : '已进入自由讨论。',
+    })
+
+    if (state.liveSegments.length > 0 && !state.isPaused) {
+      void get().refreshSpeakingHints()
+      scheduleAnalysis(() => {
+        void get().refreshAnalysis()
+      })
+    }
+  },
   setTimeBudget: (budget) => {
     const timeBudget = normalizeTimeBudget(budget)
     persistContextValue(TIME_BUDGET_STORAGE_KEY, timeBudget ? JSON.stringify(timeBudget) : '')
@@ -2415,8 +2451,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get()
     const segments = getSegmentsForAnalysis(state.liveSegments)
     const promptContext = buildSpeakingHintsPromptContext(state)
+    // The opening statement can be drafted from the topic before anyone speaks.
+    const canDraftOpening = isOpeningRoundActive(state) && Boolean(state.questionContext.trim())
 
-    if (!segments.length || state.isPaused) {
+    if ((!segments.length && !canDraftOpening) || state.isPaused) {
       return
     }
 
@@ -2733,9 +2771,11 @@ queueAutoHintsRefresh = () => {
   const latest = useAppStore.getState()
   const delay = hintsAutoRefreshDelayMs({
     // qa scenarios answer on demand instead of producing speaking hints.
+    // The opening draft only changes on request so it stays stable while being read aloud.
     enabled:
       latest.autoRefreshHints &&
-      resolveScenarioProfile(latest.scenarioId).interactionModel !== 'qa',
+      resolveScenarioProfile(latest.scenarioId).interactionModel !== 'qa' &&
+      !isOpeningRoundActive(latest),
     isStreaming: latest.isStreaming,
     isPaused: latest.isPaused,
     isRefreshing: latest.isRefreshingHints,

@@ -118,6 +118,9 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const timeBudget = useAppStore((state) => state.timeBudget)
   const currentSessionStartedAt = useAppStore((state) => state.currentSessionStartedAt)
   const currentSessionEndedAt = useAppStore((state) => state.currentSessionEndedAt)
+  const openingRoundActive = useAppStore((state) => state.openingRound)
+  const setOpeningRound = useAppStore((state) => state.setOpeningRound)
+  const hasQuestionContext = useAppStore((state) => Boolean(state.questionContext.trim()))
   const markSpeakerAsMe = useAppStore((state) => state.markSpeakerAsMe)
   const renameSpeaker = useAppStore((state) => state.renameSpeaker)
   const clearSpeakerBinding = useAppStore((state) => state.clearSpeakerBinding)
@@ -406,6 +409,15 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
               void refreshSpeakingHints()
             }}
             onToggleAutoRefresh={setAutoRefreshHints}
+            openingRound={
+              openingRoundActive && profile.openingRound
+                ? {
+                    label: profile.openingRound.label,
+                    canDraft: hasQuestionContext || liveSegments.length > 0,
+                    onEnd: () => setOpeningRound(false),
+                  }
+                : undefined
+            }
           />
         )}
         <QuestionBar

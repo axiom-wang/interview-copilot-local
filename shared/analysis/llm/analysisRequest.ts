@@ -68,6 +68,7 @@ const validateTranscriptRequest = (request: TranscriptRequest) => {
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.referenceContext) ||
     (request.timing !== undefined && !isTimingContext(request.timing)) ||
+    (request.openingRound !== undefined && typeof request.openingRound !== 'boolean') ||
     !isStringOrUndefined(request.phaseContext) ||
     !isStringOrUndefined(request.scenarioId) ||
     !isSummaryAssemblyContext(request.summaryAssemblyContext)
@@ -93,6 +94,7 @@ const toPromptContext = (request: TranscriptRequest): AnalysisPromptContext => (
   roleContext: request.roleContext?.trim() || undefined,
   referenceContext: request.referenceContext?.trim() || undefined,
   timing: request.timing,
+  openingRound: request.openingRound || undefined,
   phaseContext: request.phaseContext?.trim() || undefined,
   summaryAssemblyContext: request.summaryAssemblyContext,
 })

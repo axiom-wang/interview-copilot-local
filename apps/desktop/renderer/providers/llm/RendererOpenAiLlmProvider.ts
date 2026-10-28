@@ -48,6 +48,7 @@ const normalizePromptContext = (context: AnalysisPromptContext | undefined) => (
   roleContext: context?.roleContext?.trim() || undefined,
   referenceContext: context?.referenceContext?.trim() || undefined,
   timing: context?.timing,
+  openingRound: context?.openingRound || undefined,
   phaseContext: context?.phaseContext?.trim() || undefined,
   summaryAssemblyContext: normalizeSummaryAssemblyContext(
     context?.summaryAssemblyContext,
@@ -73,6 +74,7 @@ const buildRequestKey = (
     `r:${normalizedContext.roleContext ?? ''}`,
     `ref:${normalizedContext.referenceContext ?? ''}`,
     `t:${JSON.stringify(normalizedContext.timing ?? null)}`,
+    `o:${normalizedContext.openingRound ? 1 : 0}`,
     `p:${normalizedContext.phaseContext ?? ''}`,
     `s:${summaryContextKey}`,
   ].join('|')

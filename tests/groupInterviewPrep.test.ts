@@ -61,3 +61,25 @@ test('speaking function types include follow-up and refocus moves', () => {
   assert.equal(normalizeFunctionType('讨论跑题，需要拉回'), '拉回主线')
   assert.equal(normalizeFunctionType('分工落地'), '分工落地')
 })
+
+test('opening round drafts a standalone statement and tells every task the round is in progress', () => {
+  const opening = { scenarioId: 'group-interview' as const, questionContext: '为新品设计 618 上市方案', openingRound: true }
+  const hints = buildSpeakingHintsPrompt([], opening)
+  assert.match(hints, /准备轮到自己时的首轮发言陈述/)
+  assert.match(hints, /不重复已被说过的观点和理由/)
+  assert.match(hints, /备选说法/)
+  assert.ok(!hints.includes('认为此刻不该发言时'))
+  assert.match(buildRealtimeAnalysisPrompt([], opening), /当前处于首轮发言/)
+
+  const freeDiscussion = buildSpeakingHintsPrompt([], { ...opening, openingRound: false })
+  assert.ok(freeDiscussion.includes('认为此刻不该发言时'))
+  assert.ok(!freeDiscussion.includes('首轮发言'))
+  // Scenarios without opening-round copy ignore the flag.
+  assert.ok(!buildSpeakingHintsPrompt([], { ...opening, scenarioId: 'general' }).includes('首轮发言'))
+})
+
+test('analysis requests reject a non-boolean opening round flag', async () => {
+  const result = await handleAnalysisRequest({ action: 'speaking-hints', body: { segments: [], openingRound: 'yes' }, configOverride: {}, trustRuntimeConfig: true })
+  assert.equal(result.status, 400)
+  assert.match(JSON.stringify(result.body), /Invalid analysis context/)
+})
