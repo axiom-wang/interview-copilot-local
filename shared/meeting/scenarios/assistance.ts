@@ -15,10 +15,6 @@ export const SCENARIO_ASSISTANCE: Record<MeetingScenarioId, ScenarioAssistance> 
     title: '我的贡献机会', dimensions: ['可补充观点', '衔接与切入', '团队结论'],
     guidance: '优先寻找未被覆盖但有依据的贡献、衔接队友的切入点和团队结论。不要重复他人观点或鼓励争抢发言；没有新增价值时可以建议倾听。',
   },
-  'jd-tet': {
-    title: '群面讨论重点', dimensions: ['题目要求', '判断依据', '贡献机会'],
-    guidance: '围绕题目要求、判断依据和当前可贡献的内容组织重点，依据实际任务调整分析方式。',
-  },
   'one-on-one-interview': {
     title: '回答要点', dimensions: ['问题意图', '岗位要求', '可用经历'],
     guidance: '优先识别面试官问题在考察什么、对应岗位 JD 的哪项要求、可用哪段真实经历回答；不编造经历、公司或数字。',

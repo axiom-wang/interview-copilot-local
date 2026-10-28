@@ -1,5 +1,4 @@
 import type { MeetingScenarioId, MeetingScenarioProfile } from './types'
-import { JD_TET_PROFILE } from './jdTet'
 import { ONE_ON_ONE_INTERVIEW_PROFILE } from './oneOnOneInterview'
 
 export const DEFAULT_SCENARIO_ID: MeetingScenarioId = 'general'
@@ -184,5 +183,5 @@ const profiles: MeetingScenarioProfile[] = [
 ]
 
 export const SCENARIO_PROFILES = Object.fromEntries(
-  [...profiles, JD_TET_PROFILE, ONE_ON_ONE_INTERVIEW_PROFILE].map((profile) => [profile.id, profile]),
+  [...profiles, ONE_ON_ONE_INTERVIEW_PROFILE].map((profile) => [profile.id, profile]),
 ) as Record<MeetingScenarioId, MeetingScenarioProfile>

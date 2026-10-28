@@ -5,7 +5,7 @@ Build a Web SaaS app (Netlify) for AI-assisted meetings — multi-person meeting
 
 Meeting scenarios (default: general meeting):
 - general
-- group-interview (preset: jd-tet)
+- group-interview
 - one-on-one-interview
 - design-review
 - brainstorm

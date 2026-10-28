@@ -14,7 +14,7 @@ test('hint generation requests and returns only 60/120-second scripts', async ()
     assert.ok(!prompt.includes('hint15s') && !prompt.includes('hint30s'))
     return parser({ functionType: '检验推理', whyNow: '需要核对计算', hint60s: '短论证', hint120s: '展开论证' })
   }
-  const hints = await generateSpeakingHintsOnly([], { scenarioId: 'jd-tet', questionContext: '比较两种排序及其依据。' }, undefined, responder)
+  const hints = await generateSpeakingHintsOnly([], { scenarioId: 'group-interview', questionContext: '比较两种排序及其依据。' }, undefined, responder)
   assert.equal(hints.functionType, '检验推理')
   assert.equal(hints.hint60s, '短论证')
   assert.equal(hints.hint120s, '展开论证')
@@ -60,7 +60,7 @@ test('legacy sessions load, new scripts round-trip and Markdown exports both dur
   const legacy = loadSessions().find((session) => session.id === 'legacy-hints')!
   assert.equal(legacy.analysisSnapshots[0].speakingHints.hint60s, '旧60秒')
   assert.equal(legacy.analysisSnapshots[0].speakingHints.hint120s, '')
-  const updated = { ...legacy, id: 'new-hints', scenarioId: 'jd-tet' as const,
+  const updated = { ...legacy, id: 'new-hints', scenarioId: 'group-interview' as const,
     analysisSnapshots: [{ ...legacy.analysisSnapshots[0], speakingHints: parseSpeakingHints({
       functionType: '提出观点', hint60s: '新60秒发言', hint120s: '新120秒展开',
     }, legacy.analysisSnapshots[0].timestamp) }],
@@ -78,13 +78,13 @@ test('legacy sessions load, new scripts round-trip and Markdown exports both dur
   const markdown = await downloaded!.text()
   assert.match(markdown, /60 秒建议：新60秒发言/)
   assert.match(markdown, /120 秒建议：新120秒展开/)
-  assert.match(markdown, /京东 TET 群面/)
+  assert.match(markdown, /群面/)
   assert.ok(!markdown.includes('15 秒建议') && !markdown.includes('30 秒建议'))
 })
 
 test('combined desktop analysis includes shared instructions and meeting context only once', () => {
   const prompt = buildRealtimeAnalysisPrompt([{ id: 'source', speaker: 'A', text: '排序讨论中的原话', timestamp: 100, isFinal: true }], {
-    scenarioId: 'jd-tet', questionContext: '排序题的唯一标记',
+    scenarioId: 'group-interview', questionContext: '排序题的唯一标记',
   })
   for (const unique of ['共同规则：', '排序题的唯一标记', '排序讨论中的原话']) {
     assert.equal(prompt.split(unique).length - 1, 1)

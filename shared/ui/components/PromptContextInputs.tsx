@@ -2,16 +2,7 @@ import clsx from 'clsx'
 import { resolveScenarioProfile, SCENARIO_PROFILES } from '../../meeting/scenarios'
 import { useAppStore } from '../store/useAppStore'
 
-const SCENARIO_OPTIONS = Object.values(SCENARIO_PROFILES).flatMap((scenario) =>
-  scenario.parentScenarioId
-    ? []
-    : [
-        scenario,
-        ...Object.values(SCENARIO_PROFILES).filter(
-          (preset) => preset.parentScenarioId === scenario.id,
-        ),
-      ],
-)
+const SCENARIO_OPTIONS = Object.values(SCENARIO_PROFILES)
 
 export function ScenarioPicker({ disabled = false }: { disabled?: boolean }) {
   const scenarioId = useAppStore((state) => state.scenarioId)

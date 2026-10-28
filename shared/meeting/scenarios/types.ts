@@ -3,7 +3,6 @@ import type { PhaseType } from '../types/analysis'
 export type MeetingScenarioId =
   | 'general'
   | 'group-interview'
-  | 'jd-tet'
   | 'one-on-one-interview'
   | 'design-review'
   | 'brainstorm'
@@ -32,7 +31,6 @@ export interface MeetingScenarioProfile {
   label: string
   description: string
   interactionModel: ScenarioInteractionModel
-  parentScenarioId?: MeetingScenarioId
   roleContextEnabled?: boolean
   topicContextRequired?: boolean
   qa?: QaScenarioCopy
