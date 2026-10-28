@@ -43,11 +43,7 @@ export const ONE_ON_ONE_INTERVIEW_PROFILE: MeetingScenarioProfile = {
   },
   phaseSignals: ['是否在介绍背景或动机', '是否在追问具体经历细节', '是否在考察专业能力或案例', '是否在反问或收尾'],
   participantPersona: '候选人',
-  hintStyleRules: [
-    '先直接回答问题，再补充经历或理由',
-    '用“我”讲清个人具体做了什么，团队成果如实说明分工',
-    '口语化、简洁，不用套话和空泛形容词',
-  ],
+  hintStyleRules: ['如实说明个人具体做了什么，团队成果说明分工'],
   spokenSummaryLabel: '面试收尾陈述',
   spokenSummaryLengthHint: '约 60 秒、160-260 字',
   summaryPurpose: '回答“最后还有什么想补充”的收尾陈述，回扣岗位要求与面试中已展示的真实亮点',

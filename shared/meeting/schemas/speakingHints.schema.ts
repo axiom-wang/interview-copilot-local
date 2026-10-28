@@ -1,20 +1,31 @@
+import { SPEAKING_FUNCTION_TYPES, SPEAKING_HINT_NOTE_KINDS } from '../types/analysis'
+
 export const speakingHintsSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['functionType', 'whyNow', 'hint60s', 'hint120s'],
+  required: ['functionType', 'whyNow', 'script', 'notes'],
   properties: {
     functionType: {
       type: 'string',
-      minLength: 1,
+      enum: SPEAKING_FUNCTION_TYPES,
     },
     whyNow: {
       type: 'string',
     },
-    hint120s: {
+    script: {
       type: 'string',
     },
-    hint60s: {
-      type: 'string',
+    notes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['kind', 'text'],
+        properties: {
+          kind: { type: 'string', enum: SPEAKING_HINT_NOTE_KINDS },
+          text: { type: 'string' },
+        },
+      },
     },
   },
 } as const

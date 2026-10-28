@@ -302,22 +302,9 @@ button:disabled {
   gap: 1rem;
 }
 
-.copilot-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
 @media (min-width: 1024px) {
   .live-workspace {
     grid-template-columns: var(--live-workspace-columns);
-    gap: 0;
-    overflow: hidden;
-  }
-
-  .copilot-stack {
-    display: grid;
-    grid-template-rows: var(--copilot-stack-rows, minmax(180px, 3fr) 10px minmax(160px, 2fr));
     gap: 0;
     overflow: hidden;
   }
@@ -772,6 +759,28 @@ button:disabled {
   font-weight: 500;
   white-space: nowrap;
   color: var(--text-muted);
+}
+
+.tabs-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.5rem;
+  height: 0.5rem;
+  margin-left: 0.375rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.tabs-badge:not(:empty) {
+  min-width: 1.125rem;
+  height: 1.125rem;
+  padding: 0 0.3125rem;
 }
 
 .tabs-trigger[data-active="true"] {

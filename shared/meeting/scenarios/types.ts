@@ -32,6 +32,13 @@ export interface MeetingScenarioProfile {
   description: string
   interactionModel: ScenarioInteractionModel
   roleContextEnabled?: boolean
+  // Reusable background material (e.g. job description, prep notes) kept across sessions.
+  referenceContextEnabled?: boolean
+  referenceContextLabel?: string
+  // Tells the model how to treat the reference material; shown only in prompts.
+  referencePromptNote?: string
+  referenceHelp?: string
+  referencePlaceholder?: string
   topicContextRequired?: boolean
   qa?: QaScenarioCopy
   contextTitle?: string

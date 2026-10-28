@@ -14,6 +14,7 @@ import type {
 import type { MindMapSnapshot } from '../../../../shared/meeting/types/mindmap'
 import type { AnalysisErrorResult } from '../../../../shared/analysis/llm/analysisFailure'
 import { normalizeMeetingMemory } from '../../../../shared/meeting/context/meetingMemory'
+import { isTimingContext } from '../../../../shared/meeting/context/timeBudget'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
 import {
@@ -132,6 +133,8 @@ const validateRequest = (request: TranscriptRequest) => {
     (request.pinnedSegmentIds !== undefined && (!Array.isArray(request.pinnedSegmentIds) || !request.pinnedSegmentIds.every((id) => typeof id === 'string'))) ||
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
+    !isStringOrUndefined(request.referenceContext) ||
+    (request.timing !== undefined && !isTimingContext(request.timing)) ||
     !isStringOrUndefined(request.phaseContext) ||
     !isStringOrUndefined(request.scenarioId) ||
     !isSummaryAssemblyContext(request.summaryAssemblyContext)
@@ -159,6 +162,8 @@ const toPromptContext = (
   scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
+  referenceContext: request.referenceContext?.trim() || undefined,
+  timing: request.timing,
   phaseContext: request.phaseContext?.trim() || undefined,
   summaryAssemblyContext: request.summaryAssemblyContext,
 })

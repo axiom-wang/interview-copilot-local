@@ -210,7 +210,7 @@ test('API exhausts its existing three attempts before routing to Codex', async (
   const result = await router.run(input, async (config) => {
     if (config!.provider === 'api') return generateSpeakingHintsOnly(input.segments, input, config)
     assert.equal(attempts, 3)
-    return { functionType: '倾听观察' as const, whyNow: '先倾听', hint60s: '', hint120s: '', updatedAt: 1000 }
+    return { functionType: '倾听观察' as const, whyNow: '先倾听', script: '', updatedAt: 1000 }
   })
   assert.equal(result.routing.actualProvider, 'codex')
   assert.equal(attempts, 3)

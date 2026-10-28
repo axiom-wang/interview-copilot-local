@@ -185,7 +185,7 @@ test('realtime analysis asks for the lean schema and brief output', async (t) =>
   assert.equal(result.phaseAnalysis.nextAction, '确认预算')
   assert.equal(result.phaseAnalysis.nextBestAction, undefined)
   const sent = readFileSync(log, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as { prompt: string; argv: string[] })
-  const turn = sent.find((entry) => entry.prompt.includes('最近 90 秒转写'))!
+  const turn = sent.find((entry) => entry.prompt.includes('阶段分析任务'))!
   const sentSchema = JSON.parse(turn.argv.find((arg) => arg.startsWith('--json-schema='))!.slice(14))
   assert.deepEqual(Object.keys(sentSchema.properties.phaseAnalysis.properties).sort(), ['confidence', 'nextAction', 'phase', 'reason'])
   assert.ok(!sentSchema.properties.phaseAnalysis.required.includes('nextBestAction'))

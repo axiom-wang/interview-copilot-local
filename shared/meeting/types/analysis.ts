@@ -17,16 +17,30 @@ export interface PhaseAnalysis {
   updatedAt: number
 }
 
-export type SpeakingFunctionType =
-  | '倾听观察'
-  | '提出观点'
-  | '检验推理'
-  | '推进结构'
-  | '补齐信息'
-  | '化解分歧'
-  | '收敛结论'
-  | '分工落地'
-  | '汇报总结'
+export const SPEAKING_FUNCTION_TYPES = [
+  '倾听观察',
+  '提出观点',
+  '检验推理',
+  '推进结构',
+  '补齐信息',
+  '化解分歧',
+  '收敛结论',
+  '分工落地',
+  '汇报总结',
+  '追问落地',
+  '拉回主线',
+] as const
+
+export type SpeakingFunctionType = (typeof SPEAKING_FUNCTION_TYPES)[number]
+
+export const SPEAKING_HINT_NOTE_KINDS = ['依据', '备选说法', '风险'] as const
+
+export type SpeakingHintNoteKind = (typeof SPEAKING_HINT_NOTE_KINDS)[number]
+
+export interface SpeakingHintNote {
+  kind: SpeakingHintNoteKind
+  text: string
+}
 
 export interface ScenarioFocusItem {
   label: string
@@ -56,8 +70,9 @@ export interface ConsensusAnalysis {
 export interface SpeakingHints {
   functionType: SpeakingFunctionType
   whyNow: string
-  hint60s: string
-  hint120s: string
+  script: string
+  // Absent in sessions saved before notes existed.
+  notes?: SpeakingHintNote[]
   updatedAt: number
 }
 

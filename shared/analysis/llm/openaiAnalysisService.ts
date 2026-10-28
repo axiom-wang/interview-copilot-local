@@ -1,5 +1,5 @@
 import { groundConsensusEvidence } from '../../meeting/context/groundConsensus'
-import { acceptMemoryEvents, findHistoricalEvidence, formatEvidence, prepareMeetingHistory } from '../../meeting/context/meetingMemory'
+import { acceptMemoryEvents, findHistoricalEvidence, formatEvidence, prepareMeetingHistory, stableTranscript } from '../../meeting/context/meetingMemory'
 import { buildMeetingMemoryPrompt } from '../../meeting/prompts/meetingMemory'
 import { meetingMemorySchema } from '../../meeting/schemas/meetingMemory.schema'
 import { buildAnswerInterviewQuestionPrompt } from '../../meeting/prompts/answerInterviewQuestion'
@@ -246,7 +246,7 @@ export const analyzeTranscriptRealtimeBundle = async (
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<PhaseConsensusAnalysisBundle> => {
   context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
-  const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
+  const analysisSegments = stableTranscript(segments)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
   const [phaseAnalysis, consensusAnalysis] = await Promise.all([
@@ -280,7 +280,7 @@ export const generateSpeakingHintsOnly = async (
   createResponse: StructuredResponse = createStructuredResponse,
 ): Promise<SpeakingHints> => {
   context = await prepareAnalysisContext(segments, context, configOverride, createResponse)
-  const analysisSegments = getRecentSegmentsByWindow(segments, 90 * 1000)
+  const analysisSegments = stableTranscript(segments)
   const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
 
   return createResponse(

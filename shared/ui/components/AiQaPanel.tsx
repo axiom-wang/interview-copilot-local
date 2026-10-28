@@ -45,6 +45,7 @@ export function AiQaPanel({
   const profile = resolveScenarioProfile(scenarioId ?? activeScenarioId)
   const compact = density === 'compact'
   const isQa = profile.interactionModel === 'qa'
+  const hasInput = Boolean(onAsk && onQuestionDraftChange)
 
   return (
     <section
@@ -54,7 +55,15 @@ export function AiQaPanel({
         className,
       )}
     >
-      {embedded ? null : compact ? (
+      {embedded ? (
+        hasInput || history.length === 0 ? null : (
+          <div className="flex shrink-0 justify-end">
+            <button className="btn-ghost text-xs" onClick={onClearHistory} type="button">
+              清空记录
+            </button>
+          </div>
+        )
+      ) : compact ? (
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
           <h2 className="theme-title text-base font-semibold">AI 问答</h2>
           <button
@@ -210,10 +219,10 @@ export function AiQaPanel({
         <div
           className={clsx(
             'panel-empty theme-muted min-h-24 flex-1 overflow-y-auto rounded-[var(--radius-card)] p-5 text-sm leading-7',
-            embedded || compact ? 'mt-3' : 'mt-5',
+            embedded && !hasInput ? 'mt-0' : embedded || compact ? 'mt-3' : 'mt-5',
           )}
         >
-          输入问题后点击“提问”，这里会把 AI 的结论、依据和可直接说出口的话分层展示出来。
+          {hasInput ? '输入问题后点击“提问”，' : '提问后，'}这里会把 AI 的结论、依据和可直接说出口的话分层展示出来。
         </div>
       )}
     </section>

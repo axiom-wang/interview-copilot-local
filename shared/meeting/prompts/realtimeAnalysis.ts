@@ -3,7 +3,7 @@ import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import { buildDetectPhaseTask } from './detectPhase'
 import { buildExtractConsensusTask } from './extractConsensus'
-import { composePromptWithGlobalSystemPrompt, formatOptionalPromptContext, formatSegmentsForPrompt } from './promptUtils'
+import { composePromptWithGlobalSystemPrompt, formatOptionalPromptContext, formatTranscriptSection } from './promptUtils'
 
 export const buildRealtimeAnalysisPrompt = (
   segments: TranscriptSegment[],
@@ -21,7 +21,6 @@ ${buildExtractConsensusTask(profile)}
 
 ${formatOptionalPromptContext(context)}
 
-最近 90 秒转写：
-${formatSegmentsForPrompt(segments)}
+${formatTranscriptSection(segments, context)}
 `, profile)
 }

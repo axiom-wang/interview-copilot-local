@@ -107,17 +107,17 @@ test('question evidence searches all history and preserves old pinned statements
 const outputs: Record<string, unknown> = {
   detect_phase: { phase: 'alignment-building', confidence: 0.9, reason: '在比较', nextAction: '核对约束' },
   extract_consensus_and_tensions: { consensus: [], tensions: [], missing: [], scenarioFocus: [] },
-  generate_speaking_hints: { functionType: '补齐信息', whyNow: '确认变化', hint60s: '核对预算', hint120s: '核对预算与变化依据' },
+  generate_speaking_hints: { functionType: '补齐信息', whyNow: '确认变化', script: '核对预算与变化依据', notes: [] },
   generate_mind_map: { topic: '会议', nodes: [], edges: [] },
   generate_meeting_summary: { speech60s: '会议总结', keyPoints: [], nextSteps: [] },
   generate_meeting_minutes: { title: '纪要', overview: '会议', topics: [], decisions: [], openQuestions: [], actionItems: [] },
   answer_interview_question: { conclusion: '待确认', reasoning: ['检查原话'], suggestedReply: '请核对预算' },
 }
 
-test('all analysis tasks receive the entire meeting, role and chronology rules', async () => {
-  const prompts: string[] = []
+test('all analysis tasks receive the entire meeting, role and chronology rules; hints skip scenario guidance', async () => {
+  const prompts: Array<{ name: string, prompt: string }> = []
   const responder: StructuredResponse = async (prompt, name, _schema, parser) => {
-    prompts.push(prompt)
+    prompts.push({ name, prompt })
     assert.ok(outputs[name], name)
     return parser(outputs[name])
   }
@@ -131,8 +131,10 @@ test('all analysis tasks receive the entire meeting, role and chronology rules',
   await generateMeetingMinutesOnly(input, context, undefined, responder)
   await answerInterviewQuestionOnly('早期预算是什么？', input, context, undefined, responder)
   assert.equal(prompts.length, 7)
-  for (const prompt of prompts) {
-    for (const text of ['EARLY_CONSTRAINT', 'LATEST_CHANGE', 'ROLE', '最新明确变更优先', '风险依赖']) assert.ok(prompt.includes(text), text)
+  for (const { name, prompt } of prompts) {
+    for (const text of ['EARLY_CONSTRAINT', 'LATEST_CHANGE', 'ROLE', '最新明确变更优先']) assert.ok(prompt.includes(text), `${name}: ${text}`)
+    // Scenario guidance steers analysis tasks; speaking hints are left to the model's own judgement.
+    assert.equal(prompt.includes('风险依赖'), name !== 'generate_speaking_hints', name)
   }
 })
 
@@ -235,10 +237,9 @@ test('AI participation separates tentative contributions from facts and permits 
   assert.match(prompt, /尚未实际发言或被团队接受，不是会议事实/)
   assert.match(prompt, /预算是否含运费/)
   assert.match(prompt, /真人未回应且无新证据时不要重复/)
-  assert.match(buildSpeakingHintsPrompt([], context), /hint60s、hint120s 均为空字符串/)
-  const hints = parseSpeakingHints({ functionType: '倾听观察', whyNow: '等待成本负责人说完', hint60s: '不应该发出的重复建议', hint120s: '也不应该发出的长建议' }, 100)
-  assert.equal(hints.hint120s, '')
-  assert.equal(hints.hint60s, '')
+  assert.match(buildSpeakingHintsPrompt([], context), /script 为空字符串/)
+  const hints = parseSpeakingHints({ functionType: '倾听观察', whyNow: '等待成本负责人说完', script: '不应该发出的重复建议' }, 100)
+  assert.equal(hints.script, '')
   const analysis = parseConsensusAnalysis({ consensus: ['保持原结论'], tensions: [], missing: [], participantView: previousParticipantView, scenarioFocus: [{ label: '当前议题', detail: '建议核对预算', evidenceIds: ['missing'] }] }, 100)
   assert.deepEqual(groundConsensusEvidence(analysis, [segment('real', '预算尚未明确')]).consensus, ['保持原结论'])
   const grounded = groundConsensusEvidence(analysis, [segment('different', '其他发言')])

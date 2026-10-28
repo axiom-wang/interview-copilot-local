@@ -21,6 +21,8 @@ export interface AnalysisPromptContext {
   scenarioId?: MeetingScenarioId
   questionContext?: string
   roleContext?: string
+  referenceContext?: string
+  timing?: import('../context/timeBudget').TimingContext
   phaseContext?: string
   summaryAssemblyContext?: SummaryAssemblyContext
 }

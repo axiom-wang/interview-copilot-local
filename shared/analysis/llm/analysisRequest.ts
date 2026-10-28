@@ -1,6 +1,7 @@
 import { toAnalysisFailure } from './analysisFailure'
 import { normalizeParticipantView } from '../../meeting/context/participantView'
 import { normalizeMeetingMemory } from '../../meeting/context/meetingMemory'
+import { isTimingContext } from '../../meeting/context/timeBudget'
 import type { AnalysisPromptContext } from '../../meeting/types/promptContext'
 import type { TranscriptSegment } from '../../meeting/types/transcript'
 import {
@@ -65,6 +66,8 @@ const validateTranscriptRequest = (request: TranscriptRequest) => {
     (request.pinnedSegmentIds !== undefined && (!Array.isArray(request.pinnedSegmentIds) || !request.pinnedSegmentIds.every((id) => typeof id === 'string'))) ||
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
+    !isStringOrUndefined(request.referenceContext) ||
+    (request.timing !== undefined && !isTimingContext(request.timing)) ||
     !isStringOrUndefined(request.phaseContext) ||
     !isStringOrUndefined(request.scenarioId) ||
     !isSummaryAssemblyContext(request.summaryAssemblyContext)
@@ -88,6 +91,8 @@ const toPromptContext = (request: TranscriptRequest): AnalysisPromptContext => (
   scenarioId: request.scenarioId,
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
+  referenceContext: request.referenceContext?.trim() || undefined,
+  timing: request.timing,
   phaseContext: request.phaseContext?.trim() || undefined,
   summaryAssemblyContext: request.summaryAssemblyContext,
 })

@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ContextFields, ScenarioPicker } from '../../components/PromptContextInputs'
+import { ContextFields, ScenarioPicker, TimeBudgetFields } from '../../components/PromptContextInputs'
 import { applyPendingContext } from '../../components/promptContext'
 import { resolveScenarioProfile } from '../../../meeting/scenarios'
 import { useAppStore } from '../../store/useAppStore'
@@ -96,6 +96,12 @@ export function LivePrepView() {
         <div className="px-5 py-5">
           <ContextFields />
         </div>
+
+        {isQa ? null : (
+          <div className="px-5 py-5">
+            <TimeBudgetFields />
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
           <p className="theme-muted max-w-md text-xs leading-5">

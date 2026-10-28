@@ -18,7 +18,7 @@ const bundle: PhaseConsensusAnalysisBundle = {
   phaseAnalysis: { phase: 'decision-lock', confidence: 0.9, nextAction: '确认预算', reason: '已达成共识', updatedAt: 1000 },
   consensusAnalysis: { consensus: ['确认预算'], tensions: [], missing: [], updatedAt: 1000 },
 }
-const hints: SpeakingHints = { functionType: '收敛结论', whyNow: '已有共识', hint60s: '请确认预算', hint120s: '请确认预算和负责人', updatedAt: 1000 }
+const hints: SpeakingHints = { functionType: '收敛结论', whyNow: '已有共识', script: '请确认预算和负责人', updatedAt: 1000 }
 const summary = { speech60s: '会议确认预算', keyPoints: ['确认预算'], nextSteps: [], updatedAt: 1000 }
 const minutes = { title: '预算会议', overview: '确认预算', topics: [], decisions: ['确认预算'], openQuestions: [], actionItems: [], updatedAt: 1000 }
 const mindMap = { id: 'map', topic: '预算', nodes: [], edges: [], capturedAt: 1000 }

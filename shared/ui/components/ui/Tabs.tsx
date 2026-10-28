@@ -5,6 +5,8 @@ export interface TabItem {
   id: string
   label: string
   content: ReactNode
+  /** Unread marker: a count, or `true` for a plain dot. */
+  badge?: number | boolean
 }
 
 interface TabsProps {
@@ -43,6 +45,11 @@ export function Tabs({ items, defaultTabId, activeId, onActiveIdChange, classNam
             type="button"
           >
             {item.label}
+            {item.badge ? (
+              <span className="tabs-badge" aria-label="有更新">
+                {typeof item.badge === 'number' ? item.badge : ''}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

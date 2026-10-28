@@ -133,9 +133,8 @@ ${
 - 缺口：${snapshot.consensusAnalysis.missing.join('；') || '暂无'}
 - 动作类型：${snapshot.speakingHints.functionType}
 - Why Now：${whyNow}
-- 60 秒建议：${snapshot.speakingHints.hint60s || '未保存'}
-- 120 秒建议：${snapshot.speakingHints.hint120s || '未保存'}
-- 导图主题：${mindMapTopic}`
+- 发言建议：${snapshot.speakingHints.script || '未保存'}
+${snapshot.speakingHints.notes?.map((note) => `- ${note.kind}：${note.text}\n`).join('') ?? ''}- 导图主题：${mindMapTopic}`
           })
           .join('\n\n')
       : '暂无'

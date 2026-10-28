@@ -13,7 +13,7 @@ export const SCENARIO_ASSISTANCE: Record<MeetingScenarioId, ScenarioAssistance> 
   },
   'group-interview': {
     title: '我的贡献机会', dimensions: ['可补充观点', '衔接与切入', '团队结论'],
-    guidance: '优先寻找未被覆盖但有依据的贡献、衔接队友的切入点和团队结论。不要重复他人观点或鼓励争抢发言；没有新增价值时可以建议倾听。',
+    guidance: '优先寻找未被覆盖但有依据的贡献、衔接队友的切入点和团队结论：追问创意的落地细节、为目标补数据依据、偏题时拉回主线。不要重复他人观点或鼓励争抢发言；没有新增价值时可以建议倾听。',
   },
   'one-on-one-interview': {
     title: '回答要点', dimensions: ['问题意图', '岗位要求', '可用经历'],

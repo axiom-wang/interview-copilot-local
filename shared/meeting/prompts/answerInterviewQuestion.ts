@@ -1,25 +1,39 @@
 import { resolveScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
-import { composePromptWithGlobalSystemPrompt } from './promptUtils'
+import { formatTimingContext } from '../context/timeBudget'
+import {
+  composePromptWithGlobalSystemPrompt,
+  referenceContextHeading,
+  resolveReferenceContext,
+} from './promptUtils'
 
 const normalizeText = (value: string | undefined) => {
   const normalized = value?.trim()
   return normalized ? normalized : null
 }
 
-const buildContextData = (context?: AnalysisPromptContext) => ({
-  meetingHistory: context?.meetingHistory,
-  previousAiViewNotMeetingFact: context?.previousParticipantView,
-  questionContext: normalizeText(context?.questionContext),
-  roleContext: resolveScenarioProfile(context?.scenarioId).roleContextEnabled === false
-    ? null
-    : normalizeText(context?.roleContext),
-  phase: normalizeText(context?.phaseContext),
-  consensus: context?.summaryAssemblyContext?.consensus ?? [],
-  tensions: context?.summaryAssemblyContext?.tensions ?? [],
-  missing: context?.summaryAssemblyContext?.missing ?? [],
-})
+const buildContextData = (context?: AnalysisPromptContext) => {
+  const profile = resolveScenarioProfile(context?.scenarioId)
+  const referenceContext = resolveReferenceContext(context)
+
+  return {
+    meetingHistory: context?.meetingHistory,
+    previousAiViewNotMeetingFact: context?.previousParticipantView,
+    questionContext: normalizeText(context?.questionContext),
+    referenceContext: referenceContext
+      ? { note: referenceContextHeading(profile), content: referenceContext }
+      : null,
+    roleContext: profile.roleContextEnabled === false
+      ? null
+      : normalizeText(context?.roleContext),
+    phase: normalizeText(context?.phaseContext),
+    timing: formatTimingContext(context?.timing) || null,
+    consensus: context?.summaryAssemblyContext?.consensus ?? [],
+    tensions: context?.summaryAssemblyContext?.tensions ?? [],
+    missing: context?.summaryAssemblyContext?.missing ?? [],
+  }
+}
 
 const buildTranscriptData = (segments: TranscriptSegment[]) =>
   segments.map((segment) => ({

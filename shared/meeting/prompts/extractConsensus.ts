@@ -5,11 +5,11 @@ import type { TranscriptSegment } from '../types/transcript'
 import {
   composePromptWithGlobalSystemPrompt,
   formatOptionalPromptContext,
-  formatSegmentsForPrompt,
+  formatTranscriptSection,
 } from './promptUtils'
 
 export const buildExtractConsensusTask = (profile: MeetingScenarioProfile) => `
-提取全程讨论中当前仍有效的共识、分歧和关键缺口，结合最近 90 秒的新变化更新。
+提取全程讨论中当前仍有效的共识、分歧和关键缺口，结合最新发言带来的变化更新。
 共识需多人明确认可，或明确决策确认且相关异议已处理；分歧记录不同判断、标准或方案，已解决的不再列出。缺口仅针对题目需要，不把参考维度当成必答清单。
 相关时参考：${profile.valueDimensions.join('、')}。每类最多 4 条，简短但保留判断所需信息，无内容时返回空数组。
 
@@ -35,6 +35,5 @@ ${buildExtractConsensusTask(resolveScenarioProfile(context?.scenarioId))}
 
 ${formatOptionalPromptContext(context)}
 
-最近 90 秒转写：
-${formatSegmentsForPrompt(segments)}
+${formatTranscriptSection(segments, context)}
 `, resolveScenarioProfile(context?.scenarioId))

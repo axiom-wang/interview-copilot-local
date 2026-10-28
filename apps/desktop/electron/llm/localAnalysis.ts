@@ -5,7 +5,7 @@ import { buildRealtimeAnalysisPrompt } from '../../../../shared/meeting/prompts/
 import { detectPhaseSchema } from '../../../../shared/meeting/schemas/detectPhase.schema.ts'
 import { extractConsensusSchema } from '../../../../shared/meeting/schemas/extractConsensus.schema.ts'
 import { parseConsensusAnalysis, parsePhaseAnalysis } from '../../../../shared/analysis/llm/responseParsing'
-import { getRecentSegmentsByWindow } from '../../../../shared/analysis/llm/segmentWindows'
+import { stableTranscript } from '../../../../shared/meeting/context/meetingMemory'
 import { resolveScenarioProfile } from '../../../../shared/meeting/scenarios'
 import {
   prepareAnalysisContext, answerInterviewQuestionOnly, generateMeetingMinutesOnly,
@@ -36,7 +36,7 @@ export const createLocalAnalysis = (client: LocalAnalysisClient, options: LocalA
   return {
     realtime: async (segments: TranscriptSegment[], context?: AnalysisPromptContext) => {
       context = await prepareAnalysisContext(segments, context, undefined, createResponse)
-      const recent = getRecentSegmentsByWindow(segments, 90_000)
+      const recent = stableTranscript(segments)
       const updatedAt = segments.at(-1)?.timestamp ?? Date.now()
       const prompt = buildRealtimeAnalysisPrompt(recent, context) + (options.realtimePromptSuffix ?? '')
       const result = await client.structured(prompt, {

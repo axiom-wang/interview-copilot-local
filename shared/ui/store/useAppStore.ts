@@ -1,4 +1,5 @@
 import { readPartialMeetingMemory } from '../../meeting/context/meetingMemory'
+import { buildTimingContext, normalizeTimeBudget, type TimeBudget } from '../../meeting/context/timeBudget'
 import type { MeetingMemory } from '../../meeting/types/meetingMemory'
 import { getMeetingRuntime, type ConfiguredAstProvider } from '../runtime'
 import { DEFAULT_MODEL_SETTINGS } from '../../meeting/settings/types'
@@ -107,9 +108,12 @@ interface AppState {
   replayTimestamp: number | null
   questionContextDraft: string
   roleContextDraft: string
+  referenceContextDraft: string
   aiQuestionDraft: string
   questionContext: string
   roleContext: string
+  referenceContext: string
+  timeBudget: TimeBudget | null
   scenarioId: MeetingScenarioId
   aiQaHistory: InterviewQaTurn[]
   aiQaError: string | null
@@ -142,10 +146,13 @@ interface AppState {
   setReplayTimestamp: (timestamp: number) => void
   setQuestionContextDraft: (value: string) => void
   setRoleContextDraft: (value: string) => void
+  setReferenceContextDraft: (value: string) => void
+  setTimeBudget: (budget: TimeBudget | null) => void
   setScenarioId: (scenarioId: MeetingScenarioId) => void
   setAiQuestionDraft: (value: string) => void
   applyQuestionContext: () => void
   applyRoleContext: () => void
+  applyReferenceContext: () => void
   clearQuestionContext: () => void
   clearRoleContext: () => void
   askAiQuestion: (questionOverride?: string, options?: { recognitionMs?: number }) => Promise<void>
@@ -192,6 +199,8 @@ const ANALYSIS_DEBOUNCE_MS = 1500
 const QUESTION_CONTEXT_STORAGE_KEY = 'interview-copilot-local/question-context'
 const QUESTION_CONTEXT_DRAFT_KEY = 'interview-copilot-local/question-context-draft'
 const ROLE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/role-context'
+const REFERENCE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/reference-context'
+const TIME_BUDGET_STORAGE_KEY = 'interview-copilot-local/time-budget'
 const SCENARIO_ID_STORAGE_KEY = 'interview-copilot-local/scenario-id'
 const MAX_QA_HISTORY_ITEMS = 6
 const DUPLICATE_WINDOW_MS = 8_000
@@ -423,8 +432,7 @@ const createFallbackSpeakingHints = (
   return {
     functionType: normalizeFunctionType(undefined),
     whyNow: `点击“刷新建议”获取当前${profile.label}的实时发言建议。`,
-    hint60s: '',
-    hint120s: '',
+    script: '',
     updatedAt,
   }
 }
@@ -854,6 +862,14 @@ const persistContextValue = (storageKey: string, value: string) => {
   window.localStorage.removeItem(storageKey)
 }
 
+const readStoredTimeBudget = () => {
+  try {
+    return normalizeTimeBudget(JSON.parse(readStoredContext(TIME_BUDGET_STORAGE_KEY) || 'null'))
+  } catch {
+    return null
+  }
+}
+
 const persistQuestionDraft = (value: string) => {
   persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, value)
   persistContextValue(QUESTION_CONTEXT_DRAFT_KEY, value ? '1' : '')
@@ -889,6 +905,24 @@ const readQuestionDraft = (sessions: SessionRecord[]) => {
   return stored
 }
 
+const buildPreparationContext = (
+  state: Pick<
+    AppState,
+    'scenarioId' | 'referenceContext' | 'timeBudget' | 'currentSessionStartedAt' | 'currentSessionEndedAt'
+  >,
+): Pick<AnalysisPromptContext, 'referenceContext' | 'timing'> => {
+  const profile = resolveScenarioProfile(state.scenarioId)
+
+  return {
+    referenceContext: profile.referenceContextEnabled
+      ? state.referenceContext.trim() || undefined
+      : undefined,
+    timing: profile.interactionModel === 'discussion'
+      ? buildTimingContext(state.timeBudget, state.currentSessionStartedAt, state.currentSessionEndedAt ?? Date.now())
+      : undefined,
+  }
+}
+
 const buildPromptContext = (
   state: Pick<
     AppState,
@@ -897,6 +931,10 @@ const buildPromptContext = (
     | 'pinnedSegmentIds'
     | 'questionContext'
     | 'roleContext'
+    | 'referenceContext'
+    | 'timeBudget'
+    | 'currentSessionStartedAt'
+    | 'currentSessionEndedAt'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
     | 'mindMap'
@@ -922,6 +960,7 @@ const buildPromptContext = (
     pinnedSegmentIds: state.pinnedSegmentIds,
     questionContext,
     roleContext,
+    ...buildPreparationContext(state),
     phaseContext,
     summaryAssemblyContext: hasSummaryAssemblyContext
       ? {
@@ -935,6 +974,17 @@ const buildPromptContext = (
   }
 }
 
+// Hints read the raw transcript only; earlier AI conclusions would carry over
+// their misjudgements and anchor the model on its previous view.
+const buildSpeakingHintsPromptContext = (
+  state: Parameters<typeof buildPromptContext>[0],
+): AnalysisPromptContext => ({
+  ...buildPromptContext(state),
+  previousParticipantView: undefined,
+  phaseContext: undefined,
+  summaryAssemblyContext: undefined,
+})
+
 const buildQuestionAnswerPromptContext = (
   state: Pick<
     AppState,
@@ -943,6 +993,10 @@ const buildQuestionAnswerPromptContext = (
     | 'pinnedSegmentIds'
     | 'questionContext'
     | 'roleContext'
+    | 'referenceContext'
+    | 'timeBudget'
+    | 'currentSessionStartedAt'
+    | 'currentSessionEndedAt'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
   >,
@@ -966,6 +1020,7 @@ const buildQuestionAnswerPromptContext = (
     pinnedSegmentIds: state.pinnedSegmentIds,
     questionContext,
     roleContext,
+    ...buildPreparationContext(state),
     phaseContext,
     summaryAssemblyContext: hasSummaryAssemblyContext
       ? {
@@ -1178,9 +1233,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   replayTimestamp: null,
   questionContextDraft: '',
   roleContextDraft: '',
+  referenceContextDraft: '',
   aiQuestionDraft: '',
   questionContext: '',
   roleContext: '',
+  referenceContext: '',
+  timeBudget: null,
   scenarioId: DEFAULT_SCENARIO_ID,
   aiQaHistory: [],
   aiQaError: null,
@@ -1200,6 +1258,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       : sessions.at(-1) ?? sessions[0] ?? null
     const questionContext = readQuestionDraft(sessions)
     const roleContext = readStoredContext(ROLE_CONTEXT_STORAGE_KEY)
+    const referenceContext = readStoredContext(REFERENCE_CONTEXT_STORAGE_KEY)
+    const timeBudget = readStoredTimeBudget()
     const scenarioId = resolveScenarioProfile(
       readStoredContext(SCENARIO_ID_STORAGE_KEY),
     ).id
@@ -1221,9 +1281,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       listeningStatusLabel: supportsLiveAssist ? '未监听' : '展示模式',
       questionContextDraft: questionContext,
       roleContextDraft: roleContext,
+      referenceContextDraft: referenceContext,
       aiQuestionDraft: '',
       questionContext,
       roleContext,
+      referenceContext,
+      timeBudget,
       scenarioId,
       autoRefreshHints: readHintsAutoRefresh(),
       aiQaHistory: [],
@@ -2002,6 +2065,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   setRoleContextDraft: (value) => {
     set({ roleContextDraft: normalizeContextInput(value) })
   },
+  setReferenceContextDraft: (value) => {
+    set({ referenceContextDraft: normalizeContextInput(value) })
+  },
+  setTimeBudget: (budget) => {
+    const timeBudget = normalizeTimeBudget(budget)
+    persistContextValue(TIME_BUDGET_STORAGE_KEY, timeBudget ? JSON.stringify(timeBudget) : '')
+    set({ timeBudget })
+  },
   setScenarioId: (scenarioId) => {
     const resolvedScenarioId = resolveScenarioProfile(scenarioId).id
     const shouldRefresh =
@@ -2064,6 +2135,24 @@ export const useAppStore = create<AppState>((set, get) => ({
       roleContext: nextValue,
       errorMessage: null,
       statusMessage: 'roleContext 已应用到后续分析。',
+    })
+  },
+  applyReferenceContext: () => {
+    const state = get()
+    const nextValue = normalizeContextInput(state.referenceContextDraft)
+
+    if (
+      getComparableContextValue(nextValue) ===
+      getComparableContextValue(state.referenceContext)
+    ) {
+      return
+    }
+
+    persistContextValue(REFERENCE_CONTEXT_STORAGE_KEY, nextValue)
+    set({
+      referenceContext: nextValue,
+      errorMessage: null,
+      statusMessage: 'referenceContext 已应用到后续分析。',
     })
   },
   clearQuestionContext: () => {
@@ -2325,7 +2414,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshSpeakingHints: async () => {
     const state = get()
     const segments = getSegmentsForAnalysis(state.liveSegments)
-    const promptContext = buildPromptContext(state)
+    const promptContext = buildSpeakingHintsPromptContext(state)
 
     if (!segments.length || state.isPaused) {
       return

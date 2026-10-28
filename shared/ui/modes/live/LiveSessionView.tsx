@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useEffectEvent, useState, type CSSProperties } from 'react'
 import { AiQaPanel } from '../../components/AiQaPanel'
 import { ConsensusPanel } from '../../components/ConsensusPanel'
 import { HintsPanel } from '../../components/HintsPanel'
 import { InterviewAnswerPanel } from '../../components/InterviewAnswerPanel'
+import { LatestTranscriptLine } from '../../components/LatestTranscriptLine'
 import { PhasePanel } from '../../components/PhasePanel'
+import { QuestionBar } from '../../components/QuestionBar'
 import { RuntimeMessageStrip } from '../../components/RuntimeMessageStrip'
 import { SummaryPreviewPanel } from '../../components/SummaryPreviewPanel'
+import { TimeBudgetBar } from '../../components/TimeBudgetBar'
 import { TranscriptPanel } from '../../components/TranscriptPanel'
 import { ResizeHandle } from '../../components/ui/ResizeHandle'
 import { Tabs } from '../../components/ui/Tabs'
@@ -13,6 +16,7 @@ import { useElementSize } from '../../hooks/useElementSize'
 import { exportLiveTranscriptAsTxt } from '../../../meeting/services/transcriptExport'
 import { resolveScenarioProfile } from '../../../meeting/scenarios'
 import { useAppStore } from '../../store/useAppStore'
+import type { ConsensusAnalysis, InterviewQaTurn } from '../../../meeting/types/analysis'
 import type { SpeakerProfile } from '../../../meeting/types/speaker'
 import { LiveReviewBar } from './LiveReviewBar'
 
@@ -20,14 +24,9 @@ const LIVE_LAYOUT_STORAGE_KEY = 'interview-copilot-local/live-layout'
 const DEFAULT_COPILOT_RATIO = 0.6
 const MIN_COPILOT_RATIO = 0.45
 const MAX_COPILOT_RATIO = 0.72
-const DEFAULT_HINTS_RATIO = 0.58
-const MIN_HINTS_PX = 180
-const MIN_ANALYSIS_PX = 160
-const STACK_RAIL = 10
 
 interface LiveLayout {
   copilotRatio: number
-  hintsRatio: number
 }
 
 const clamp = (value: number, min: number, max: number) =>
@@ -40,7 +39,7 @@ const readLayout = (): LiveLayout => {
   try {
     const stored = JSON.parse(
       window.localStorage.getItem(LIVE_LAYOUT_STORAGE_KEY) ?? '{}',
-    ) as { copilotRatio?: unknown; hintsRatio?: unknown }
+    ) as { copilotRatio?: unknown }
 
     return {
       copilotRatio: readRatio(
@@ -49,20 +48,19 @@ const readLayout = (): LiveLayout => {
         MAX_COPILOT_RATIO,
         DEFAULT_COPILOT_RATIO,
       ),
-      hintsRatio: readRatio(stored.hintsRatio, 0.05, 0.95, DEFAULT_HINTS_RATIO),
     }
   } catch {
-    return { copilotRatio: DEFAULT_COPILOT_RATIO, hintsRatio: DEFAULT_HINTS_RATIO }
+    return { copilotRatio: DEFAULT_COPILOT_RATIO }
   }
 }
 
-const hintsHeightFor = (ratio: number, stackHeight: number) => {
-  const available = Math.max(stackHeight - STACK_RAIL, 1)
-  const minHints = Math.min(MIN_HINTS_PX, available)
-  const maxHints = Math.max(minHints, available - Math.min(MIN_ANALYSIS_PX, available - minHints))
+// Unread tracking for the live side tabs: what the user has already seen.
+const consensusItemsOf = (analysis: ConsensusAnalysis | null) =>
+  analysis ? [...analysis.consensus, ...analysis.tensions] : []
 
-  return clamp(ratio * available, minHints, maxHints)
-}
+// Interview turns already show in the answer panel, so they never count as unread.
+const latestTypedTurnId = (history: InterviewQaTurn[]) =>
+  history.find((turn) => !turn.answer.interview)?.id ?? null
 
 const getSpeakerDisplayName = (
   speakerId: string,
@@ -87,10 +85,9 @@ const isTypingTarget = (target: EventTarget | null) =>
 
 export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const { ref: layoutRef, width: layoutWidth } = useElementSize<HTMLDivElement>()
-  const { ref: stackRef, height: stackHeight } = useElementSize<HTMLDivElement>()
   const [layout, setLayout] = useState(readLayout)
   const [reviewTab, setReviewTab] = useState('summary')
-  const stackHeightRef = useRef(stackHeight)
+  const [liveTab, setLiveTab] = useState('transcript')
 
   const liveSegments = useAppStore((state) => state.liveSegments)
   const speakerProfiles = useAppStore((state) => state.speakerProfiles)
@@ -118,6 +115,9 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const speakerStability = useAppStore((state) => state.speakerStability)
   const isAnalyzing = useAppStore((state) => state.isAnalyzing)
   const isStreaming = useAppStore((state) => state.isStreaming)
+  const timeBudget = useAppStore((state) => state.timeBudget)
+  const currentSessionStartedAt = useAppStore((state) => state.currentSessionStartedAt)
+  const currentSessionEndedAt = useAppStore((state) => state.currentSessionEndedAt)
   const markSpeakerAsMe = useAppStore((state) => state.markSpeakerAsMe)
   const renameSpeaker = useAppStore((state) => state.renameSpeaker)
   const clearSpeakerBinding = useAppStore((state) => state.clearSpeakerBinding)
@@ -136,10 +136,33 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const profile = resolveScenarioProfile(scenarioId)
   const isQa = profile.interactionModel === 'qa'
   const clearAiQaHistory = useAppStore((state) => state.clearAiQaHistory)
+  const [seenConsensus, setSeenConsensus] = useState(() => consensusItemsOf(consensusAnalysis))
+  const [seenTurnId, setSeenTurnId] = useState(() => latestTypedTurnId(aiQaHistory))
 
-  useEffect(() => {
-    stackHeightRef.current = stackHeight
-  }, [stackHeight])
+  const liveTabIds = isQa ? ['transcript', 'qa'] : ['transcript', 'consensus', 'qa']
+  const unreadConsensus =
+    liveTab === 'consensus'
+      ? 0
+      : consensusItemsOf(consensusAnalysis).filter((item) => !seenConsensus.includes(item)).length
+  const unreadQa = liveTab !== 'qa' && latestTypedTurnId(aiQaHistory) !== seenTurnId
+
+  // Entering or leaving a tab marks everything it currently shows as seen.
+  const selectLiveTab = (next: string) => {
+    if (liveTab === 'consensus' || next === 'consensus') {
+      setSeenConsensus(consensusItemsOf(consensusAnalysis))
+    }
+    if (liveTab === 'qa' || next === 'qa') {
+      setSeenTurnId(latestTypedTurnId(aiQaHistory))
+    }
+    setLiveTab(next)
+  }
+
+  const selectLiveTabByKey = useEffectEvent((key: string) => {
+    const next = liveTabIds[Number(key) - 1]
+    if (!next) return false
+    selectLiveTab(next)
+    return true
+  })
 
   useEffect(() => {
     try {
@@ -167,6 +190,11 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       }
 
       const key = event.key.toLowerCase()
+
+      if (/^[1-9]$/.test(key) && selectLiveTabByKey(key)) {
+        event.preventDefault()
+        return
+      }
 
       if (isQa) {
         if (event.code === 'Space') {
@@ -262,23 +290,6 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
     }))
   }
 
-  const resizeHints = (delta: number) => {
-    const available = Math.max(stackHeightRef.current - STACK_RAIL, 1)
-    setLayout((current) => {
-      const nextHeight = clamp(
-        hintsHeightFor(current.hintsRatio, stackHeightRef.current) + delta,
-        Math.min(MIN_HINTS_PX, available),
-        Math.max(
-          Math.min(MIN_HINTS_PX, available),
-          available - Math.min(MIN_ANALYSIS_PX, available),
-        ),
-      )
-
-      return { ...current, hintsRatio: nextHeight / available }
-    })
-  }
-
-  const hintsHeight = hintsHeightFor(layout.hintsRatio, stackHeight)
 
   const generateSummaryAndMinutes = () => {
     setReviewTab('summary')
@@ -300,6 +311,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
     />
   )
 
+  // Live mode asks from the always-visible question bar; review keeps the inline form.
   const aiQaPanel = (
     <AiQaPanel
       className="w-full min-w-0"
@@ -308,84 +320,111 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       error={aiQaError}
       history={aiQaHistory}
       isAnswering={isAnsweringQuestion}
-      onAsk={() => {
-        void askAiQuestion()
-      }}
+      onAsk={mode === 'review' ? () => void askAiQuestion() : undefined}
       onClearHistory={clearAiQaHistory}
-      onQuestionDraftChange={setAiQuestionDraft}
+      onQuestionDraftChange={mode === 'review' ? setAiQuestionDraft : undefined}
       questionDraft={aiQuestionDraft}
     />
   )
+
+  const transcriptTitle = isQa ? profile.qa?.transcriptTitle ?? '提问' : '转写'
+
+  const transcriptPanel = (
+    <TranscriptPanel
+      className="lg:flex-1"
+      density="compact"
+      emptyMessage={
+        mode === 'live'
+          ? isQa
+            ? profile.qa?.emptyTranscript ?? '还没有录入内容。'
+            : '正在收音，听到发言后会实时出现在这里。'
+          : '这场会议没有转写内容。'
+      }
+      followLatest={mode === 'live'}
+      onClearSpeakerBinding={clearSpeakerBinding}
+      onDeleteSegment={deleteLiveSegment}
+      onExportAll={() => exportLiveTranscriptAsTxt(liveSegments, speakerProfiles)}
+      onMarkAsMe={markSpeakerAsMe}
+      onRenameSpeaker={renameSpeaker}
+      onTogglePin={togglePinnedSegment}
+      pinnedSegments={pinnedSegments}
+      segments={liveSegments}
+      speakerProfiles={speakerProfiles}
+      status={transcriptStatus}
+      title={transcriptTitle}
+    />
+  )
+
+  const latestSegment = liveSegments.at(-1)
 
   const copilotColumn =
     mode === 'live' ? (
       <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full lg:overflow-hidden">
         {isQa ? null : (
-          <PhasePanel
-            className="shrink-0"
-            isLoading={isAnalyzing}
-            phaseAnalysis={phaseAnalysis}
-            variant="compact"
+          <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-stretch">
+            {timeBudget && currentSessionStartedAt ? (
+              <TimeBudgetBar
+                budget={timeBudget}
+                className="shrink-0"
+                endedAt={currentSessionEndedAt}
+                startedAt={currentSessionStartedAt}
+              />
+            ) : null}
+            <PhasePanel
+              className="min-w-0 flex-1"
+              isLoading={isAnalyzing}
+              phaseAnalysis={phaseAnalysis}
+              variant="compact"
+            />
+          </div>
+        )}
+        {isQa ? (
+          <InterviewAnswerPanel
+            capture={questionCapture}
+            className="min-h-[280px] lg:min-h-0 lg:flex-1"
+            error={aiQaError}
+            isAnswering={isAnsweringQuestion}
+            latestTurn={latestInterviewTurn}
+            onCaptureEnd={() => {
+              void finishQuestionCapture()
+            }}
+            captureHint={profile.qa?.captureHint}
+            onCaptureStart={() => {
+              void startQuestionCapture()
+            }}
+          />
+        ) : (
+          <HintsPanel
+            autoRefresh={autoRefreshHints}
+            className="min-h-[280px] lg:min-h-0 lg:flex-1"
+            density="live"
+            hints={speakingHints}
+            isRefreshing={isRefreshingHints}
+            isStale={speakingHintsStale}
+            lastUpdatedAt={lastHintsUpdatedAt}
+            onRefresh={() => {
+              void refreshSpeakingHints()
+            }}
+            onToggleAutoRefresh={setAutoRefreshHints}
           />
         )}
-        <div
-          className="copilot-stack min-h-0 lg:flex-1"
-          ref={stackRef}
-          style={
-            stackHeight > 0
-              ? ({
-                  '--copilot-stack-rows': `${Math.round(hintsHeight)}px ${STACK_RAIL}px minmax(0, 1fr)`,
-                } as CSSProperties)
-              : undefined
+        <QuestionBar
+          className="shrink-0"
+          disableAsk={disableAiQuestionAsk}
+          isAnswering={isAnsweringQuestion}
+          onAsk={() => {
+            selectLiveTab('qa')
+            void askAiQuestion()
+          }}
+          onChange={setAiQuestionDraft}
+          placeholder={
+            isQa
+              ? profile.qa?.questionPlaceholder ?? '输入要提问的内容'
+              : '问 AI：例如轮到我发言时，怎么承接前面的讨论？'
           }
-        >
-          {isQa ? (
-            <InterviewAnswerPanel
-              capture={questionCapture}
-              className="min-h-[280px] lg:h-full lg:min-h-0"
-              error={aiQaError}
-              isAnswering={isAnsweringQuestion}
-              latestTurn={latestInterviewTurn}
-              onCaptureEnd={() => {
-                void finishQuestionCapture()
-              }}
-              captureHint={profile.qa?.captureHint}
-              onCaptureStart={() => {
-                void startQuestionCapture()
-              }}
-            />
-          ) : (
-            <HintsPanel
-              autoRefresh={autoRefreshHints}
-              className="min-h-[280px] lg:h-full lg:min-h-0"
-              density="live"
-              hints={speakingHints}
-              isRefreshing={isRefreshingHints}
-              isStale={speakingHintsStale}
-              lastUpdatedAt={lastHintsUpdatedAt}
-              onRefresh={() => {
-                void refreshSpeakingHints()
-              }}
-              onToggleAutoRefresh={setAutoRefreshHints}
-            />
-          )}
-          <ResizeHandle
-            ariaLabel="调整发言建议与分析区高度"
-            onDelta={resizeHints}
-            onReset={() =>
-              setLayout((current) => ({ ...current, hintsRatio: DEFAULT_HINTS_RATIO }))
-            }
-            orientation="horizontal"
-          />
-          <Tabs
-            className="min-h-[240px] lg:h-full lg:min-h-0"
-            defaultTabId={isQa ? 'qa' : 'consensus'}
-            items={[
-              ...(isQa ? [] : [{ id: 'consensus', label: '共识分歧', content: consensusPanel }]),
-              { id: 'qa', label: 'AI 问答', content: aiQaPanel },
-            ]}
-          />
-        </div>
+          quickQuestions={profile.quickQuestions}
+          value={aiQuestionDraft}
+        />
       </div>
     ) : (
       <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
@@ -416,6 +455,46 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
           onActiveIdChange={setReviewTab}
         />
       </div>
+    )
+
+  // Live: the transcript shares its column with the on-demand analysis tabs.
+  const sideColumn =
+    mode === 'live' ? (
+      <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full">
+        <Tabs
+          activeId={liveTab}
+          className="min-h-[480px] lg:min-h-0 lg:flex-1"
+          items={[
+            { id: 'transcript', label: transcriptTitle, content: transcriptPanel },
+            ...(isQa
+              ? []
+              : [
+                  {
+                    id: 'consensus',
+                    label: '共识分歧',
+                    content: consensusPanel,
+                    badge: unreadConsensus,
+                  },
+                ]),
+            { id: 'qa', label: 'AI 问答', content: aiQaPanel, badge: unreadQa },
+          ]}
+          onActiveIdChange={selectLiveTab}
+        />
+        {liveTab === 'transcript' ? null : (
+          <LatestTranscriptLine
+            className="shrink-0"
+            onOpen={() => selectLiveTab('transcript')}
+            segment={latestSegment}
+            speakerName={
+              latestSegment
+                ? getSpeakerDisplayName(latestSegment.speaker, speakerProfiles)
+                : undefined
+            }
+          />
+        )}
+      </div>
+    ) : (
+      <div className="flex min-h-0 min-w-0 flex-col lg:h-full">{transcriptPanel}</div>
     )
 
   return (
@@ -451,31 +530,7 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
           orientation="vertical"
         />
 
-        <div className="flex min-h-0 min-w-0 flex-col lg:h-full">
-          <TranscriptPanel
-            className="lg:flex-1"
-            density="compact"
-            emptyMessage={
-              mode === 'live'
-                ? isQa
-                  ? profile.qa?.emptyTranscript ?? '还没有录入内容。'
-                  : '正在收音，听到发言后会实时出现在这里。'
-                : '这场会议没有转写内容。'
-            }
-            followLatest={mode === 'live'}
-            onClearSpeakerBinding={clearSpeakerBinding}
-            onDeleteSegment={deleteLiveSegment}
-            onExportAll={() => exportLiveTranscriptAsTxt(liveSegments, speakerProfiles)}
-            onMarkAsMe={markSpeakerAsMe}
-            onRenameSpeaker={renameSpeaker}
-            onTogglePin={togglePinnedSegment}
-            pinnedSegments={pinnedSegments}
-            segments={liveSegments}
-            speakerProfiles={speakerProfiles}
-            status={transcriptStatus}
-            title={isQa ? profile.qa?.transcriptTitle ?? '提问' : '转写'}
-          />
-        </div>
+        {sideColumn}
       </div>
     </div>
   )

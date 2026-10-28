@@ -48,10 +48,25 @@ const useNow = (intervalMs: number, enabled: boolean) => {
   return now
 }
 
-const HINT_ROWS = [
-  { key: 'hint60s', label: '60 秒' },
-  { key: 'hint120s', label: '120 秒' },
-] as const
+function HintNotes({ notes }: { notes?: SpeakingHints['notes'] }) {
+  if (!notes?.length) return null
+
+  return (
+    <details className="mt-3">
+      <summary className="theme-muted cursor-pointer text-xs font-semibold">
+        依据与备选（{notes.length}）
+      </summary>
+      <ul className="mt-2 space-y-2">
+        {notes.map((note, index) => (
+          <li className="theme-body text-sm leading-6" key={`${note.kind}-${index}`}>
+            <span className="status-badge mr-2">{note.kind}</span>
+            {note.text}
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
 
 function LiveHints({
   hints,
@@ -135,19 +150,11 @@ function LiveHints({
         ) : hints ? (
           <div className={clsx('transition-opacity duration-200', isRefreshing && 'opacity-60')}>
             <p className="text-xs font-semibold text-[color:var(--accent-text)]">{hints.functionType === '倾听观察' ? '先听一听' : '可以这样接话'}</p>
-            <p className="theme-title mt-1.5 text-lg leading-8 font-medium text-balance">
+            <p className="theme-title mt-1.5 text-lg leading-8 font-medium text-pretty">
               {hints.whyNow || FALLBACK_WHY_NOW}
             </p>
-            {hints.functionType !== '倾听观察' ? <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
-              {HINT_ROWS.map((row) => (
-                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 py-3" key={row.key}>
-                  <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
-                    {row.label}
-                  </dt>
-                  <dd className="theme-title whitespace-pre-line text-[15px] leading-7">{hints[row.key] || '未保存该时长的建议'}</dd>
-                </div>
-              ))}
-            </dl> : null}
+            {hints.functionType !== '倾听观察' ? <p className="theme-divider theme-title mt-4 whitespace-pre-line border-t pt-3 text-[15px] leading-7">{hints.script || '未保存发言建议'}</p> : null}
+            <HintNotes notes={hints.notes} />
           </div>
         ) : (
           <div className="flex h-full min-h-32 flex-col items-start justify-center gap-1">
@@ -155,7 +162,7 @@ function LiveHints({
               {autoRefresh ? '听到第一段完整发言后自动生成' : '自动更新已关闭'}
             </p>
             <p className="theme-muted text-sm leading-6">
-              有值得补充的内容时，给出 60 / 120 秒两种说法；没有新贡献时，会建议继续倾听。也可以按 R 立即生成。
+              有值得补充的内容时，给出可以直接说的话；没有新贡献时，会建议继续倾听。也可以按 R 立即生成。
             </p>
           </div>
         )}
@@ -229,16 +236,8 @@ export function HintsPanel(props: HintsPanelProps) {
             <p className="theme-title mt-1.5 text-base leading-7 font-medium">
               {hints.whyNow || FALLBACK_WHY_NOW}
             </p>
-            {hints.functionType !== '倾听观察' ? <dl className="theme-divider mt-4 divide-y divide-[color:var(--divider)] border-t">
-              {HINT_ROWS.map((row) => (
-                <div className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-3 py-3" key={row.key}>
-                  <dt className="theme-muted pt-0.5 text-xs font-semibold tabular-nums">
-                    {row.label}
-                  </dt>
-                  <dd className="theme-body whitespace-pre-line text-sm leading-7">{hints[row.key] || '未保存该时长的建议'}</dd>
-                </div>
-              ))}
-            </dl> : null}
+            {hints.functionType !== '倾听观察' ? <p className="theme-divider theme-body mt-4 whitespace-pre-line border-t pt-3 text-sm leading-7">{hints.script || '未保存发言建议'}</p> : null}
+            <HintNotes notes={hints.notes} />
           </div>
         ) : (
           <div className="panel-empty theme-muted rounded-[var(--radius-card)] p-5 text-sm leading-7">
