@@ -3,7 +3,7 @@ import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
   composePromptWithGlobalSystemPrompt,
-  formatOptionalPromptContext,
+  formatWholeMeetingPromptContext,
   formatSegmentsForPrompt,
 } from './promptUtils'
 
@@ -19,7 +19,7 @@ export const buildGenerateMindMapPrompt = (
 返回适合 React Flow 的 JSON：topic 为主题；nodes 包含唯一 id、type（root/branch/leaf）、position（x/y）和 data.label；edges 包含唯一 id、source 和 target，引用真实节点。
 包含一个 root，其余按需要生成，通常总计 4—8 个节点。root 在左侧，branch 和 leaf 依次向右，纵向留出间距避免重叠。材料少时使用更简结构，不因最近窗口短而丢失历史主线。
 
-${formatOptionalPromptContext(context)}
+${formatWholeMeetingPromptContext(context)}
 
 最近 3 分钟转写：
 ${formatSegmentsForPrompt(segments)}

@@ -1,4 +1,3 @@
-import { formatTimingContext } from '../context/timeBudget'
 import { resolveScenarioAssistance } from '../scenarios/assistance'
 import type { MeetingScenarioProfile } from '../scenarios'
 import { resolveScenarioProfile } from '../scenarios'
@@ -52,6 +51,13 @@ export const resolveReferenceContext = (context?: AnalysisPromptContext) =>
 
 export const referenceContextHeading = (profile: MeetingScenarioProfile) =>
   `${profile.referenceContextLabel ?? '参考资料'}（${profile.referencePromptNote ?? '用户提供的参考资料，不是本场讨论事实；与题目冲突时以题目为准'}）`
+
+export const formatSelfSpeakers = (context?: AnalysisPromptContext) => {
+  const speakers = [...new Set((context?.selfSpeakers ?? []).map((speaker) => speaker.trim()).filter(Boolean))]
+  return speakers.length
+    ? `用户本人：转写中标为「${speakers.join('」「')}」的发言是用户自己说的，其余发言来自其他参与者。`
+    : ''
+}
 
 export const resolveOpeningRound = (context?: AnalysisPromptContext) =>
   context?.openingRound ? resolveScenarioProfile(context.scenarioId).openingRound ?? null : null
@@ -147,10 +153,8 @@ export const formatOptionalPromptContext = (
     context?.summaryAssemblyContext,
   )
 
+  // Stable material goes first so providers can reuse the cached prompt prefix across requests.
   const sections: string[] = []
-
-  if (context?.meetingHistory) sections.push(context.meetingHistory)
-  if (context?.previousParticipantView) sections.push(`AI 上一轮的参会观点（尚未实际发言或被团队接受，不是会议事实）：${JSON.stringify(context.previousParticipantView)}`)
 
   if (questionContext) {
     sections.push(`${profile.topicContextLabel}：${questionContext}`)
@@ -165,11 +169,14 @@ export const formatOptionalPromptContext = (
     sections.push(`${profile.roleContextLabel}：${roleContext}`)
   }
 
-  const timing = formatTimingContext(context?.timing)
-  if (timing) sections.push(timing)
+  const selfSpeakers = formatSelfSpeakers(context)
+  if (selfSpeakers) sections.push(selfSpeakers)
 
   const openingRound = resolveOpeningRound(context)
   if (openingRound) sections.push(formatOpeningRoundStatus(openingRound))
+
+  if (context?.meetingHistory) sections.push(context.meetingHistory)
+  if (context?.previousParticipantView) sections.push(`AI 上一轮的参会观点（尚未实际发言或被团队接受，不是会议事实）：${JSON.stringify(context.previousParticipantView)}`)
 
   if (phaseContext) {
     const phaseLabel =
@@ -191,6 +198,11 @@ export const formatOptionalPromptContext = (
 ${sections.join('\n\n')}
 `.trim()
 }
+
+// Summaries, minutes and mind maps cover the meeting as a whole, so a still-set
+// opening-round flag must not tell them the discussion has not started.
+export const formatWholeMeetingPromptContext = (context?: AnalysisPromptContext) =>
+  formatOptionalPromptContext(context && { ...context, openingRound: undefined })
 
 // The history keeps a raw tail and compresses older segments; only fall back to raw segments without it.
 export const formatTranscriptSection = (

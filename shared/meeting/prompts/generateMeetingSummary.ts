@@ -3,7 +3,7 @@ import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
   composePromptWithGlobalSystemPrompt,
-  formatOptionalPromptContext,
+  formatWholeMeetingPromptContext,
   formatSegmentsForPrompt,
 } from './promptUtils'
 
@@ -27,7 +27,7 @@ speech60s 是可直接口播的总结稿（沿用字段名），${profile.spoken
   "nextSteps": ["已讨论的下一步"]
 }
 
-${formatOptionalPromptContext(context)}
+${formatWholeMeetingPromptContext(context)}
 
 最近原话（结果覆盖整场会议）：
 ${formatSegmentsForPrompt(segments)}

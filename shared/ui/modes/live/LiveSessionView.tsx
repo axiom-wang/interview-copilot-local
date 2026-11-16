@@ -8,7 +8,6 @@ import { PhasePanel } from '../../components/PhasePanel'
 import { QuestionBar } from '../../components/QuestionBar'
 import { RuntimeMessageStrip } from '../../components/RuntimeMessageStrip'
 import { SummaryPreviewPanel } from '../../components/SummaryPreviewPanel'
-import { TimeBudgetBar } from '../../components/TimeBudgetBar'
 import { TranscriptPanel } from '../../components/TranscriptPanel'
 import { ResizeHandle } from '../../components/ui/ResizeHandle'
 import { Tabs } from '../../components/ui/Tabs'
@@ -115,9 +114,6 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
   const speakerStability = useAppStore((state) => state.speakerStability)
   const isAnalyzing = useAppStore((state) => state.isAnalyzing)
   const isStreaming = useAppStore((state) => state.isStreaming)
-  const timeBudget = useAppStore((state) => state.timeBudget)
-  const currentSessionStartedAt = useAppStore((state) => state.currentSessionStartedAt)
-  const currentSessionEndedAt = useAppStore((state) => state.currentSessionEndedAt)
   const openingRoundActive = useAppStore((state) => state.openingRound)
   const setOpeningRound = useAppStore((state) => state.setOpeningRound)
   const hasQuestionContext = useAppStore((state) => Boolean(state.questionContext.trim()))
@@ -365,14 +361,6 @@ export function LiveSessionView({ mode }: { mode: 'live' | 'review' }) {
       <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:h-full lg:overflow-hidden">
         {isQa ? null : (
           <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-stretch">
-            {timeBudget && currentSessionStartedAt ? (
-              <TimeBudgetBar
-                budget={timeBudget}
-                className="shrink-0"
-                endedAt={currentSessionEndedAt}
-                startedAt={currentSessionStartedAt}
-              />
-            ) : null}
             <PhasePanel
               className="min-w-0 flex-1"
               isLoading={isAnalyzing}

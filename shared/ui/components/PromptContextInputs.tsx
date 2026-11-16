@@ -1,5 +1,4 @@
 import clsx from 'clsx'
-import { useState } from 'react'
 import { resolveScenarioProfile, SCENARIO_PROFILES } from '../../meeting/scenarios'
 import { useAppStore } from '../store/useAppStore'
 
@@ -104,71 +103,6 @@ export function ContextFields({ compact = false }: { compact?: boolean }) {
 
       {profile.referenceContextEnabled ? <ReferenceContextField /> : null}
     </div>
-  )
-}
-
-const parseMinutes = (value: string) => {
-  const minutes = Math.round(Number(value))
-  return value.trim() && Number.isFinite(minutes) && minutes > 0 ? minutes : undefined
-}
-
-export function TimeBudgetFields() {
-  const timeBudget = useAppStore((state) => state.timeBudget)
-  const setTimeBudget = useAppStore((state) => state.setTimeBudget)
-
-  // Keep in-progress edits locally so clearing one field doesn't drop the other.
-  const [draft, setDraft] = useState({
-    discussionMinutes: timeBudget?.discussionMinutes?.toString() ?? '',
-    reportMinutes: timeBudget?.reportMinutes?.toString() ?? '',
-  })
-
-  const update = (field: 'discussionMinutes' | 'reportMinutes', value: string) => {
-    const nextDraft = { ...draft, [field]: value }
-    setDraft(nextDraft)
-    const discussionMinutes = parseMinutes(nextDraft.discussionMinutes)
-    setTimeBudget(discussionMinutes
-      ? { discussionMinutes, reportMinutes: parseMinutes(nextDraft.reportMinutes) }
-      : null)
-  }
-
-  return (
-    <fieldset>
-      <legend className="theme-title text-sm font-semibold">时间预算</legend>
-      <p className="theme-muted mt-1 text-xs leading-5">
-        可选。填写后显示倒计时，AI 会按剩余时间提醒推进或收口；留空表示不限时。
-      </p>
-      <div className="mt-2.5 flex flex-wrap gap-4">
-        <label className="flex items-center gap-2 text-sm">
-          <span className="theme-body">讨论</span>
-          <input
-            className="theme-input w-20 px-2 py-1.5 text-sm tabular-nums"
-            inputMode="numeric"
-            max={240}
-            min={1}
-            onChange={(event) => update('discussionMinutes', event.currentTarget.value)}
-            placeholder="45"
-            type="number"
-            value={draft.discussionMinutes}
-          />
-          <span className="theme-muted">分钟</span>
-        </label>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="theme-body">汇报</span>
-          <input
-            className="theme-input w-20 px-2 py-1.5 text-sm tabular-nums"
-            disabled={!timeBudget}
-            inputMode="numeric"
-            max={60}
-            min={1}
-            onChange={(event) => update('reportMinutes', event.currentTarget.value)}
-            placeholder="10"
-            type="number"
-            value={draft.reportMinutes}
-          />
-          <span className="theme-muted">分钟</span>
-        </label>
-      </div>
-    </fieldset>
   )
 }
 

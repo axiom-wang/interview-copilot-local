@@ -12,7 +12,7 @@ export const buildDetectPhaseTask = (profile: MeetingScenarioProfile) => `
 ${Object.entries(profile.phaseDefinitions).map(([phase, definition]) =>
   `- ${phase}（${profile.phaseLabels[phase as keyof typeof profile.phaseLabels]}）：${definition}`).join('\n')}
 参考信号：${profile.phaseSignals.join('；')}。
-只选当前最主导阶段，reason 简述依据或切换迹象，confidence 表示证据充分程度，nextAction 按题目与现场需要给出下一步，有时间预算时结合剩余时间。
+只选当前最主导阶段，reason 简述依据或切换迹象，confidence 表示证据充分程度，nextAction 按题目与现场需要给出下一步。
 输出 JSON：{"phase":"阶段枚举", "confidence":0.8, "nextAction":"下一步", "reason":"判断依据"}
 `.trim()
 

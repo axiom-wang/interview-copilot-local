@@ -3,7 +3,7 @@ import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
 import {
   composePromptWithGlobalSystemPrompt,
-  formatOptionalPromptContext,
+  formatWholeMeetingPromptContext,
   formatSegmentsForPrompt,
 } from './promptUtils'
 
@@ -27,7 +27,7 @@ decisions 仅列明确决定；openQuestions 记录未决问题；actionItems �
   "actionItems": [{"owner":"负责人或空字符串", "task":"实际行动", "due":"期限或空字符串"}]
 }
 
-${formatOptionalPromptContext(context)}
+${formatWholeMeetingPromptContext(context)}
 
 最近原话（纪要覆盖整场会议）：
 ${formatSegmentsForPrompt(segments)}

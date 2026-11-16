@@ -1,9 +1,9 @@
 import { resolveScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
-import { formatTimingContext } from '../context/timeBudget'
 import {
   composePromptWithGlobalSystemPrompt,
+  formatSelfSpeakers,
   referenceContextHeading,
   resolveReferenceContext,
 } from './promptUtils'
@@ -17,9 +17,8 @@ const buildContextData = (context?: AnalysisPromptContext) => {
   const profile = resolveScenarioProfile(context?.scenarioId)
   const referenceContext = resolveReferenceContext(context)
 
+  // Stable material goes first so providers can reuse the cached prompt prefix across requests.
   return {
-    meetingHistory: context?.meetingHistory,
-    previousAiViewNotMeetingFact: context?.previousParticipantView,
     questionContext: normalizeText(context?.questionContext),
     referenceContext: referenceContext
       ? { note: referenceContextHeading(profile), content: referenceContext }
@@ -27,8 +26,10 @@ const buildContextData = (context?: AnalysisPromptContext) => {
     roleContext: profile.roleContextEnabled === false
       ? null
       : normalizeText(context?.roleContext),
+    userSpeakers: formatSelfSpeakers(context) || null,
+    meetingHistory: context?.meetingHistory,
+    previousAiViewNotMeetingFact: context?.previousParticipantView,
     phase: normalizeText(context?.phaseContext),
-    timing: formatTimingContext(context?.timing) || null,
     consensus: context?.summaryAssemblyContext?.consensus ?? [],
     tensions: context?.summaryAssemblyContext?.tensions ?? [],
     missing: context?.summaryAssemblyContext?.missing ?? [],
@@ -62,13 +63,13 @@ suggestedReply 给出可直接说出口的自然发言，长度按问题需要�
   "suggestedReply": "自然口语发言，或空字符串"
 }
 
-QUESTION_BLOCK:
-${JSON.stringify({ question: question.trim() }, null, 2)}
-
 CONTEXT_BLOCK:
 ${JSON.stringify(buildContextData(context), null, 2)}
 
 TRANSCRIPT_BLOCK:
 ${JSON.stringify(buildTranscriptData(segments), null, 2)}
+
+QUESTION_BLOCK:
+${JSON.stringify({ question: question.trim() }, null, 2)}
 `.trim(), profile)
 }
