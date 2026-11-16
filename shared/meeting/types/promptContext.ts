@@ -22,7 +22,8 @@ export interface AnalysisPromptContext {
   questionContext?: string
   roleContext?: string
   referenceContext?: string
-  timing?: import('../context/timeBudget').TimingContext
+  // Transcript speaker labels the user marked as themselves.
+  selfSpeakers?: string[]
   // Set while participants give their opening statements in turn.
   openingRound?: boolean
   phaseContext?: string

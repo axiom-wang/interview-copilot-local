@@ -1,5 +1,4 @@
 import { readPartialMeetingMemory } from '../../meeting/context/meetingMemory'
-import { buildTimingContext, normalizeTimeBudget, type TimeBudget } from '../../meeting/context/timeBudget'
 import type { MeetingMemory } from '../../meeting/types/meetingMemory'
 import { getMeetingRuntime, type ConfiguredAstProvider } from '../runtime'
 import { DEFAULT_MODEL_SETTINGS } from '../../meeting/settings/types'
@@ -113,7 +112,6 @@ interface AppState {
   questionContext: string
   roleContext: string
   referenceContext: string
-  timeBudget: TimeBudget | null
   openingRound: boolean
   scenarioId: MeetingScenarioId
   aiQaHistory: InterviewQaTurn[]
@@ -148,7 +146,6 @@ interface AppState {
   setQuestionContextDraft: (value: string) => void
   setRoleContextDraft: (value: string) => void
   setReferenceContextDraft: (value: string) => void
-  setTimeBudget: (budget: TimeBudget | null) => void
   setOpeningRound: (active: boolean) => void
   setScenarioId: (scenarioId: MeetingScenarioId) => void
   setAiQuestionDraft: (value: string) => void
@@ -202,7 +199,6 @@ const QUESTION_CONTEXT_STORAGE_KEY = 'interview-copilot-local/question-context'
 const QUESTION_CONTEXT_DRAFT_KEY = 'interview-copilot-local/question-context-draft'
 const ROLE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/role-context'
 const REFERENCE_CONTEXT_STORAGE_KEY = 'interview-copilot-local/reference-context'
-const TIME_BUDGET_STORAGE_KEY = 'interview-copilot-local/time-budget'
 const SCENARIO_ID_STORAGE_KEY = 'interview-copilot-local/scenario-id'
 const MAX_QA_HISTORY_ITEMS = 6
 const DUPLICATE_WINDOW_MS = 8_000
@@ -864,14 +860,6 @@ const persistContextValue = (storageKey: string, value: string) => {
   window.localStorage.removeItem(storageKey)
 }
 
-const readStoredTimeBudget = () => {
-  try {
-    return normalizeTimeBudget(JSON.parse(readStoredContext(TIME_BUDGET_STORAGE_KEY) || 'null'))
-  } catch {
-    return null
-  }
-}
-
 const persistQuestionDraft = (value: string) => {
   persistContextValue(QUESTION_CONTEXT_STORAGE_KEY, value)
   persistContextValue(QUESTION_CONTEXT_DRAFT_KEY, value ? '1' : '')
@@ -919,21 +907,22 @@ const buildPreparationContext = (
     AppState,
     | 'scenarioId'
     | 'referenceContext'
-    | 'timeBudget'
     | 'openingRound'
-    | 'currentSessionStartedAt'
     | 'currentSessionEndedAt'
+    | 'speakerProfiles'
   >,
-): Pick<AnalysisPromptContext, 'referenceContext' | 'timing' | 'openingRound'> => {
+): Pick<AnalysisPromptContext, 'referenceContext' | 'selfSpeakers' | 'openingRound'> => {
   const profile = resolveScenarioProfile(state.scenarioId)
+  // qa transcripts hold only the asker's questions, relabelled, so no speaker is the user.
+  const selfSpeakers = profile.interactionModel === 'discussion'
+    ? Object.values(state.speakerProfiles).filter((speaker) => speaker.isMe).map((speaker) => speaker.speakerId)
+    : []
 
   return {
     referenceContext: profile.referenceContextEnabled
       ? state.referenceContext.trim() || undefined
       : undefined,
-    timing: profile.interactionModel === 'discussion'
-      ? buildTimingContext(state.timeBudget, state.currentSessionStartedAt, state.currentSessionEndedAt ?? Date.now())
-      : undefined,
+    selfSpeakers: selfSpeakers.length ? selfSpeakers : undefined,
     openingRound: isOpeningRoundActive(state) || undefined,
   }
 }
@@ -947,10 +936,10 @@ const buildPromptContext = (
     | 'questionContext'
     | 'roleContext'
     | 'referenceContext'
-    | 'timeBudget'
     | 'currentSessionStartedAt'
     | 'currentSessionEndedAt'
     | 'openingRound'
+    | 'speakerProfiles'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
     | 'mindMap'
@@ -1010,10 +999,10 @@ const buildQuestionAnswerPromptContext = (
     | 'questionContext'
     | 'roleContext'
     | 'referenceContext'
-    | 'timeBudget'
     | 'currentSessionStartedAt'
     | 'currentSessionEndedAt'
     | 'openingRound'
+    | 'speakerProfiles'
     | 'phaseAnalysis'
     | 'consensusAnalysis'
   >,
@@ -1255,7 +1244,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   questionContext: '',
   roleContext: '',
   referenceContext: '',
-  timeBudget: null,
   openingRound: false,
   scenarioId: DEFAULT_SCENARIO_ID,
   aiQaHistory: [],
@@ -1277,7 +1265,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     const questionContext = readQuestionDraft(sessions)
     const roleContext = readStoredContext(ROLE_CONTEXT_STORAGE_KEY)
     const referenceContext = readStoredContext(REFERENCE_CONTEXT_STORAGE_KEY)
-    const timeBudget = readStoredTimeBudget()
     const scenarioId = resolveScenarioProfile(
       readStoredContext(SCENARIO_ID_STORAGE_KEY),
     ).id
@@ -1304,7 +1291,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       questionContext,
       roleContext,
       referenceContext,
-      timeBudget,
       scenarioId,
       autoRefreshHints: readHintsAutoRefresh(),
       aiQaHistory: [],
@@ -1803,25 +1789,19 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set((state) => {
-      const nextProfiles: Record<string, SpeakerProfile> = {}
-
-      for (const [id, profile] of Object.entries(state.speakerProfiles)) {
-        nextProfiles[id] = {
-          ...profile,
-          isMe: id === speakerId,
-          updatedAt: id === speakerId ? Date.now() : profile.updatedAt,
-        }
-      }
-
-      if (!nextProfiles[speakerId]) {
-        nextProfiles[speakerId] = {
-          ...createDefaultSpeakerProfile(speakerId, Date.now()),
+      // Diarization can split one voice across several labels, so earlier marks are kept.
+      const nextProfiles: Record<string, SpeakerProfile> = {
+        ...state.speakerProfiles,
+        [speakerId]: {
+          ...(state.speakerProfiles[speakerId] ?? createDefaultSpeakerProfile(speakerId, Date.now())),
           isMe: true,
-        }
+          updatedAt: Date.now(),
+        },
       }
 
       return {
         speakerProfiles: nextProfiles,
+        speakingHintsStale: Boolean(state.speakingHints),
         speakerOrder: state.speakerOrder.includes(speakerId)
           ? state.speakerOrder
           : [...state.speakerOrder, speakerId],
@@ -1876,6 +1856,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           [speakerId]: {
             ...currentProfile,
             displayName: undefined,
+            isMe: false,
             nameSource: 'manual',
             confidence: undefined,
             updatedAt: Date.now(),
@@ -2103,11 +2084,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         void get().refreshAnalysis()
       })
     }
-  },
-  setTimeBudget: (budget) => {
-    const timeBudget = normalizeTimeBudget(budget)
-    persistContextValue(TIME_BUDGET_STORAGE_KEY, timeBudget ? JSON.stringify(timeBudget) : '')
-    set({ timeBudget })
   },
   setScenarioId: (scenarioId) => {
     const resolvedScenarioId = resolveScenarioProfile(scenarioId).id

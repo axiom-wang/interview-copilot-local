@@ -1,9 +1,9 @@
 import { resolveScenarioProfile, type MeetingScenarioProfile } from '../scenarios'
 import type { AnalysisPromptContext } from '../types/promptContext'
 import type { TranscriptSegment } from '../types/transcript'
-import { formatTimingContext } from '../context/timeBudget'
 import { SPEAKING_FUNCTION_TYPES, SPEAKING_HINT_NOTE_KINDS } from '../types/analysis'
 import {
+  formatSelfSpeakers,
   formatTranscriptSection,
   referenceContextHeading,
   resolveOpeningRound,
@@ -22,9 +22,8 @@ const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
     ? null
     : normalizeContextValue(context?.roleContext)
 
+  // Stable material goes first so providers can reuse the cached prompt prefix across requests.
   const sections: string[] = []
-
-  if (context?.meetingHistory) sections.push(context.meetingHistory)
 
   if (questionContext) {
     sections.push(`${profile.topicContextLabel}：\n${questionContext}`)
@@ -39,8 +38,10 @@ const formatSpeakingHintsContext = (context?: AnalysisPromptContext) => {
     sections.push(`${profile.roleContextLabel}：\n${roleContext}`)
   }
 
-  const timing = formatTimingContext(context?.timing)
-  if (timing) sections.push(timing)
+  const selfSpeakers = formatSelfSpeakers(context)
+  if (selfSpeakers) sections.push(selfSpeakers)
+
+  if (context?.meetingHistory) sections.push(context.meetingHistory)
 
   if (sections.length === 0) {
     return ''

@@ -14,7 +14,6 @@ import type {
 import type { MindMapSnapshot } from '../../../../shared/meeting/types/mindmap'
 import type { AnalysisErrorResult } from '../../../../shared/analysis/llm/analysisFailure'
 import { normalizeMeetingMemory } from '../../../../shared/meeting/context/meetingMemory'
-import { isTimingContext } from '../../../../shared/meeting/context/timeBudget'
 import type { AnalysisPromptContext } from '../../../../shared/meeting/types/promptContext'
 import type { TranscriptSegment } from '../../../../shared/meeting/types/transcript'
 import {
@@ -134,7 +133,7 @@ const validateRequest = (request: TranscriptRequest) => {
     !isStringOrUndefined(request.questionContext) ||
     !isStringOrUndefined(request.roleContext) ||
     !isStringOrUndefined(request.referenceContext) ||
-    (request.timing !== undefined && !isTimingContext(request.timing)) ||
+    (request.selfSpeakers !== undefined && (!Array.isArray(request.selfSpeakers) || !request.selfSpeakers.every((speaker) => typeof speaker === 'string'))) ||
     (request.openingRound !== undefined && typeof request.openingRound !== 'boolean') ||
     !isStringOrUndefined(request.phaseContext) ||
     !isStringOrUndefined(request.scenarioId) ||
@@ -164,7 +163,7 @@ const toPromptContext = (
   questionContext: request.questionContext?.trim() || undefined,
   roleContext: request.roleContext?.trim() || undefined,
   referenceContext: request.referenceContext?.trim() || undefined,
-  timing: request.timing,
+  selfSpeakers: request.selfSpeakers?.length ? request.selfSpeakers : undefined,
   openingRound: request.openingRound || undefined,
   phaseContext: request.phaseContext?.trim() || undefined,
   summaryAssemblyContext: request.summaryAssemblyContext,
