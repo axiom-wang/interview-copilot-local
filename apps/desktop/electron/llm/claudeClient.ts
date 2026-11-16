@@ -249,7 +249,7 @@ export class ClaudeClient {
     return { session, shared: true }
   }
 
-  private async run(prompt: string, schema: ObjectValue, effort: ClaudeReasoningEffort) {
+  private async run(prompt: string, schema: ObjectValue, effort: ClaudeReasoningEffort, timeout = this.turnTimeout) {
     if (this.disposed) throw new Error('Claude 通道已关闭。')
     const executable = resolveClaudeExecutable(this.config.executablePath)
     for (let attempt = 0; ; attempt++) {
@@ -257,7 +257,7 @@ export class ClaudeClient {
       if (!shared) this.transientSessions.add(session)
       const reused = session.turns > 0 || session.prewarmed
       try {
-        return await session.run(prompt, this.turnTimeout)
+        return await session.run(prompt, timeout)
       } catch (error) {
         if (this.disposed) throw new Error('Claude 分析通道已切换或应用已退出。')
         if (error instanceof SessionDied && reused && attempt === 0) continue
@@ -293,8 +293,8 @@ export class ClaudeClient {
     for (const session of this.sessions.values()) session.setKeepAlive(false)
   }
 
-  async structured(prompt: string, schema: ObjectValue, effort: ClaudeReasoningEffort = 'medium'): Promise<unknown> {
-    return (await this.run(prompt, schema, effort)).output
+  async structured(prompt: string, schema: ObjectValue, effort: ClaudeReasoningEffort = 'medium', timeout?: number): Promise<unknown> {
+    return (await this.run(prompt, schema, effort, timeout)).output
   }
 
   // 会议重置时只中止进行中的请求，空闲的常驻会话已清空上下文，继续保留。

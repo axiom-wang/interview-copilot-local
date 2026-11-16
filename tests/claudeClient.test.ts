@@ -79,6 +79,17 @@ test('times out hung turns and cleans up; dispose cancels in-flight work and blo
   await assert.rejects(client.structured('again', schema), /已关闭/)
 })
 
+test('a per-call timeout overrides the client default in both directions', async (t) => {
+  const config = install(t)
+  const short = new ClaudeClient(config, { turnTimeout: 100 })
+  assert.equal(((await short.structured('SLOW', schema, 'medium', 5_000)) as Echo).echo, 'SLOW')
+  short.dispose()
+
+  const long = new ClaudeClient(config)
+  await assert.rejects(long.structured('HANG', schema, 'medium', 300), /超时/)
+  long.dispose()
+})
+
 test('keeps one process per schema and effort, and clears the conversation between tasks', async (t) => {
   const client = new ClaudeClient(install(t))
   t.after(() => client.dispose())

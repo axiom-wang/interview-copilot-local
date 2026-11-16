@@ -14,7 +14,7 @@ import {
 } from '../../../../shared/analysis/llm/openaiAnalysisService'
 
 export interface LocalAnalysisClient {
-  structured(prompt: string, schema: Record<string, unknown>, effort?: 'low' | 'medium'): Promise<unknown>
+  structured(prompt: string, schema: Record<string, unknown>, effort?: 'low' | 'medium', timeout?: number): Promise<unknown>
 }
 
 export interface LocalAnalysisOptions {
@@ -24,14 +24,16 @@ export interface LocalAnalysisOptions {
   realtimePromptSuffix?: string
   // Use the low-effort path for answers in `qa` scenarios, where latency matters most.
   fastQaAnswers?: boolean
+  // Per-turn timeout in ms by task name ('realtime' or a response schema name); unset falls back to the client default.
+  taskTimeout?: (task: string) => number | undefined
 }
 
 // Analysis surface shared by the local CLI channels (Codex, Claude).
 export const createLocalAnalysis = (client: LocalAnalysisClient, options: LocalAnalysisOptions = {}) => {
-  const createResponse: StructuredResponse = async (prompt, _name, schema, parser) =>
-    parser(await client.structured(prompt, schema))
+  const createResponse: StructuredResponse = async (prompt, name, schema, parser) =>
+    parser(await client.structured(prompt, schema, undefined, options.taskTimeout?.(name)))
   const createLiveResponse: StructuredResponse = async (prompt, name, schema, parser) =>
-    parser(await client.structured(prompt, schema, name === 'meeting_memory' ? 'medium' : 'low'))
+    parser(await client.structured(prompt, schema, name === 'meeting_memory' ? 'medium' : 'low', options.taskTimeout?.(name)))
 
   return {
     realtime: async (segments: TranscriptSegment[], context?: AnalysisPromptContext) => {
@@ -43,7 +45,7 @@ export const createLocalAnalysis = (client: LocalAnalysisClient, options: LocalA
         type: 'object',
         properties: { phaseAnalysis: options.phaseSchema ?? detectPhaseSchema, consensusAnalysis: extractConsensusSchema },
         required: ['phaseAnalysis', 'consensusAnalysis'], additionalProperties: false,
-      }, 'low') as Record<string, unknown>
+      }, 'low', options.taskTimeout?.('realtime')) as Record<string, unknown>
       return {
         phaseAnalysis: parsePhaseAnalysis(result.phaseAnalysis, updatedAt),
         consensusAnalysis: {

@@ -60,8 +60,14 @@ const briefOutputRule = `
 
 输出尽量精简（越短越好）：reason、understanding、contribution、detail 各不超过 40 字；nextAction 不超过 30 字；consensus、tensions、missing 每类最多 3 条且每条不超过 25 字；scenarioFocus 最多 2 条；不要在不同字段重复同一句话。`
 
+// 长转写上的导图、总结、纪要输出很长，90 秒的默认上限不够；实时类任务保持默认以便尽快失败重试。
+const longTaskTimeout = 180_000
+const longTasks = new Set(['generate_mind_map', 'generate_meeting_summary', 'generate_meeting_minutes'])
+const taskTimeout = (task: string) => longTasks.has(task) ? longTaskTimeout : undefined
+
 export const claudeAnalysis = (config: ClaudeConfig) => createLocalAnalysis(getClient(config), {
   phaseSchema: leanPhaseSchema,
   realtimePromptSuffix: briefOutputRule,
   fastQaAnswers: true,
+  taskTimeout,
 })
